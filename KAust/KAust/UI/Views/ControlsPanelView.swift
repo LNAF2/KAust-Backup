@@ -13,6 +13,7 @@ struct ControlsPanelView: View {
     private let borderWidth = AppConstants.Layout.panelBorderWidth
     private let gap = AppConstants.Layout.defaultSpacing
     private let filterButtonWidth = AppConstants.Layout.filterButtonWidth
+    private let panelGap: CGFloat = 8 // Match SongListView's panelGap
 
     @State private var searchText: String = ""
 
@@ -32,7 +33,7 @@ struct ControlsPanelView: View {
             }
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(AppTheme.leftPanelListBackground) // <-- Light purple background
+                    .fill(AppTheme.leftPanelListBackground)
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius)
                             .stroke(AppTheme.leftPanelAccent, lineWidth: borderWidth)
@@ -47,18 +48,18 @@ struct ControlsPanelView: View {
                     .foregroundColor(AppTheme.leftPanelAccent)
                     .accentColor(AppTheme.leftPanelAccent)
             }
-            .padding(.horizontal, 8)
+            .padding(.leading, 2)
             .frame(height: panelHeight * 0.8)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(AppTheme.leftPanelListBackground) // <-- Light purple background
+                    .fill(AppTheme.leftPanelListBackground)
                     .overlay(
                         RoundedRectangle(cornerRadius: cornerRadius)
                             .stroke(AppTheme.leftPanelAccent, lineWidth: borderWidth)
                     )
             )
         }
-        .padding(.horizontal, gap)
+        .padding(.horizontal, panelGap) // Use panelGap to match SongListView's inner padding
         .frame(height: panelHeight)
         .background(AppTheme.leftPanelBackground)
         .cornerRadius(cornerRadius)
@@ -66,5 +67,14 @@ struct ControlsPanelView: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(AppTheme.leftPanelAccent, lineWidth: borderWidth)
         )
+    }
+}
+
+struct ControlsPanelView_Previews: PreviewProvider {
+    static var previews: some View {
+        ControlsPanelView()
+            .padding()
+            .previewLayout(.sizeThatFits)
+            .background(Color(UIColor.systemGray6))
     }
 }

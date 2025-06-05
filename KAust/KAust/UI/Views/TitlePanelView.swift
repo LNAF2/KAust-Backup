@@ -11,7 +11,7 @@ struct TitlePanelView: View {
     private let panelHeight = AppConstants.Layout.titlePanelHeight
     private let cornerRadius = AppConstants.Layout.panelCornerRadius
     private let borderWidth = AppConstants.Layout.panelBorderWidth
-    private let leftPadding = AppConstants.Layout.defaultSpacing
+    private let panelGap: CGFloat = 8 // Match ControlsPanelView's panelGap
     private let starSize: CGFloat = 12.0
     private let logoFontName: String = "Helvetica" // Replace with your font if needed
 
@@ -45,7 +45,7 @@ struct TitlePanelView: View {
 
             Spacer()
         }
-        .padding(.leading, leftPadding)
+        .padding(.horizontal, panelGap) // Use panelGap to match ControlsPanelView
         .frame(height: panelHeight)
         .background(AppTheme.leftPanelBackground)
         .cornerRadius(cornerRadius)
@@ -64,4 +64,3 @@ struct TitlePanelView_Previews: PreviewProvider {
             .background(Color(UIColor.systemGray6))
     }
 }
-
