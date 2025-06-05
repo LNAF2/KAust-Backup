@@ -1,0 +1,99 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Protocol-Based Service Access Rule
+
+This rule enforces the use of protocol-based service access in Swift code.
+
+<rule>
+name: protocol-based-service-access
+description: Enforce protocol-based service access for better testability and modularity
+message: Services should be accessed through protocol interfaces
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $SERVICE {
+        func $METHOD($PARAMS) -> $RETURN {
+          $BODY
+        }
+      }
+    message: "Service should conform to a protocol. Define a protocol for this service's interface."
+    
+  - pattern: |
+      struct $TYPE {
+        let service = $SERVICE()
+      }
+    message: "Direct service instantiation detected. Use protocol type and dependency injection instead."
+    
+  - pattern: |
+      class $TYPE {
+        var service: $SERVICE
+      }
+    message: "Service property should use protocol type instead of concrete implementation."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define protocol for the service
+      protocol UserServiceProtocol {
+          func fetchUser(id: String) async throws -> User
+          func updateUser(_ user: User) async throws
+      }
+      
+      // Implement service conforming to protocol
+      struct UserService: UserServiceProtocol {
+          private let networkClient: NetworkClientProtocol
+          
+          init(networkClient: NetworkClientProtocol) {
+              self.networkClient = networkClient
+          }
+          
+          func fetchUser(id: String) async throws -> User {
+              // Implementation
+          }
+          
+          func updateUser(_ user: User) async throws {
+              // Implementation
+          }
+      }
+      
+      // Use service through protocol
+      struct UserViewModel {
+          private let userService: UserServiceProtocol
+          
+          init(userService: UserServiceProtocol) {
+              self.userService = userService
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Service without protocol
+      class UserService {
+          func fetchUser(id: String) async throws -> User {
+              // Implementation
+          }
+      }
+      
+      // Direct service instantiation
+      struct UserViewModel {
+          let userService = UserService()  // Bad: Direct instantiation
+          
+          func fetchUser(id: String) {
+              // Using concrete type directly
+          }
+      }
+</rule>
+
+## Guidelines
+1. Always define a protocol for services
+2. Use protocol types in properties and parameters
+3. Inject dependencies through initializers
+4. Keep protocols focused and single-purpose
+5. Use protocol composition when needed
+6. Consider using protocol extensions for default implementations
+7. Mark protocols as `async` when containing asynchronous methods

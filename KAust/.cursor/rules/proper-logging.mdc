@@ -1,0 +1,171 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Proper Logging Rule
+
+This rule enforces consistent and informative error logging practices.
+
+<rule>
+name: proper-logging
+description: Enforce proper error logging practices
+message: Implement proper error logging with appropriate detail and context
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      print($ERROR)
+    message: "Use proper logging system instead of print statements."
+
+  - pattern: |
+      catch {
+          // No logging
+      }
+    message: "Log errors in catch blocks for debugging purposes."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define logging system
+      enum LogLevel {
+          case debug
+          case info
+          case warning
+          case error
+          case critical
+      }
+      
+      class Logger {
+          static let shared = Logger()
+          private let dateFormatter: DateFormatter
+          
+          private init() {
+              dateFormatter = DateFormatter()
+              dateFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS"
+          }
+          
+          func log(
+              level: LogLevel,
+              message: String,
+              error: Error? = nil,
+              file: String = #file,
+              function: String = #function,
+              line: Int = #line
+          ) {
+              let timestamp = dateFormatter.string(from: Date())
+              let filename = (file as NSString).lastPathComponent
+              
+              var logMessage = "[\(timestamp)] [\(level)] [\(filename):\(line)] \(function): \(message)"
+              
+              if let error = error {
+                  logMessage += "\nError: \(error.localizedDescription)"
+                  if let nsError = error as NSError {
+                      logMessage += "\nDomain: \(nsError.domain), Code: \(nsError.code)"
+                      if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? Error {
+                          logMessage += "\nUnderlying error: \(underlying)"
+                      }
+                  }
+              }
+              
+              // In production, send to logging service
+              #if DEBUG
+              print(logMessage)
+              #else
+              LoggingService.shared.send(logMessage, level: level)
+              #endif
+          }
+      }
+      
+      // Service with proper logging
+      class NetworkService {
+          func fetchData() async throws -> Data {
+              do {
+                  guard let url = URL(string: "https://api.example.com") else {
+                      Logger.shared.log(
+                          level: .error,
+                          message: "Invalid URL configuration"
+                      )
+                      throw NetworkError.invalidURL
+                  }
+                  
+                  Logger.shared.log(
+                      level: .info,
+                      message: "Fetching data from \(url.absoluteString)"
+                  )
+                  
+                  let (data, response) = try await URLSession.shared.data(from: url)
+                  
+                  guard let httpResponse = response as? HTTPURLResponse else {
+                      Logger.shared.log(
+                          level: .error,
+                          message: "Invalid response type"
+                      )
+                      throw NetworkError.invalidResponse
+                  }
+                  
+                  guard 200...299 ~= httpResponse.statusCode else {
+                      Logger.shared.log(
+                          level: .error,
+                          message: "HTTP error",
+                          error: NetworkError.httpError(statusCode: httpResponse.statusCode)
+                      )
+                      throw NetworkError.httpError(statusCode: httpResponse.statusCode)
+                  }
+                  
+                  Logger.shared.log(
+                      level: .info,
+                      message: "Successfully fetched \(data.count) bytes"
+                  )
+                  
+                  return data
+              } catch {
+                  Logger.shared.log(
+                      level: .error,
+                      message: "Failed to fetch data",
+                      error: error
+                  )
+                  throw error
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Poor logging practices
+      class BadNetworkService {
+          func fetchData() async throws -> Data {
+              do {
+                  let url = URL(string: "https://api.example.com")!
+                  let (data, _) = try await URLSession.shared.data(from: url)
+                  return data
+              } catch {
+                  print("Error: \(error)")  // Bad: Using print for errors
+                  throw error
+              }
+          }
+      }
+      
+      class InconsistentLogger {
+          func logError(_ message: String) {
+              print("ERROR: \(message)")  // Bad: Inconsistent format
+          }
+          
+          func logWarning(_ message: String) {
+              NSLog("%@", message)  // Bad: Mixed logging methods
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use structured logging system
+2. Include timestamp and context
+3. Define appropriate log levels
+4. Include relevant error details
+5. Add stack traces when needed
+6. Use consistent format
+7. Configure logging per environment
+8. Include request/response data
+9. Protect sensitive information
+10. Implement log rotation

@@ -1,0 +1,119 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Dependency Inversion Principle Rule
+
+This rule enforces that high-level modules should not depend on low-level modules; both should depend on abstractions.
+
+<rule>
+name: dependency-inversion
+description: Enforce Dependency Inversion Principle (DIP)
+message: High-level modules should depend on abstractions, not concrete implementations
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $CLASS {
+          let database = SQLiteDatabase()
+          let network = URLSession.shared
+          let analytics = FirebaseAnalytics()
+      }
+    message: "Direct instantiation of concrete types detected. Use protocol abstractions and dependency injection instead."
+
+  - pattern: |
+      class $CLASS {
+          func method() {
+              let service = ConcreteService()
+              service.doSomething()
+          }
+      }
+    message: "Service instantiation inside method. Inject dependencies through initializer instead."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define abstractions
+      protocol DatabaseProtocol {
+          func save(_ data: Data) async throws
+          func fetch(id: String) async throws -> Data
+      }
+      
+      protocol NetworkClientProtocol {
+          func request(_ endpoint: Endpoint) async throws -> Data
+      }
+      
+      protocol AnalyticsProtocol {
+          func track(_ event: AnalyticsEvent)
+      }
+      
+      // High-level module depends on abstractions
+      class UserService {
+          private let database: DatabaseProtocol
+          private let network: NetworkClientProtocol
+          private let analytics: AnalyticsProtocol
+          
+          init(
+              database: DatabaseProtocol,
+              network: NetworkClientProtocol,
+              analytics: AnalyticsProtocol
+          ) {
+              self.database = database
+              self.network = network
+              self.analytics = analytics
+          }
+          
+          func fetchUser(id: String) async throws -> User {
+              let data = try await network.request(.user(id))
+              try await database.save(data)
+              analytics.track(.userFetched(id))
+              return try User(data: data)
+          }
+      }
+      
+      // Low-level modules implement abstractions
+      class SQLiteDatabase: DatabaseProtocol {
+          func save(_ data: Data) async throws { }
+          func fetch(id: String) async throws -> Data { }
+      }
+      
+      class URLSessionNetworkClient: NetworkClientProtocol {
+          func request(_ endpoint: Endpoint) async throws -> Data { }
+      }
+      
+      class FirebaseAnalyticsService: AnalyticsProtocol {
+          func track(_ event: AnalyticsEvent) { }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: High-level module depends on concrete implementations
+      class UserManager {
+          // Direct coupling to concrete implementations
+          private let database = SQLiteDatabase()
+          private let network = URLSession.shared
+          private let analytics = FirebaseAnalytics.shared
+          
+          func fetchUser(id: String) async throws -> User {
+              // Tightly coupled to specific implementations
+              let data = try await network.data(from: URL(string: "api/users/\(id)")!)
+              try database.execute("INSERT INTO users ...")
+              analytics.logEvent("user_fetched", parameters: ["id": id])
+              return try User(data: data)
+          }
+      }
+</rule>
+
+## Guidelines
+1. Define abstractions (protocols) for dependencies
+2. Inject dependencies through initializers
+3. High-level modules should define abstractions
+4. Low-level modules should implement abstractions
+5. Avoid direct instantiation of concrete types
+6. Use protocol-based APIs
+7. Keep abstractions focused and stable
+8. Consider using factories for complex object creation
+9. Use dependency containers at composition root
+10. Document dependencies and their purposes

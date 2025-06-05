@@ -1,0 +1,172 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# Secure Storage Rule
+
+This rule enforces secure file storage practices.
+
+<rule>
+name: secure-storage
+description: Enforce secure file storage practices
+message: File storage operations must follow security best practices
+severity: warning
+languages: [swift]
+files:
+  - "*Storage*.swift"
+  - "*File*.swift"
+  - "*Document*.swift"
+  - "*Security*.swift"
+  - "*Keychain*.swift"
+  - "*Crypto*.swift"
+
+patterns:
+  - pattern: |
+      FileManager.default.createFile(
+          atPath: $PATH,
+          contents: $DATA
+      )
+    message: "Use SecureFileManager for file operations with proper encryption."
+
+  - pattern: |
+      UserDefaults.standard.set($DATA, forKey: $KEY)
+    message: "Use SecureStorage for sensitive data storage."
+
+examples:
+  - name: Good Example
+    code: |
+      // Secure storage protocol
+      protocol SecureStorageProtocol {
+          func save(_ data: Data, key: String) throws
+          func load(key: String) throws -> Data
+          func delete(key: String) throws
+      }
+      
+      // Secure file manager implementation
+      class SecureFileManager: SecureStorageProtocol {
+          private let fileManager: FileManager
+          private let keychain: KeychainProtocol
+          private let crypto: CryptoProtocol
+          
+          init(
+              fileManager: FileManager = .default,
+              keychain: KeychainProtocol,
+              crypto: CryptoProtocol
+          ) {
+              self.fileManager = fileManager
+              self.keychain = keychain
+              self.crypto = crypto
+          }
+          
+          func save(_ data: Data, key: String) throws {
+              // Generate unique encryption key
+              let encryptionKey = try crypto.generateKey()
+              
+              // Encrypt data
+              let encryptedData = try crypto.encrypt(data, using: encryptionKey)
+              
+              // Save encryption key to keychain
+              try keychain.save(encryptionKey, for: key + ".key")
+              
+              // Save encrypted data to file
+              let url = try secureStorageURL(for: key)
+              try encryptedData.write(to: url, options: .completeFileProtection)
+              
+              // Set secure file attributes
+              var attributes = [FileAttributeKey: Any]()
+              attributes[.posixPermissions] = 0o600
+              try fileManager.setAttributes(attributes, ofItemAtPath: url.path)
+          }
+          
+          func load(key: String) throws -> Data {
+              // Load encryption key from keychain
+              let encryptionKey = try keychain.load(key + ".key")
+              
+              // Load encrypted data
+              let url = try secureStorageURL(for: key)
+              let encryptedData = try Data(contentsOf: url)
+              
+              // Decrypt data
+              return try crypto.decrypt(encryptedData, using: encryptionKey)
+          }
+          
+          func delete(key: String) throws {
+              // Delete encryption key from keychain
+              try keychain.delete(key + ".key")
+              
+              // Delete encrypted file
+              let url = try secureStorageURL(for: key)
+              try fileManager.removeItem(at: url)
+          }
+          
+          private func secureStorageURL(for key: String) throws -> URL {
+              let directory = try fileManager
+                  .url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
+                  .appendingPathComponent("SecureStorage", isDirectory: true)
+              
+              try fileManager.createDirectory(
+                  at: directory,
+                  withIntermediateDirectories: true,
+                  attributes: [.posixPermissions: 0o700]
+              )
+              
+              return directory.appendingPathComponent(key.sha256)
+          }
+      }
+      
+      // Usage example
+      class DocumentManager {
+          private let secureStorage: SecureStorageProtocol
+          
+          init(secureStorage: SecureStorageProtocol) {
+              self.secureStorage = secureStorage
+          }
+          
+          func saveDocument(_ document: Document) throws {
+              let data = try JSONEncoder().encode(document)
+              try secureStorage.save(data, key: document.id)
+          }
+          
+          func loadDocument(id: String) throws -> Document {
+              let data = try secureStorage.load(key: id)
+              return try JSONDecoder().decode(Document.self, from: data)
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Insecure file operations
+      class UnsafeFileManager {
+          func saveDocument(_ document: Document) {
+              // Bad: No encryption
+              let data = try? JSONEncoder().encode(document)
+              
+              // Bad: Direct file writing without protection
+              FileManager.default.createFile(
+                  atPath: "/path/to/file",
+                  contents: data
+              )
+          }
+          
+          func saveCredentials(_ credentials: Credentials) {
+              // Bad: Sensitive data in UserDefaults
+              UserDefaults.standard.set(
+                  credentials.password,
+                  forKey: "password"
+              )
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use encryption for sensitive data
+2. Implement secure key management
+3. Use proper file permissions
+4. Secure temporary files
+5. Implement secure deletion
+6. Handle encryption errors
+7. Validate data integrity
+8. Use secure storage locations
+9. Implement access control
+10. Document security measures

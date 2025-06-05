@@ -1,0 +1,123 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# Bright Red for Playlist Rule
+
+This rule enforces consistent bright red color usage for playlist elements in the UI.
+
+<rule>
+name: bright-red-for-playlist
+description: Enforce consistent bright red color usage for playlists
+message: Playlist elements must use the defined bright red color scheme
+severity: warning
+languages: [swift]
+files:
+  - "**/*Playlist*.swift"
+  - "**/*PlayList*.swift"
+  - "**/Playlist/**/*.swift"
+  - "**/Views/Playlist/**/*.swift"
+  - "**/Features/Playlist/**/*.swift"
+  - "**/Components/Playlist/**/*.swift"
+  - "**/*PlaylistView.swift"
+  - "**/*PlaylistCell.swift"
+  - "**/*PlaylistRow.swift"
+  - "**/*PlaylistList.swift"
+  - "**/*PlaylistGrid.swift"
+  - "**/*PlaylistDetail.swift"
+
+patterns:
+  - pattern: |
+      struct $VIEW: View {
+          var body: some View {
+              List {
+                  ForEach($PLAYLISTS) { $PLAYLIST in
+                      // Content without bright red theme
+                  }
+              }
+          }
+      }
+    message: "Playlist view should use the defined bright red color scheme."
+
+  - pattern: |
+      Color($COLOR_NAME)
+    message: "Use the predefined .playlistBrightRed color for playlist elements."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define the standard bright red colors
+      extension Color {
+          static let playlistBrightRed = Color(red: 255/255, green: 0/255, blue: 0/255)
+          static let playlistBrightRedLight = Color(red: 255/255, green: 102/255, blue: 102/255)
+      }
+      
+      // Playlist with proper bright red theme
+      struct PlaylistView: View {
+          let playlists: [Playlist]
+          
+          var body: some View {
+              List(playlists) { playlist in
+                  PlaylistRowView(playlist: playlist)
+                      .listRowBackground(Color.playlistBrightRed.opacity(0.1))
+              }
+              .background(Color.playlistBrightRed.opacity(0.05))
+              .tint(Color.playlistBrightRed)
+          }
+      }
+      
+      struct PlaylistRowView: View {
+          let playlist: Playlist
+          
+          var body: some View {
+              HStack {
+                  Image(systemName: "music.note.list")
+                      .foregroundColor(Color.playlistBrightRed)
+                  
+                  VStack(alignment: .leading) {
+                      Text(playlist.name)
+                          .foregroundColor(Color.playlistBrightRed)
+                      Text("\(playlist.songCount) songs")
+                          .foregroundColor(Color.playlistBrightRedLight)
+                  }
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Inconsistent or missing bright red theme
+      struct PlaylistView: View {
+          let playlists: [Playlist]
+          
+          var body: some View {
+              List(playlists) { playlist in
+                  HStack {
+                      Image(systemName: "music.note.list")
+                          .foregroundColor(.purple)  // Wrong color
+                      
+                      VStack(alignment: .leading) {
+                          Text(playlist.name)
+                              .foregroundColor(.primary)  // Missing theme color
+                          Text("\(playlist.songCount) songs")
+                              .foregroundColor(.secondary)  // Missing theme color
+                      }
+                  }
+                  .listRowBackground(Color.gray.opacity(0.1))  // Wrong color
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use predefined bright red color constants
+2. Apply bright red theme to list backgrounds
+3. Use bright red tint for interactive elements
+4. Apply bright red theme to text elements
+5. Maintain consistent opacity levels
+6. Use lighter bright red for secondary elements
+7. Ensure sufficient contrast with text
+8. Apply bright red accents to icons
+9. Use bright red for selection states
+10. Maintain color harmony with other UI elements

@@ -1,0 +1,161 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# Admin-User Separation Rule
+
+This rule enforces proper separation between admin and user roles.
+
+<rule>
+name: admin-user-separation
+description: Enforce clear separation between admin and user functionality
+message: Admin and user functionality must be properly separated and secured
+severity: warning
+languages: [swift]
+files:
+  - "*Admin*.swift"
+  - "*User*.swift"
+  - "*Role*.swift"
+  - "*Permission*.swift"
+  - "*Auth*.swift"
+  - "*Access*.swift"
+  - "*Security*.swift"
+
+patterns:
+  - pattern: |
+      struct $VIEW: View {
+          func perform$AdminAction() {
+              // Admin action without role check
+          }
+      }
+    message: "Admin actions must be protected by role checks."
+
+  - pattern: |
+      class $SERVICE {
+          func $ADMIN_METHOD() async throws {
+              // Admin method without role verification
+          }
+      }
+    message: "Admin methods must verify role before execution."
+
+examples:
+  - name: Good Example
+    code: |
+      // Role enumeration with clear separation
+      enum UserRole: String {
+          case user
+          case admin
+          
+          var canAccessAdminFeatures: Bool {
+              self == .admin
+          }
+          
+          var canModifyContent: Bool {
+              self == .admin
+          }
+      }
+      
+      // Secure role-based service
+      protocol AdminServiceProtocol {
+          func deleteUser(id: String) async throws
+          func updateUserRole(id: String, newRole: UserRole) async throws
+          func viewAnalytics() async throws -> AnalyticsData
+      }
+      
+      class AdminService: AdminServiceProtocol {
+          private let authManager: AuthManagerProtocol
+          private let database: DatabaseProtocol
+          
+          init(authManager: AuthManagerProtocol, database: DatabaseProtocol) {
+              self.authManager = authManager
+              self.database = database
+          }
+          
+          private func verifyAdminAccess() throws {
+              guard let currentUser = authManager.currentUser,
+                    currentUser.role == .admin else {
+                  throw SecurityError.unauthorized
+              }
+          }
+          
+          func deleteUser(id: String) async throws {
+              try verifyAdminAccess()
+              try await database.deleteUser(id: id)
+          }
+          
+          func updateUserRole(id: String, newRole: UserRole) async throws {
+              try verifyAdminAccess()
+              try await database.updateUserRole(id: id, role: newRole)
+          }
+          
+          func viewAnalytics() async throws -> AnalyticsData {
+              try verifyAdminAccess()
+              return try await database.fetchAnalytics()
+          }
+      }
+      
+      // View with proper role separation
+      struct AdminDashboardView: View {
+          @StateObject private var viewModel: AdminDashboardViewModel
+          @EnvironmentObject private var authManager: AuthManager
+          
+          var body: some View {
+              Group {
+                  if authManager.currentUser?.role == .admin {
+                      AdminContentView(viewModel: viewModel)
+                  } else {
+                      UnauthorizedView()
+                  }
+              }
+              .onAppear {
+                  guard authManager.currentUser?.role == .admin else {
+                      authManager.redirectToLogin()
+                      return
+                  }
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: No role separation
+      class UnsafeService {
+          func deleteUser(id: String) async throws {
+              // Bad: Direct database access without role check
+              try await database.deleteUser(id: id)
+          }
+          
+          func updateUserRole(id: String, role: String) async throws {
+              // Bad: Role modification without verification
+              try await database.updateRole(id: id, role: role)
+          }
+      }
+      
+      // Bad: Mixed admin/user functionality
+      struct UnsafeView: View {
+          func deleteUser(_ user: User) {
+              // Bad: Admin action without role check
+              database.deleteUser(user.id)
+          }
+          
+          var body: some View {
+              Button("Delete User") {
+                  // Bad: Exposed admin action to all users
+                  deleteUser(currentUser)
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Define clear role enumerations
+2. Verify roles before admin actions
+3. Separate admin and user interfaces
+4. Use role-based routing
+5. Implement role verification middleware
+6. Log all admin actions
+7. Handle unauthorized access gracefully
+8. Use secure role storage
+9. Implement role-based feature flags
+10. Document role requirements

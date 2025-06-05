@@ -1,0 +1,156 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# User-Friendly Messages Rule
+
+This rule enforces the use of clear, user-friendly error messages.
+
+<rule>
+name: user-friendly-messages
+description: Enforce user-friendly error messages
+message: Error messages must be clear and actionable for users
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      throw $ERROR($MESSAGE)
+    message: "Error messages should be user-friendly and provide clear actions."
+
+  - pattern: |
+      Text($ERROR.localizedDescription)
+    message: "Consider using custom user-friendly error messages instead of default descriptions."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define user-friendly error messages
+      enum NetworkError: LocalizedError {
+          case noInternet
+          case serverUnavailable
+          case invalidData
+          
+          var errorDescription: String? {
+              switch self {
+              case .noInternet:
+                  return "Unable to connect to the internet. Please check your connection and try again."
+              case .serverUnavailable:
+                  return "Our servers are temporarily unavailable. We're working on it and will be back soon."
+              case .invalidData:
+                  return "There was a problem loading your data. Please try again."
+              }
+          }
+          
+          var recoverySuggestion: String? {
+              switch self {
+              case .noInternet:
+                  return "Check your Wi-Fi or cellular connection."
+              case .serverUnavailable:
+                  return "Try again in a few minutes."
+              case .invalidData:
+                  return "If the problem persists, contact support."
+              }
+          }
+      }
+      
+      // Error view with user-friendly presentation
+      struct ErrorView: View {
+          let error: NetworkError
+          let retryAction: () -> Void
+          
+          var body: some View {
+              VStack(spacing: 16) {
+                  Image(systemName: "exclamationmark.triangle")
+                      .font(.largeTitle)
+                      .foregroundColor(.orange)
+                  
+                  Text(error.localizedDescription)
+                      .font(.headline)
+                      .multilineTextAlignment(.center)
+                  
+                  if let recovery = error.recoverySuggestion {
+                      Text(recovery)
+                          .font(.subheadline)
+                          .foregroundColor(.secondary)
+                          .multilineTextAlignment(.center)
+                  }
+                  
+                  Button("Try Again") {
+                      retryAction()
+                  }
+                  .buttonStyle(.bordered)
+              }
+              .padding()
+          }
+      }
+      
+      // Service with user-friendly error handling
+      class MusicService {
+          func fetchSongs() async throws -> [Song] {
+              guard NetworkMonitor.shared.isConnected else {
+                  throw NetworkError.noInternet
+              }
+              
+              do {
+                  let songs = try await api.fetchSongs()
+                  return songs
+              } catch {
+                  // Convert technical errors to user-friendly ones
+                  switch error {
+                  case URLError.notConnectedToInternet:
+                      throw NetworkError.noInternet
+                  case URLError.timedOut, URLError.cannotConnectToHost:
+                      throw NetworkError.serverUnavailable
+                  default:
+                      throw NetworkError.invalidData
+                  }
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Technical or unclear error messages
+      enum BadError: Error {
+          case error404  // Bad: Technical term
+          case dbError   // Bad: Technical term
+          
+          var description: String {
+              switch self {
+              case .error404:
+                  return "404 Not Found"  // Bad: Technical message
+              case .dbError:
+                  return "Database error occurred"  // Bad: Vague and technical
+              }
+          }
+      }
+      
+      struct BadErrorView: View {
+          let error: Error
+          
+          var body: some View {
+              VStack {
+                  Text("Error")  // Bad: Too vague
+                  Text(error.localizedDescription)  // Bad: Raw error message
+                  
+                  Button("OK") {  // Bad: No clear action
+                      // No recovery action
+                  }
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use clear, non-technical language
+2. Explain what happened
+3. Provide recovery suggestions
+4. Offer clear actions
+5. Be concise but informative
+6. Maintain consistent tone
+7. Consider localization
+8. Include visual indicators
+9. Provide context-specific help
+10. Convert technical errors to user-friendly ones

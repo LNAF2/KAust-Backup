@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="23788" systemVersion="24F74" minimumToolsVersion="Automatic" sourceLanguage="Swift" userDefinedModelVersionIdentifier="">
+    <entity name="FilterGenreMappingEntity" representedClassName="FilterGenreMappingEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="displayOrder" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="filterCategoryName" attributeType="String"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <relationship name="mappedGenres" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="GenreEntity" inverseName="filterMappings" inverseEntity="GenreEntity"/>
+    </entity>
+    <entity name="GenreEntity" representedClassName="GenreEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String"/>
+        <relationship name="filterMappings" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="FilterGenreMappingEntity" inverseName="mappedGenres" inverseEntity="FilterGenreMappingEntity"/>
+        <relationship name="songs" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="SongEntity" inverseName="genres" inverseEntity="SongEntity"/>
+    </entity>
+    <entity name="PlayedSongEntity" representedClassName="PlayedSongEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="playedDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="songArtist" optional="YES" attributeType="String"/>
+        <attribute name="songTitle" attributeType="String"/>
+        <relationship name="song" maxCount="1" deletionRule="Nullify" destinationEntity="SongEntity" inverseName="playHistory" inverseEntity="SongEntity"/>
+        <relationship name="user" maxCount="1" deletionRule="Nullify" destinationEntity="UserEntity" inverseName="playedSongs" inverseEntity="UserEntity"/>
+    </entity>
+    <entity name="PlaylistEntity" representedClassName="PlaylistEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="dateCreated" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="lastModifiedDate" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="name" attributeType="String"/>
+        <relationship name="owner" maxCount="1" deletionRule="Nullify" destinationEntity="UserEntity" inverseName="playlists" inverseEntity="UserEntity"/>
+        <relationship name="songs" toMany="YES" deletionRule="Nullify" ordered="YES" destinationEntity="SongEntity" inverseName="playlists" inverseEntity="SongEntity"/>
+    </entity>
+    <entity name="SongEntity" representedClassName="SongEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="artist" optional="YES" attributeType="String"/>
+        <attribute name="dateAdded" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="duration" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="event" optional="YES" attributeType="String"/>
+        <attribute name="filePath" attributeType="String"/>
+        <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="isDownloaded" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
+        <attribute name="language" optional="YES" attributeType="String"/>
+        <attribute name="lastPlayedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lrcFilePath" optional="YES" attributeType="String"/>
+        <attribute name="playCount" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="title" attributeType="String"/>
+        <attribute name="year" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="genres" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="GenreEntity" inverseName="songs" inverseEntity="GenreEntity"/>
+        <relationship name="playHistory" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PlayedSongEntity" inverseName="song" inverseEntity="PlayedSongEntity"/>
+        <relationship name="playlists" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PlaylistEntity" inverseName="songs" inverseEntity="PlaylistEntity"/>
+    </entity>
+    <entity name="UserEntity" representedClassName="UserEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="appleUserID" attributeType="String"/>
+        <attribute name="role" attributeType="String"/>
+        <attribute name="userName" optional="YES" attributeType="String"/>
+        <relationship name="playedSongs" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PlayedSongEntity" inverseName="user" inverseEntity="PlayedSongEntity"/>
+        <relationship name="playlists" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PlaylistEntity" inverseName="owner" inverseEntity="PlaylistEntity"/>
+    </entity>
+</model>

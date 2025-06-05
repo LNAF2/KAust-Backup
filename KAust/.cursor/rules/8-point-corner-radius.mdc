@@ -1,0 +1,132 @@
+---
+description: 
+globs: **/*View.swift
+alwaysApply: false
+---
+# 8-Point Corner Radius Rule
+
+This rule enforces consistent 8-point corner radius usage throughout the UI.
+
+<rule>
+name: 8-point-corner-radius
+description: Enforce consistent 8-point corner radius usage
+message: UI elements must use 8-point corner radius for consistency
+severity: warning
+languages: [swift]
+files:
+  - "**/*View.swift"
+  - "**/*Cell.swift"
+  - "**/*Row.swift"
+  - "**/*Button.swift"
+  - "**/*Card.swift"
+  - "**/*Container.swift"
+  - "**/*Modal.swift"
+  - "**/*Sheet.swift"
+  - "**/Views/**/*.swift"
+  - "**/UI/**/*.swift"
+  - "**/Components/**/*.swift"
+  - "**/Features/**/*.swift"
+  - "**/Screens/**/*.swift"
+  - "**/Shared/UI/**/*.swift"
+  - "**/Common/Views/**/*.swift"
+  - "**/*Style*.swift"
+  - "**/*Theme*.swift"
+  - "**/*Design*.swift"
+
+patterns:
+  - pattern: |
+      .cornerRadius($NUMBER)
+    message: "Use the standard 8-point corner radius for consistency."
+
+  - pattern: |
+      RoundedRectangle(cornerRadius: $NUMBER)
+    message: "Use the standard 8-point corner radius for RoundedRectangle."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define standard corner radius
+      enum CornerRadius {
+          static let standard: CGFloat = 8
+          
+          // Variations for specific cases
+          static let small: CGFloat = 4  // Half of standard
+          static let large: CGFloat = 16 // Double of standard
+      }
+      
+      // View using standard corner radius
+      struct SongCardView: View {
+          let song: Song
+          
+          var body: some View {
+              VStack {
+                  Image(song.artwork)
+                      .resizable()
+                      .aspectRatio(contentMode: .fill)
+                      .cornerRadius(CornerRadius.standard)
+                  
+                  Text(song.title)
+                      .padding()
+              }
+              .background(
+                  RoundedRectangle(cornerRadius: CornerRadius.standard)
+                      .fill(Color.white)
+                      .shadow(radius: 4)
+              )
+          }
+      }
+      
+      struct PlaylistButton: View {
+          let action: () -> Void
+          
+          var body: some View {
+              Button(action: action) {
+                  Text("Add to Playlist")
+                      .padding()
+                      .background(
+                          RoundedRectangle(cornerRadius: CornerRadius.standard)
+                              .fill(Color.blue)
+                      )
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Inconsistent corner radius values
+      struct InconsistentCardView: View {
+          var body: some View {
+              VStack {
+                  Image("artwork")
+                      .cornerRadius(10)  // Wrong: Non-standard value
+                  
+                  Text("Title")
+                      .padding()
+                      .background(
+                          RoundedRectangle(cornerRadius: 5)  // Wrong: Non-standard value
+                              .fill(Color.white)
+                      )
+              }
+              .background(
+                  RoundedRectangle(cornerRadius: 12)  // Wrong: Non-standard value
+                      .fill(Color.gray.opacity(0.1))
+              )
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use CornerRadius.standard (8 points) as the default
+2. Use small (4 points) for compact UI elements
+3. Use large (16 points) for prominent elements
+4. Maintain consistent radius within component hierarchies
+5. Apply corner radius to:
+   - Cards and containers
+   - Buttons and interactive elements
+   - Images and media
+   - Modal sheets and popovers
+6. Consider using .continuous corner style
+7. Ensure corner radius works with dynamic type
+8. Test corner radius on different screen sizes
+9. Maintain radius when scaling elements
+10. Document any exceptions to the standard radius

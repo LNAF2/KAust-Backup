@@ -1,0 +1,54 @@
+---
+description: This app should only be tested on iPad devices, not iPhones
+globs: *.swift
+alwaysApply: true
+---
+# iPad-Only Testing Rule
+
+This rule enforces that the KaraokeAustralia app should only be tested on iPad devices, not on iPhones.
+
+<rule>
+name: ipad-only-testing
+description: Enforce iPad-only testing for the KaraokeAustralia app
+message: This app must only be tested on iPad devices, not on iPhones
+severity: error
+languages: [swift]
+
+patterns:
+  - pattern: |
+      platform:iOS Simulator, name:iPhone
+    message: "Testing on iPhone simulators is not allowed. Use iPad simulators only."
+
+  - pattern: |
+      -destination 'platform=iOS Simulator,name=iPhone
+    message: "iPhone simulator destinations are not allowed. Use iPad simulators only."
+
+examples:
+  - name: Good Example
+    code: |
+      // Testing with iPad simulator
+      xcodebuild -scheme KaraokeAustralia -destination 'platform=iOS Simulator,name=iPad Pro (11-inch) (4th generation),OS=18.4' test
+      
+      // Running on iPad simulator
+      xcodebuild -scheme KaraokeAustralia -destination 'platform=iOS Simulator,name=iPad Air (5th generation),OS=18.4' build
+
+  - name: Bad Example
+    code: |
+      // Bad: Testing with iPhone simulator
+      xcodebuild -scheme KaraokeAustralia -destination 'platform=iOS Simulator,name=iPhone 16,OS=18.4' test
+      
+      // Bad: Running on iPhone simulator
+      xcodebuild -scheme KaraokeAustralia -destination 'platform=iOS Simulator,name=iPhone 14,OS=18.4' build
+</rule>
+
+## Guidelines
+1. Always use iPad simulators for testing
+2. Never test on iPhone simulators
+3. Use iPad Pro, iPad Air, or iPad mini simulators
+4. Test on various iPad screen sizes
+5. Test in both portrait and landscape orientations
+6. Ensure UI elements scale properly for iPad screens
+7. Test with different iPad generations
+8. Document iPad-specific testing procedures
+9. Report any iPad-specific issues separately
+10. Maintain iPad-optimized UI layouts

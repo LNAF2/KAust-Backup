@@ -1,0 +1,129 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Preview Containers Rule
+
+This rule enforces the use of preview containers for SwiftUI previews to ensure testability.
+
+<rule>
+name: preview-containers
+description: Enforce preview containers for SwiftUI previews
+message: Views must include preview containers with mock data and different states
+severity: warning
+languages: [swift]
+files:
+  - "*View.swift"
+  - "*Screen.swift"
+  - "*Page.swift"
+  - "*Component.swift"
+
+patterns:
+  - pattern: |
+      #Preview {
+          $VIEW()
+      }
+    message: "Preview should use a container with mock data and different states."
+
+  - pattern: |
+      struct $VIEW_PREVIEWS: PreviewProvider {
+          static var previews: some View {
+              $VIEW()
+          }
+      }
+    message: "Preview provider should use a container with mock data and different states."
+
+examples:
+  - name: Good Example
+    code: |
+      struct SongListView: View {
+          @ObservedObject var viewModel: SongListViewModel
+          
+          var body: some View {
+              List(viewModel.songs) { song in
+                  SongRowView(song: song)
+              }
+          }
+      }
+      
+      // Preview container with different states
+      struct PreviewContainer: PreviewProvider {
+          static var previews: some View {
+              Group {
+                  // Loading state
+                  SongListView(viewModel: .preview(state: .loading))
+                      .previewDisplayName("Loading")
+                  
+                  // Empty state
+                  SongListView(viewModel: .preview(state: .empty))
+                      .previewDisplayName("Empty")
+                  
+                  // Error state
+                  SongListView(viewModel: .preview(state: .error))
+                      .previewDisplayName("Error")
+                  
+                  // Success state with mock data
+                  SongListView(viewModel: .preview(state: .loaded([
+                      Song(id: "1", title: "Song 1", artist: "Artist 1"),
+                      Song(id: "2", title: "Song 2", artist: "Artist 2")
+                  ])))
+                  .previewDisplayName("Loaded")
+              }
+          }
+      }
+      
+      // Preview helper extension
+      extension SongListViewModel {
+          enum PreviewState {
+              case loading
+              case empty
+              case error
+              case loaded([Song])
+          }
+          
+          static func preview(state: PreviewState) -> SongListViewModel {
+              let viewModel = SongListViewModel(
+                  musicService: MockMusicService()
+              )
+              
+              switch state {
+              case .loading:
+                  viewModel.isLoading = true
+              case .empty:
+                  viewModel.songs = []
+              case .error:
+                  viewModel.error = NSError(domain: "", code: -1)
+              case .loaded(let songs):
+                  viewModel.songs = songs
+              }
+              
+              return viewModel
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Preview without container or states
+      struct SongListView_Previews: PreviewProvider {
+          static var previews: some View {
+              SongListView(viewModel: SongListViewModel())  // Missing mock data
+          }
+      }
+      
+      #Preview {
+          SongListView(viewModel: SongListViewModel())  // Missing states and mock data
+      }
+</rule>
+
+## Guidelines
+1. Create preview containers for all views
+2. Include all relevant states (loading, empty, error, success)
+3. Use mock data in previews
+4. Add preview display names
+5. Group related previews
+6. Create preview helper extensions
+7. Test different device sizes
+8. Test dark/light modes
+9. Test accessibility features
+10. Document preview requirements

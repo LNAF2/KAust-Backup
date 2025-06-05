@@ -1,0 +1,143 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Liskov Substitution Principle Rule
+
+This rule enforces that objects of a superclass should be replaceable with objects of its subclasses without breaking the application.
+
+<rule>
+name: liskov-substitution
+description: Enforce Liskov Substitution Principle (LSP)
+message: Subtypes must be substitutable for their base types without altering program correctness
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $SUBCLASS: $SUPERCLASS {
+          override func $METHOD() throws {
+              fatalError("Not supported")
+          }
+      }
+    message: "Subclass violates LSP by refusing to implement superclass behavior. Consider redesigning the inheritance hierarchy."
+
+  - pattern: |
+      class $SUBCLASS: $SUPERCLASS {
+          override func $METHOD() {
+              // Different preconditions or postconditions
+              guard let specialType = input as? SpecialType else {
+                  fatalError()
+              }
+          }
+      }
+    message: "Subclass violates LSP by changing preconditions or postconditions. Use composition instead of inheritance."
+
+examples:
+  - name: Good Example
+    code: |
+      // Base protocol defining shape behavior
+      protocol Shape {
+          func area() -> Double
+          func perimeter() -> Double
+      }
+      
+      // Rectangle implements Shape contract
+      struct Rectangle: Shape {
+          let width: Double
+          let height: Double
+          
+          func area() -> Double {
+              return width * height
+          }
+          
+          func perimeter() -> Double {
+              return 2 * (width + height)
+          }
+      }
+      
+      // Square is a special case of Rectangle
+      struct Square: Shape {
+          let side: Double
+          
+          func area() -> Double {
+              return side * side
+          }
+          
+          func perimeter() -> Double {
+              return 4 * side
+          }
+      }
+      
+      // Function works with any Shape
+      func printShapeProperties(_ shape: Shape) {
+          print("Area: \(shape.area())")
+          print("Perimeter: \(shape.perimeter())")
+      }
+      
+      // Usage preserves correctness
+      let rectangle = Rectangle(width: 4, height: 5)
+      let square = Square(side: 4)
+      
+      printShapeProperties(rectangle) // Works correctly
+      printShapeProperties(square)    // Works correctly
+
+  - name: Bad Example
+    code: |
+      // Bad: Square inherits from Rectangle and breaks LSP
+      class Rectangle {
+          var width: Double
+          var height: Double
+          
+          init(width: Double, height: Double) {
+              self.width = width
+              self.height = height
+          }
+          
+          func setWidth(_ width: Double) {
+              self.width = width
+          }
+          
+          func setHeight(_ height: Double) {
+              self.height = height
+          }
+          
+          func area() -> Double {
+              return width * height
+          }
+      }
+      
+      class Square: Rectangle {
+          override func setWidth(_ width: Double) {
+              // Violates LSP by changing parent behavior
+              super.setWidth(width)
+              super.setHeight(width)  // Forces square constraint
+          }
+          
+          override func setHeight(_ height: Double) {
+              // Violates LSP by changing parent behavior
+              super.setWidth(height)
+              super.setHeight(height)  // Forces square constraint
+          }
+      }
+      
+      // This code breaks with Square
+      func adjustRectangle(_ rectangle: Rectangle) {
+          rectangle.setWidth(5)
+          rectangle.setHeight(4)
+          assert(rectangle.area() == 20)  // Fails for Square!
+      }
+</rule>
+
+## Guidelines
+1. Ensure subtypes can substitute base types
+2. Maintain invariants of base types
+3. Don't strengthen preconditions
+4. Don't weaken postconditions
+5. Preserve behavior contracts
+6. Use composition over inheritance
+7. Follow "Tell, Don't Ask" principle
+8. Keep inheritance hierarchies shallow
+9. Consider protocol-oriented alternatives
+10. Document substitutability requirements

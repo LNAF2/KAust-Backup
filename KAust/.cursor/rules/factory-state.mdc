@@ -1,0 +1,111 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Factory State Rule
+
+This rule enforces proper implementation of the Factory pattern in Swift.
+
+<rule>
+name: factory-state
+description: Enforce proper implementation of Factory pattern
+message: Factory pattern implementation must follow best practices
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $CLASS {
+          static func create() -> $TYPE {
+              return $TYPE()
+          }
+      }
+    message: "Factory methods should handle configuration and dependency injection."
+
+  - pattern: |
+      class $CLASS {
+          func create$TYPE() -> $TYPE {
+              return $TYPE()
+          }
+      }
+    message: "Instance factory methods should be static or part of a factory protocol."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define factory protocol
+      protocol ViewControllerFactory {
+          func makeHomeViewController(with coordinator: Coordinating) -> UIViewController
+          func makeProfileViewController(for user: User) -> UIViewController
+          func makeSettingsViewController() -> UIViewController
+      }
+      
+      // Implement factory
+      final class DefaultViewControllerFactory: ViewControllerFactory {
+          private let dependencies: DependencyContainer
+          
+          init(dependencies: DependencyContainer) {
+              self.dependencies = dependencies
+          }
+          
+          func makeHomeViewController(with coordinator: Coordinating) -> UIViewController {
+              let viewModel = HomeViewModel(
+                  userService: dependencies.userService,
+                  analyticsService: dependencies.analyticsService
+              )
+              
+              let controller = HomeViewController(
+                  viewModel: viewModel,
+                  coordinator: coordinator
+              )
+              
+              return controller
+          }
+          
+          func makeProfileViewController(for user: User) -> UIViewController {
+              let viewModel = ProfileViewModel(
+                  user: user,
+                  userService: dependencies.userService
+              )
+              
+              return ProfileViewController(viewModel: viewModel)
+          }
+          
+          func makeSettingsViewController() -> UIViewController {
+              let viewModel = SettingsViewModel(
+                  settingsService: dependencies.settingsService,
+                  userDefaults: dependencies.userDefaults
+              )
+              
+              return SettingsViewController(viewModel: viewModel)
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Direct instantiation without factory
+      class ViewControllerCreator {
+          func createHomeScreen() -> UIViewController {
+              let vc = HomeViewController()
+              vc.userService = UserService()  // Bad: Direct service creation
+              return vc
+          }
+          
+          func createProfileScreen() -> UIViewController {
+              return ProfileViewController()  // Bad: No dependency injection
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use protocols to define factory interfaces
+2. Inject dependencies through factory constructors
+3. Make factories final when not meant for inheritance
+4. Use clear, intention-revealing naming
+5. Keep factory methods focused and single-purpose
+6. Handle all required dependencies
+7. Consider using generics for flexible factories
+8. Document factory method requirements
+9. Use proper access control
+10. Consider using builder pattern for complex objects

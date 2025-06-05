@@ -1,0 +1,189 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# Factory Reset Cleanup Rule
+
+This rule enforces proper cleanup during factory reset operations.
+
+<rule>
+name: factory-reset-cleanup
+description: Enforce proper cleanup during factory reset
+message: Factory reset must properly clean up all app data
+severity: warning
+languages: [swift]
+files:
+  - "*Reset*.swift"
+  - "*Cleanup*.swift"
+  - "*Storage*.swift"
+  - "*Manager*.swift"
+  - "*Service*.swift"
+  - "*App*.swift"
+
+patterns:
+  - pattern: |
+      func resetApp() {
+          UserDefaults.standard.removePersistentDomain(forName: $NAME)
+      }
+    message: "Factory reset must clean up all app data, not just UserDefaults."
+
+  - pattern: |
+      func clearData() {
+          // Incomplete cleanup
+      }
+    message: "Implement comprehensive cleanup in factory reset."
+
+examples:
+  - name: Good Example
+    code: |
+      // Factory reset protocol
+      protocol FactoryResetProtocol {
+          func reset() async throws
+      }
+      
+      // App cleanup manager
+      class AppCleanupManager: FactoryResetProtocol {
+          private let fileManager: FileManager
+          private let keychain: KeychainProtocol
+          private let database: DatabaseProtocol
+          private let userDefaults: UserDefaults
+          private let notificationCenter: NotificationCenter
+          
+          init(
+              fileManager: FileManager = .default,
+              keychain: KeychainProtocol,
+              database: DatabaseProtocol,
+              userDefaults: UserDefaults = .standard,
+              notificationCenter: NotificationCenter = .default
+          ) {
+              self.fileManager = fileManager
+              self.keychain = keychain
+              self.database = database
+              self.userDefaults = userDefaults
+              self.notificationCenter = notificationCenter
+          }
+          
+          func reset() async throws {
+              // Notify cleanup start
+              notificationCenter.post(name: .factoryResetWillBegin, object: nil)
+              
+              // Clean up user data
+              try await cleanupUserData()
+              
+              // Clean up app files
+              try cleanupAppFiles()
+              
+              // Clean up keychain
+              try cleanupKeychain()
+              
+              // Clean up user defaults
+              cleanupUserDefaults()
+              
+              // Clean up database
+              try await cleanupDatabase()
+              
+              // Clean up caches
+              try cleanupCaches()
+              
+              // Clean up temporary files
+              try cleanupTemporaryFiles()
+              
+              // Notify cleanup completion
+              notificationCenter.post(name: .factoryResetDidComplete, object: nil)
+          }
+          
+          private func cleanupUserData() async throws {
+              // Remove user authentication
+              try await auth.signOut()
+              
+              // Remove stored credentials
+              try keychain.removeAllItems()
+              
+              // Remove user preferences
+              userDefaults.removePersistentDomain(
+                  forName: Bundle.main.bundleIdentifier ?? ""
+              )
+          }
+          
+          private func cleanupAppFiles() throws {
+              let urls = try fileManager.contentsOfDirectory(
+                  at: fileManager.urls(for: .documentDirectory, in: .userDomainMask)[0],
+                  includingPropertiesForKeys: nil
+              )
+              
+              for url in urls {
+                  try fileManager.removeItem(at: url)
+              }
+          }
+          
+          private func cleanupDatabase() async throws {
+              try await database.deleteAllData()
+              try await database.vacuum()
+          }
+          
+          private func cleanupCaches() throws {
+              let cacheURLs = try fileManager.contentsOfDirectory(
+                  at: fileManager.urls(for: .cachesDirectory, in: .userDomainMask)[0],
+                  includingPropertiesForKeys: nil
+              )
+              
+              for url in cacheURLs {
+                  try fileManager.removeItem(at: url)
+              }
+          }
+          
+          private func cleanupTemporaryFiles() throws {
+              let tempDirectory = NSTemporaryDirectory()
+              let contents = try fileManager.contentsOfDirectory(
+                  atPath: tempDirectory
+              )
+              
+              for path in contents {
+                  try fileManager.removeItem(
+                      atPath: (tempDirectory as NSString).appendingPathComponent(path)
+                  )
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Incomplete cleanup
+      class IncompleteCleanupManager {
+          func resetApp() {
+              // Bad: Only cleans UserDefaults
+              UserDefaults.standard.removePersistentDomain(
+                  forName: Bundle.main.bundleIdentifier ?? ""
+              )
+              
+              // Bad: Direct file deletion without error handling
+              try? FileManager.default.removeItem(
+                  at: documentsURL
+              )
+              
+              // Bad: No database cleanup
+              // Bad: No keychain cleanup
+              // Bad: No cache cleanup
+              // Bad: No temporary files cleanup
+          }
+          
+          func clearData() {
+              // Bad: Incomplete and unsafe cleanup
+              UserDefaults.standard.removeObject(forKey: "userData")
+              try? FileManager.default.removeItem(atPath: "/some/path")
+          }
+      }
+</rule>
+
+## Guidelines
+1. Clean up all data stores
+2. Handle cleanup errors
+3. Use proper file deletion
+4. Clean up user authentication
+5. Remove cached data
+6. Clean up temporary files
+7. Implement proper notifications
+8. Document cleanup process
+9. Test cleanup thoroughly
+10. Verify cleanup completion

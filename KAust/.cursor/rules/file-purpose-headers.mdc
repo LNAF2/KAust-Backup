@@ -1,0 +1,106 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# File Purpose Headers Rule
+
+This rule enforces proper documentation of file purpose in headers.
+
+<rule>
+name: file-purpose-headers
+description: Enforce proper file purpose documentation in headers
+message: Files must include clear purpose documentation in headers
+severity: warning
+languages: [swift]
+files:
+  - "*.swift"
+
+patterns:
+  - pattern: |
+      //
+      //  $FILE.swift
+      //  $PROJECT
+      //
+      //  Created by $AUTHOR on $DATE.
+      //
+    message: "Add file purpose documentation after the standard header."
+
+examples:
+  - name: Good Example
+    code: |
+      //
+      //  UserAuthenticationService.swift
+      //  KaraokeApp
+      //
+      //  Created by John Doe on 2024-03-20.
+      //
+      
+      /// This service handles user authentication and session management.
+      /// It provides functionality for:
+      /// - User login and registration
+      /// - Password reset and account recovery
+      /// - Session token management
+      /// - Biometric authentication integration
+      ///
+      /// The service uses JWT tokens for authentication and implements
+      /// OAuth 2.0 for third-party login providers.
+      ///
+      /// Usage Example:
+      /// ```swift
+      /// let auth = UserAuthenticationService()
+      /// try await auth.login(email: "user@example.com", password: "secure123")
+      /// ```
+      ///
+      /// - Important: This service must be initialized before any other authentication operations.
+      /// - Note: All authentication operations are performed asynchronously.
+      
+      import Foundation
+      import Security
+      import LocalAuthentication
+      
+      protocol UserAuthenticationServiceProtocol {
+          func login(email: String, password: String) async throws
+          func register(email: String, password: String) async throws
+          func resetPassword(email: String) async throws
+      }
+      
+      class UserAuthenticationService: UserAuthenticationServiceProtocol {
+          // Implementation
+      }
+
+  - name: Bad Example
+    code: |
+      //
+      //  UserAuth.swift
+      //  KaraokeApp
+      //
+      //  Created by John Doe on 2024-03-20.
+      //
+      
+      // Bad: No file purpose documentation
+      
+      import Foundation
+      
+      class UserAuth {
+          func login(email: String, password: String) {
+              // Implementation
+          }
+          
+          func register(email: String, password: String) {
+              // Implementation
+          }
+      }
+</rule>
+
+## Guidelines
+1. Document file's primary purpose
+2. List key functionality
+3. Provide usage examples
+4. Document dependencies
+5. Include important notes
+6. Document architecture role
+7. List related files
+8. Document version history
+9. Include author contact
+10. Document security considerations

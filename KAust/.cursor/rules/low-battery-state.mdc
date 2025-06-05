@@ -1,0 +1,104 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Low Battery State Rule
+
+This rule enforces proper handling of low battery states in iOS applications.
+
+<rule>
+name: low-battery-state
+description: Enforce proper handling of low battery states
+message: Low battery state must be handled appropriately
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $CLASS {
+          func $METHOD() {
+              UIDevice.current.batteryLevel
+          }
+      }
+    message: "Battery level checks should include state handling and user notifications."
+
+  - pattern: |
+      class $CLASS {
+          func $METHOD() {
+              UIDevice.current.isBatteryMonitoringEnabled = true
+          }
+      }
+    message: "Battery monitoring should be properly configured and cleaned up."
+
+examples:
+  - name: Good Example
+    code: |
+      class BatteryStateManager {
+          private var batteryStateObserver: NSObjectProtocol?
+          
+          init() {
+              UIDevice.current.isBatteryMonitoringEnabled = true
+              setupBatteryMonitoring()
+          }
+          
+          private func setupBatteryMonitoring() {
+              batteryStateObserver = NotificationCenter.default.addObserver(
+                  forName: UIDevice.batteryStateDidChangeNotification,
+                  object: nil,
+                  queue: .main
+              ) { [weak self] _ in
+                  self?.handleBatteryStateChange()
+              }
+          }
+          
+          private func handleBatteryStateChange() {
+              let batteryLevel = UIDevice.current.batteryLevel
+              if batteryLevel <= 0.2 {
+                  notifyUserOfLowBattery()
+                  adjustAppBehaviorForLowBattery()
+              }
+          }
+          
+          private func notifyUserOfLowBattery() {
+              // Implementation
+          }
+          
+          private func adjustAppBehaviorForLowBattery() {
+              // Adjust app behavior
+          }
+          
+          deinit {
+              if let observer = batteryStateObserver {
+                  NotificationCenter.default.removeObserver(observer)
+              }
+              UIDevice.current.isBatteryMonitoringEnabled = false
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      class ViewController {
+          func checkBattery() {
+              // Bad: No proper setup or cleanup
+              UIDevice.current.isBatteryMonitoringEnabled = true
+              let level = UIDevice.current.batteryLevel
+              
+              if level < 0.2 {
+                  print("Low battery")
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Always enable battery monitoring before use
+2. Properly clean up battery monitoring when no longer needed
+3. Use proper notification observation patterns
+4. Handle memory management with weak self references
+5. Provide user feedback for low battery states
+6. Adjust app behavior appropriately for low battery
+7. Consider implementing power-saving features
+8. Handle all battery states (charging, full, unplugged)
+9. Use appropriate threading for battery state handling
+10. Document battery-related behavior changes

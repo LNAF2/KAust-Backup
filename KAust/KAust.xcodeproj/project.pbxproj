@@ -1,0 +1,696 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		C0A8FEDB2DE9C7AC00459205 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C0A8FEC52DE9C7AB00459205 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C0A8FECC2DE9C7AB00459205;
+			remoteInfo = KAust;
+		};
+		C0A8FEE52DE9C7AC00459205 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = C0A8FEC52DE9C7AB00459205 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C0A8FECC2DE9C7AB00459205;
+			remoteInfo = KAust;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		C05622B62DEDB51300C7A5AA /* KAust.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = KAust.xcodeproj; sourceTree = "<group>"; };
+		C066A17E2DEE8864001499DA /* KAust.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = KAust.xcodeproj; sourceTree = "<group>"; };
+		C079C67D2DEF07740080DF81 /* KAust.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = KAust.xcodeproj; sourceTree = "<group>"; };
+		C0A8FECD2DE9C7AB00459205 /* KAust.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KAust.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0A8FEDA2DE9C7AC00459205 /* KAustTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KAustTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0A8FEE42DE9C7AC00459205 /* KAustUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = KAustUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0A8FF512DEC858400459205 /* KAust.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; name = KAust.xcodeproj; path = KAust/KAust.xcodeproj; sourceTree = SOURCE_ROOT; };
+		C0B5E4852DED49C0007245CA /* KAust.xcodeproj */ = {isa = PBXFileReference; lastKnownFileType = "wrapper.pb-project"; path = KAust.xcodeproj; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		C0A8FF202DEC76FB00459205 /* Exceptions for "KAustUITests" folder in "KAustTests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				KAustTests.swift,
+			);
+			target = C0A8FED92DE9C7AC00459205 /* KAustTests */;
+		};
+		C0A8FF212DEC76FB00459205 /* Exceptions for "KAustUITests" folder in "KAustUITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				KAustTests.swift,
+			);
+			target = C0A8FEE32DE9C7AC00459205 /* KAustUITests */;
+		};
+		C0A8FF292DEC771B00459205 /* Exceptions for "KAust" folder in "KAust" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Assets.xcassets,
+				ContentView.swift,
+				Core/Data/KAustModel.xcdatamodeld,
+				Core/Data/PersistenceController.swift,
+				Core/Managers/FocusManager.swift,
+				Core/Models/AppSong.swift,
+				Core/Models/DemoSongs.swift,
+				Core/Services/AuthenticationServiceProtocol.swift,
+				Core/Services/DataProviderServiceProtocol.swift,
+				Core/Services/UserPreferencesServiceProtocol.swift,
+				Features/PlayList/ViewModels/PlaylistViewModel.swift,
+				Features/PlayList/Views/PlaylistEmptyState.swift,
+				Features/PlayList/Views/PlaylistItemView.swift,
+				Features/PlayList/Views/PlaylistView.swift,
+				Features/SongList/ViewModels/SonglistViewModel.swift,
+				Features/SongList/Views/SonglistEmptyState.swift,
+				Features/SongList/Views/SonglistItemView.swift,
+				Features/SongList/Views/SonglistView.swift,
+				KAustApp.swift,
+				Shared/Constants.swift,
+				Shared/Theme.swift,
+				UI/Views/ControlsPanelView.swift,
+				UI/Views/EmptyPanelView.swift,
+				UI/Views/SettingsAccessPanelView.swift,
+				UI/Views/SettingsView.swift,
+				UI/Views/TitlePanelView.swift,
+				UI/Views/VideoPlayerOverlayView.swift,
+			);
+			target = C0A8FECC2DE9C7AB00459205 /* KAust */;
+		};
+		C0A8FF2A2DEC771B00459205 /* Exceptions for "KAust" folder in "KAustUITests" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Assets.xcassets,
+				ContentView.swift,
+				KAustApp.swift,
+			);
+			target = C0A8FEE32DE9C7AC00459205 /* KAustUITests */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		C0A8FEE72DE9C7AC00459205 /* KAustUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C0A8FF202DEC76FB00459205 /* Exceptions for "KAustUITests" folder in "KAustTests" target */,
+				C0A8FF212DEC76FB00459205 /* Exceptions for "KAustUITests" folder in "KAustUITests" target */,
+			);
+			path = KAustUITests;
+			sourceTree = "<group>";
+		};
+		C0A8FF252DEC771B00459205 /* KAust */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				C0A8FF292DEC771B00459205 /* Exceptions for "KAust" folder in "KAust" target */,
+				C0A8FF2A2DEC771B00459205 /* Exceptions for "KAust" folder in "KAustUITests" target */,
+			);
+			path = KAust;
+			sourceTree = "<group>";
+		};
+		C0A8FF2B2DEC777A00459205 /* KAustTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = KAustTests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C0A8FECA2DE9C7AB00459205 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0A8FED72DE9C7AC00459205 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0A8FEE12DE9C7AC00459205 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		C05622B82DEDB51300C7A5AA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C066A1802DEE8864001499DA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C079C67F2DEF07740080DF81 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C0A8FEC42DE9C7AB00459205 = {
+			isa = PBXGroup;
+			children = (
+				C0A8FF252DEC771B00459205 /* KAust */,
+				C0A8FEE72DE9C7AC00459205 /* KAustUITests */,
+				C0A8FECE2DE9C7AB00459205 /* Products */,
+				C0A8FF2B2DEC777A00459205 /* KAustTests */,
+			);
+			sourceTree = "<group>";
+		};
+		C0A8FECE2DE9C7AB00459205 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				C0A8FECD2DE9C7AB00459205 /* KAust.app */,
+				C0A8FEDA2DE9C7AC00459205 /* KAustTests.xctest */,
+				C0A8FEE42DE9C7AC00459205 /* KAustUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C0A8FF542DEC858400459205 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		C0B5E4872DED49C0007245CA /* Products */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		C0A8FECC2DE9C7AB00459205 /* KAust */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0A8FEEE2DE9C7AC00459205 /* Build configuration list for PBXNativeTarget "KAust" */;
+			buildPhases = (
+				C0A8FEC92DE9C7AB00459205 /* Sources */,
+				C0A8FECA2DE9C7AB00459205 /* Frameworks */,
+				C0A8FECB2DE9C7AB00459205 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = KAust;
+			packageProductDependencies = (
+			);
+			productName = KAust;
+			productReference = C0A8FECD2DE9C7AB00459205 /* KAust.app */;
+			productType = "com.apple.product-type.application";
+		};
+		C0A8FED92DE9C7AC00459205 /* KAustTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0A8FEF12DE9C7AC00459205 /* Build configuration list for PBXNativeTarget "KAustTests" */;
+			buildPhases = (
+				C0A8FED62DE9C7AC00459205 /* Sources */,
+				C0A8FED72DE9C7AC00459205 /* Frameworks */,
+				C0A8FED82DE9C7AC00459205 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C0A8FEDC2DE9C7AC00459205 /* PBXTargetDependency */,
+			);
+			name = KAustTests;
+			packageProductDependencies = (
+			);
+			productName = KAustTests;
+			productReference = C0A8FEDA2DE9C7AC00459205 /* KAustTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		C0A8FEE32DE9C7AC00459205 /* KAustUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C0A8FEF42DE9C7AC00459205 /* Build configuration list for PBXNativeTarget "KAustUITests" */;
+			buildPhases = (
+				C0A8FEE02DE9C7AC00459205 /* Sources */,
+				C0A8FEE12DE9C7AC00459205 /* Frameworks */,
+				C0A8FEE22DE9C7AC00459205 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				C0A8FEE62DE9C7AC00459205 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				C0A8FEE72DE9C7AC00459205 /* KAustUITests */,
+				C0A8FF252DEC771B00459205 /* KAust */,
+				C0A8FF2B2DEC777A00459205 /* KAustTests */,
+			);
+			name = KAustUITests;
+			packageProductDependencies = (
+			);
+			productName = KAustUITests;
+			productReference = C0A8FEE42DE9C7AC00459205 /* KAustUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		C0A8FEC52DE9C7AB00459205 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1630;
+				LastUpgradeCheck = 1630;
+				TargetAttributes = {
+					C0A8FECC2DE9C7AB00459205 = {
+						CreatedOnToolsVersion = 16.3;
+					};
+					C0A8FED92DE9C7AC00459205 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = C0A8FECC2DE9C7AB00459205;
+					};
+					C0A8FEE32DE9C7AC00459205 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = C0A8FECC2DE9C7AB00459205;
+					};
+				};
+			};
+			buildConfigurationList = C0A8FEC82DE9C7AB00459205 /* Build configuration list for PBXProject "KAust" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = C0A8FEC42DE9C7AB00459205;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = C0A8FECE2DE9C7AB00459205 /* Products */;
+			projectDirPath = "";
+			projectReferences = (
+				{
+					ProductGroup = C0A8FF542DEC858400459205 /* Products */;
+					ProjectRef = C0A8FF512DEC858400459205 /* KAust.xcodeproj */;
+				},
+				{
+					ProductGroup = C066A1802DEE8864001499DA /* Products */;
+					ProjectRef = C066A17E2DEE8864001499DA /* KAust.xcodeproj */;
+				},
+				{
+					ProductGroup = C05622B82DEDB51300C7A5AA /* Products */;
+					ProjectRef = C05622B62DEDB51300C7A5AA /* KAust.xcodeproj */;
+				},
+				{
+					ProductGroup = C079C67F2DEF07740080DF81 /* Products */;
+					ProjectRef = C079C67D2DEF07740080DF81 /* KAust.xcodeproj */;
+				},
+				{
+					ProductGroup = C0B5E4872DED49C0007245CA /* Products */;
+					ProjectRef = C0B5E4852DED49C0007245CA /* KAust.xcodeproj */;
+				},
+			);
+			projectRoot = "";
+			targets = (
+				C0A8FECC2DE9C7AB00459205 /* KAust */,
+				C0A8FED92DE9C7AC00459205 /* KAustTests */,
+				C0A8FEE32DE9C7AC00459205 /* KAustUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C0A8FECB2DE9C7AB00459205 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0A8FED82DE9C7AC00459205 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0A8FEE22DE9C7AC00459205 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C0A8FEC92DE9C7AB00459205 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0A8FED62DE9C7AC00459205 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C0A8FEE02DE9C7AC00459205 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		C0A8FEDC2DE9C7AC00459205 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C0A8FECC2DE9C7AB00459205 /* KAust */;
+			targetProxy = C0A8FEDB2DE9C7AC00459205 /* PBXContainerItemProxy */;
+		};
+		C0A8FEE62DE9C7AC00459205 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C0A8FECC2DE9C7AB00459205 /* KAust */;
+			targetProxy = C0A8FEE52DE9C7AC00459205 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		C0A8FEEC2DE9C7AC00459205 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = T9GY7569V2;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		C0A8FEED2DE9C7AC00459205 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = T9GY7569V2;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C0A8FEEF2DE9C7AC00459205 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T9GY7569V2;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KAust/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.erlingbreaden.KAust;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Debug;
+		};
+		C0A8FEF02DE9C7AC00459205 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T9GY7569V2;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = KAust/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.erlingbreaden.KAust;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 2;
+			};
+			name = Release;
+		};
+		C0A8FEF22DE9C7AC00459205 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T9GY7569V2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.erlingbreaden.KAustTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/KAust.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/KAust";
+			};
+			name = Debug;
+		};
+		C0A8FEF32DE9C7AC00459205 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T9GY7569V2;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.erlingbreaden.KAustTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/KAust.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/KAust";
+			};
+			name = Release;
+		};
+		C0A8FEF52DE9C7AC00459205 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T9GY7569V2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.erlingbreaden.KAustUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = KAust;
+			};
+			name = Debug;
+		};
+		C0A8FEF62DE9C7AC00459205 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = T9GY7569V2;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.erlingbreaden.KAustUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = KAust;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		C0A8FEC82DE9C7AB00459205 /* Build configuration list for PBXProject "KAust" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0A8FEEC2DE9C7AC00459205 /* Debug */,
+				C0A8FEED2DE9C7AC00459205 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C0A8FEEE2DE9C7AC00459205 /* Build configuration list for PBXNativeTarget "KAust" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0A8FEEF2DE9C7AC00459205 /* Debug */,
+				C0A8FEF02DE9C7AC00459205 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C0A8FEF12DE9C7AC00459205 /* Build configuration list for PBXNativeTarget "KAustTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0A8FEF22DE9C7AC00459205 /* Debug */,
+				C0A8FEF32DE9C7AC00459205 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C0A8FEF42DE9C7AC00459205 /* Build configuration list for PBXNativeTarget "KAustUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C0A8FEF52DE9C7AC00459205 /* Debug */,
+				C0A8FEF62DE9C7AC00459205 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = C0A8FEC52DE9C7AB00459205 /* Project object */;
+}

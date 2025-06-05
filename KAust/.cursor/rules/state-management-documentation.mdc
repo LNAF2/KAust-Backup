@@ -1,0 +1,194 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# State Management Documentation Rule
+
+This rule enforces proper documentation of state management.
+
+<rule>
+name: state-management-documentation
+description: Enforce proper documentation of state management
+message: State management must be properly documented
+severity: warning
+languages: [swift]
+files:
+  - "*ViewModel*.swift"
+  - "*Store*.swift"
+  - "*State*.swift"
+  - "*Reducer*.swift"
+  - "*Manager*.swift"
+  - "*Controller*.swift"
+
+patterns:
+  - pattern: |
+      @Published var $STATE
+    message: "Document state property purpose and update triggers."
+
+  - pattern: |
+      func update$STATE($PARAMS)
+    message: "Document state update method's side effects and threading."
+
+examples:
+  - name: Good Example
+    code: |
+      /// Manages the state and business logic for the playlist screen.
+      ///
+      /// ## State Management
+      /// This ViewModel manages several pieces of state:
+      /// - Playlist items (songs, loading state, error state)
+      /// - Playback state (current song, progress)
+      /// - Edit mode state (selection, reordering)
+      ///
+      /// ## State Updates
+      /// State updates are performed on the main actor to ensure
+      /// thread safety and proper SwiftUI updates.
+      ///
+      /// ## State Flow
+      /// ```
+      /// User Action -> Intent -> State Update -> UI Update
+      /// ```
+      @MainActor
+      class PlaylistViewModel: ObservableObject {
+          /// The current items in the playlist.
+          /// - Updates: On load, add, remove, and reorder operations
+          /// - Threading: Always updated on main thread
+          @Published private(set) var items: [PlaylistItem] = []
+          
+          /// The current loading state of the playlist.
+          /// - Updates: During data fetching and updates
+          /// - States: .idle, .loading, .loaded, .error
+          @Published private(set) var loadingState = LoadingState.idle
+          
+          /// The currently selected items in edit mode.
+          /// - Updates: When user selects/deselects items
+          /// - Note: Empty when not in edit mode
+          @Published private(set) var selectedItems: Set<PlaylistItem.ID> = []
+          
+          /// The current playback state.
+          /// - Updates: When playback starts, pauses, or stops
+          /// - Dependencies: Requires MediaPlayer to be initialized
+          @Published private(set) var playbackState = PlaybackState.stopped
+          
+          /// The currently playing item, if any.
+          /// - Updates: When playback starts or stops
+          /// - Threading: Updated via MediaPlayer callbacks
+          @Published private(set) var currentItem: PlaylistItem?
+          
+          private let mediaPlayer: MediaPlayerProtocol
+          private let playlistStorage: PlaylistStorageProtocol
+          
+          /// Creates a new playlist view model.
+          /// - Parameters:
+          ///   - mediaPlayer: The media player to use for playback
+          ///   - storage: The storage to use for persistence
+          init(
+              mediaPlayer: MediaPlayerProtocol,
+              storage: PlaylistStorageProtocol
+          ) {
+              self.mediaPlayer = mediaPlayer
+              self.playlistStorage = storage
+              setupObservers()
+          }
+          
+          /// Loads the playlist items from storage.
+          ///
+          /// State Updates:
+          /// 1. Sets loadingState to .loading
+          /// 2. Fetches items from storage
+          /// 3. Updates items array
+          /// 4. Sets loadingState to .loaded or .error
+          func loadItems() async {
+              loadingState = .loading
+              
+              do {
+                  items = try await playlistStorage.loadItems()
+                  loadingState = .loaded
+              } catch {
+                  loadingState = .error(error)
+              }
+          }
+          
+          /// Adds a new item to the playlist.
+          ///
+          /// State Updates:
+          /// - Appends item to items array
+          /// - Persists changes to storage
+          /// - Updates currentItem if playlist was empty
+          ///
+          /// - Parameter item: The item to add
+          func addItem(_ item: PlaylistItem) async throws {
+              items.append(item)
+              try await playlistStorage.save(items)
+              
+              if currentItem == nil {
+                  currentItem = item
+              }
+          }
+          
+          /// Removes items from the playlist.
+          ///
+          /// State Updates:
+          /// - Removes items from items array
+          /// - Clears selection if items were selected
+          /// - Updates currentItem if removed
+          /// - Persists changes to storage
+          ///
+          /// - Parameter ids: The IDs of items to remove
+          func removeItems(withIDs ids: Set<PlaylistItem.ID>) async throws {
+              items.removeAll { ids.contains($0.id) }
+              selectedItems.subtract(ids)
+              
+              if let currentID = currentItem?.id,
+                 ids.contains(currentID) {
+                  currentItem = items.first
+              }
+              
+              try await playlistStorage.save(items)
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: No state management documentation
+      class PlaylistViewModel: ObservableObject {
+          @Published var items: [Item] = []
+          @Published var isLoading = false
+          @Published var error: Error?
+          @Published var currentItem: Item?
+          
+          func loadItems() {
+              // State changes without documentation
+              isLoading = true
+              // Load items...
+              isLoading = false
+          }
+          
+          func addItem(_ item: Item) {
+              // Undocumented state updates
+              items.append(item)
+              currentItem = item
+          }
+          
+          func removeItem(_ item: Item) {
+              // Complex state changes without explanation
+              items.removeAll { $0.id == item.id }
+              if currentItem?.id == item.id {
+                  currentItem = items.first
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Document state properties
+2. Document update triggers
+3. Explain state flow
+4. Document threading model
+5. Document dependencies
+6. Explain side effects
+7. Document state transitions
+8. Include error states
+9. Document initialization
+10. Use state diagrams

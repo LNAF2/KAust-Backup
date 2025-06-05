@@ -1,0 +1,70 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Constructor-Based Dependency Injection Rule
+
+This rule enforces the use of constructor-based dependency injection in Swift code.
+
+<rule>
+name: constructor-based-di-only
+description: Enforce constructor-based dependency injection
+message: Dependencies must be injected through the constructor/initializer
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $CLASS {
+        var $DEP: $TYPE!
+      }
+    message: "Avoid force-unwrapped properties for dependencies. Use constructor injection instead."
+  
+  - pattern: |
+      class $CLASS {
+        var $DEP: $TYPE?
+      }
+    message: "Avoid optional properties for dependencies. Use constructor injection instead."
+  
+  - pattern: |
+      class $CLASS {
+        func inject$DEP($dep: $TYPE) {
+          self.$dep = $dep
+        }
+      }
+    message: "Avoid setter injection methods. Use constructor injection instead."
+
+examples:
+  - name: Good Example
+    code: |
+      struct UserService {
+          private let networkClient: NetworkClientProtocol
+          private let database: DatabaseProtocol
+          
+          init(networkClient: NetworkClientProtocol, database: DatabaseProtocol) {
+              self.networkClient = networkClient
+              self.database = database
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      class UserService {
+          var networkClient: NetworkClientProtocol!  // Property injection
+          var database: DatabaseProtocol?           // Optional dependency
+          
+          func injectDependencies(_ client: NetworkClientProtocol, _ db: DatabaseProtocol) {
+              self.networkClient = client
+              self.database = db
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use `init` to inject all dependencies
+2. Make dependencies private and immutable (use `let`)
+3. Use protocol types for dependencies to enable testing
+4. Avoid optional dependencies unless absolutely necessary
+5. Prefer value types (`struct`) over reference types (`class`)
+6. Use dependency containers at composition root only

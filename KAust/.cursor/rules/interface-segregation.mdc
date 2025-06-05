@@ -1,0 +1,113 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Interface Segregation Principle Rule
+
+This rule enforces that clients should not be forced to depend on interfaces they don't use.
+
+<rule>
+name: interface-segregation
+description: Enforce Interface Segregation Principle (ISP)
+message: Protocols should be small and focused, clients should not be forced to implement methods they don't need
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      protocol $PROTOCOL {
+          func method1()
+          func method2()
+          func method3()
+          func method4()
+          func method5()
+      }
+    message: "Large protocol detected. Consider splitting into smaller, focused protocols."
+
+  - pattern: |
+      protocol $PROTOCOL {
+          var database: Database { get }
+          var network: NetworkClient { get }
+          var analytics: Analytics { get }
+      }
+    message: "Protocol has unrelated requirements. Split into separate protocols based on client needs."
+
+examples:
+  - name: Good Example
+    code: |
+      // Separate, focused protocols
+      protocol UserFetching {
+          func fetchUser(id: String) async throws -> User
+      }
+      
+      protocol UserPersisting {
+          func saveUser(_ user: User) async throws
+      }
+      
+      protocol UserAuthenticating {
+          func authenticate(_ credentials: Credentials) async throws -> AuthToken
+      }
+      
+      // Types can implement only what they need
+      struct UserRepository: UserFetching, UserPersisting {
+          func fetchUser(id: String) async throws -> User {
+              // Implementation
+          }
+          
+          func saveUser(_ user: User) async throws {
+              // Implementation
+          }
+      }
+      
+      struct AuthService: UserAuthenticating {
+          func authenticate(_ credentials: Credentials) async throws -> AuthToken {
+              // Implementation
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Large protocol forcing unnecessary implementations
+      protocol UserService {
+          func fetchUser(id: String) async throws -> User
+          func saveUser(_ user: User) async throws
+          func authenticate(_ credentials: Credentials) async throws -> AuthToken
+          func updateProfile(_ profile: Profile) async throws
+          func uploadAvatar(_ image: Image) async throws -> URL
+          func sendPasswordReset(to email: String) async throws
+          func verifyEmail(_ token: String) async throws
+          func deleteAccount() async throws
+          func exportUserData() async throws -> Data
+      }
+      
+      // Clients forced to implement methods they don't need
+      class ReadOnlyUserClient: UserService {
+          // Must implement all methods even though it only needs fetch
+          func fetchUser(id: String) async throws -> User { }
+          func saveUser(_ user: User) async throws { }
+          func authenticate(_ credentials: Credentials) async throws -> AuthToken { }
+          func updateProfile(_ profile: Profile) async throws { }
+          func uploadAvatar(_ image: Image) async throws -> URL { }
+          func sendPasswordReset(to email: String) async throws { }
+          func verifyEmail(_ token: String) async throws { }
+          func deleteAccount() async throws { }
+          func exportUserData() async throws -> Data { }
+      }
+</rule>
+
+## Guidelines
+1. Keep protocols focused and cohesive
+2. Split large protocols into smaller ones
+3. Group methods by responsibility
+4. Let clients implement only what they need
+5. Watch for signs of protocol pollution:
+   - Unrelated methods
+   - Methods that only some clients use
+   - Large number of requirements
+   - Mixed levels of abstraction
+6. Use protocol composition to combine behaviors
+7. Consider role-based protocol separation
+8. Name protocols based on capabilities
+9. Avoid "kitchen sink" protocols
+10. Document protocol responsibilities clearly

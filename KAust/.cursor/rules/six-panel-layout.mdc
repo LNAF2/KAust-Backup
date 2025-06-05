@@ -1,0 +1,168 @@
+---
+description: 
+globs: *View.swift
+alwaysApply: false
+---
+# Six-Panel Layout Rule
+
+This rule enforces the use of a six-panel layout structure for main views.
+
+<rule>
+name: six-panel-layout
+description: Enforce six-panel layout structure
+message: Main views should use the six-panel layout pattern
+severity: warning
+languages: [swift]
+files:
+  - "*View.swift"
+  - "*Screen.swift"
+  - "*Layout*.swift"
+  - "*Container*.swift"
+  - "*Panel*.swift"
+
+patterns:
+  - pattern: |
+      struct $VIEW: View {
+          var body: some View {
+              VStack {
+                  // Content without panel structure
+              }
+          }
+      }
+    message: "Main views should implement the six-panel layout structure."
+
+examples:
+  - name: Good Example
+    code: |
+      struct SixPanelLayout: View {
+          var body: some View {
+              GeometryReader { geometry in
+                  let width = geometry.size.width
+                  let height = geometry.size.height
+                  let panelSpacing: CGFloat = 16
+                  
+                  HStack(spacing: panelSpacing) {
+                      // Left column (40% width)
+                      VStack(spacing: panelSpacing) {
+                          // Panel 1: Navigation (30% height)
+                          NavigationPanel()
+                              .frame(height: height * 0.3)
+                          
+                          // Panel 2: Tools (70% height)
+                          ToolsPanel()
+                              .frame(height: height * 0.7)
+                      }
+                      .frame(width: width * 0.4)
+                      
+                      // Center column (35% width)
+                      VStack(spacing: panelSpacing) {
+                          // Panel 3: Content List (50% height)
+                          ContentListPanel()
+                              .frame(height: height * 0.5)
+                          
+                          // Panel 4: Details (50% height)
+                          DetailsPanel()
+                              .frame(height: height * 0.5)
+                      }
+                      .frame(width: width * 0.35)
+                      
+                      // Right column (25% width)
+                      VStack(spacing: panelSpacing) {
+                          // Panel 5: Preview (40% height)
+                          PreviewPanel()
+                              .frame(height: height * 0.4)
+                          
+                          // Panel 6: Properties (60% height)
+                          PropertiesPanel()
+                              .frame(height: height * 0.6)
+                      }
+                      .frame(width: width * 0.25)
+                  }
+                  .padding(panelSpacing)
+              }
+          }
+      }
+      
+      // Individual panel views
+      struct NavigationPanel: View {
+          var body: some View {
+              PanelContainer {
+                  Text("Navigation")
+              }
+          }
+      }
+      
+      struct ToolsPanel: View {
+          var body: some View {
+              PanelContainer {
+                  Text("Tools")
+              }
+          }
+      }
+      
+      // Reusable panel container
+      struct PanelContainer<Content: View>: View {
+          let content: Content
+          
+          init(@ViewBuilder content: () -> Content) {
+              self.content = content()
+          }
+          
+          var body: some View {
+              content
+                  .padding()
+                  .background(Color.backgroundSecondary)
+                  .cornerRadius(8)
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Unstructured layout
+      struct UnstructuredLayout: View {
+          var body: some View {
+              VStack {
+                  // Bad: No clear panel structure
+                  HeaderView()
+                  
+                  HStack {
+                      SidebarView()
+                      ContentView()
+                  }
+                  
+                  FooterView()
+              }
+              .padding()
+          }
+      }
+      
+      // Bad: Fixed dimensions
+      struct FixedPanelLayout: View {
+          var body: some View {
+              HStack {
+                  // Bad: Fixed widths
+                  VStack {
+                      NavigationView()
+                          .frame(width: 300)
+                      ToolsView()
+                          .frame(width: 300)
+                  }
+                  
+                  ContentView()
+                      .frame(width: 500)
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use proportional panel sizes
+2. Maintain consistent spacing
+3. Implement proper panel hierarchy
+4. Use flexible layouts
+5. Consider device sizes
+6. Handle panel resizing
+7. Support panel collapsing
+8. Maintain aspect ratios
+9. Use proper alignment
+10. Document layout structure

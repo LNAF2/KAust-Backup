@@ -1,0 +1,108 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Single Responsibility Principle Rule
+
+This rule enforces that each class or struct has only one reason to change.
+
+<rule>
+name: single-responsibility
+description: Enforce Single Responsibility Principle (SRP)
+message: Types should have only one responsibility and one reason to change
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $CLASS {
+          func fetch$DATA() { }
+          func process$DATA() { }
+          func save$DATA() { }
+          func display$DATA() { }
+      }
+    message: "Class appears to have multiple responsibilities (data fetching, processing, storage, and UI). Consider splitting into separate types."
+
+  - pattern: |
+      class $CLASS {
+          var database: Database
+          var networkClient: NetworkClient
+          var userInterface: UserInterface
+      }
+    message: "Class has dependencies suggesting multiple responsibilities. Consider separating concerns."
+
+examples:
+  - name: Good Example
+    code: |
+      // Data fetching responsibility only
+      struct UserRepository {
+          private let networkClient: NetworkClientProtocol
+          
+          init(networkClient: NetworkClientProtocol) {
+              self.networkClient = networkClient
+          }
+          
+          func fetchUser(id: String) async throws -> User {
+              return try await networkClient.get("/users/\(id)")
+          }
+      }
+      
+      // User data processing responsibility only
+      struct UserProcessor {
+          func processUserData(_ user: User) -> ProcessedUserData {
+              // Transform user data
+              return ProcessedUserData(user)
+          }
+      }
+      
+      // UI presentation responsibility only
+      struct UserProfileView: View {
+          let user: User
+          
+          var body: some View {
+              VStack {
+                  Text(user.name)
+                  Text(user.email)
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Class doing too many things
+      class UserManager {
+          private let database: Database
+          private let networkClient: NetworkClient
+          private let cache: Cache
+          
+          func fetchUserFromNetwork(id: String) -> User { }
+          func saveUserToDatabase(_ user: User) { }
+          func cacheUserData(_ user: User) { }
+          func validateUserData(_ user: User) -> Bool { }
+          func formatUserDataForDisplay(_ user: User) -> String { }
+          func updateUserInterface(with user: User) { }
+          func handleUserInteraction(_ event: UserEvent) { }
+          func processPayment(for user: User) { }
+      }
+</rule>
+
+## Guidelines
+1. Each type should have only one reason to change
+2. Separate data access, business logic, and presentation
+3. Use composition over inheritance
+4. Keep methods focused and cohesive
+5. Watch for signs of multiple responsibilities:
+   - Multiple unrelated properties
+   - Methods operating on different concerns
+   - Mixed abstraction levels
+   - Too many dependencies
+   - Large number of methods
+6. Consider splitting types when they:
+   - Handle both data and UI
+   - Mix business logic with infrastructure
+   - Combine multiple domain concepts
+7. Use protocol-based separation of concerns
+8. Create focused, single-purpose services
+9. Avoid "manager" or "helper" classes that do too much
+10. Document the single responsibility of each type

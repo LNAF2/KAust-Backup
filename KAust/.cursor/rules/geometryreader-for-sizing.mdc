@@ -1,0 +1,160 @@
+---
+description: 
+globs: *View.swift
+alwaysApply: false
+---
+# GeometryReader for Sizing Rule
+
+This rule enforces the use of GeometryReader for responsive sizing in SwiftUI.
+
+<rule>
+name: geometryreader-for-sizing
+description: Enforce GeometryReader usage for responsive sizing
+message: Views must use GeometryReader for responsive sizing
+severity: warning
+languages: [swift]
+files:
+  - "*View.swift"
+  - "*Screen.swift"
+  - "*Layout*.swift"
+  - "*Container*.swift"
+  - "*Panel*.swift"
+
+patterns:
+  - pattern: |
+      struct $VIEW: View {
+          var body: some View {
+              VStack {
+                  // Content without GeometryReader
+              }
+              .frame(width: $NUMBER, height: $NUMBER)
+          }
+      }
+    message: "Use GeometryReader for responsive sizing instead of fixed dimensions."
+
+  - pattern: |
+      .frame(maxWidth: .infinity)
+    message: "Consider using GeometryReader for more precise control over sizing."
+
+examples:
+  - name: Good Example
+    code: |
+      struct ResponsiveCardView: View {
+          var body: some View {
+              GeometryReader { geometry in
+                  VStack(spacing: 16) {
+                      Image("artwork")
+                          .resizable()
+                          .aspectRatio(contentMode: .fill)
+                          .frame(
+                              width: geometry.size.width * 0.8,
+                              height: geometry.size.height * 0.4
+                          )
+                          .clipped()
+                      
+                      Text("Title")
+                          .font(.title)
+                          .frame(maxWidth: geometry.size.width * 0.9)
+                      
+                      Text("Description")
+                          .font(.body)
+                          .frame(maxWidth: geometry.size.width * 0.9)
+                      
+                      HStack {
+                          Button("Action 1") { }
+                          Button("Action 2") { }
+                      }
+                      .frame(width: geometry.size.width * 0.8)
+                  }
+                  .frame(
+                      width: geometry.size.width,
+                      height: geometry.size.height,
+                      alignment: .top
+                  )
+              }
+          }
+      }
+      
+      struct ResponsiveGridView: View {
+          let items: [Item]
+          
+          var body: some View {
+              GeometryReader { geometry in
+                  let width = geometry.size.width
+                  let columns = width > 768 ? 3 : (width > 414 ? 2 : 1)
+                  let spacing: CGFloat = 16
+                  let itemWidth = (width - spacing * CGFloat(columns + 1)) / CGFloat(columns)
+                  
+                  ScrollView {
+                      LazyVGrid(
+                          columns: Array(
+                              repeating: GridItem(.fixed(itemWidth), spacing: spacing),
+                              count: columns
+                          ),
+                          spacing: spacing
+                      ) {
+                          ForEach(items) { item in
+                              ItemView(item: item)
+                                  .frame(height: itemWidth * 1.5)
+                          }
+                      }
+                      .padding(.horizontal, spacing)
+                  }
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Fixed dimensions without GeometryReader
+      struct NonResponsiveCardView: View {
+          var body: some View {
+              VStack(spacing: 16) {
+                  Image("artwork")
+                      .resizable()
+                      .frame(width: 300, height: 200)  // Bad: Fixed dimensions
+                  
+                  Text("Title")
+                      .frame(width: 280)  // Bad: Fixed width
+                  
+                  Text("Description")
+                      .frame(maxWidth: .infinity)  // Bad: Infinite width
+              }
+              .frame(width: 320, height: 400)  // Bad: Fixed container size
+          }
+      }
+      
+      // Bad: No responsive layout
+      struct NonResponsiveGridView: View {
+          let items: [Item]
+          
+          var body: some View {
+              ScrollView {
+                  LazyVGrid(
+                      columns: [
+                          GridItem(.fixed(150)),
+                          GridItem(.fixed(150))
+                      ],
+                      spacing: 16
+                  ) {
+                      ForEach(items) { item in
+                          ItemView(item: item)
+                              .frame(height: 200)  // Bad: Fixed height
+                      }
+                  }
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use GeometryReader for responsive sizing
+2. Calculate dimensions based on container size
+3. Use proportional dimensions (e.g., 0.8 * width)
+4. Adapt layout based on available space
+5. Consider device orientation changes
+6. Handle different screen sizes
+7. Use flexible spacing
+8. Maintain aspect ratios
+9. Implement responsive grids
+10. Test on various device sizes

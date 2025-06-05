@@ -1,0 +1,155 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Primary Data Store Protocol Access Rule
+
+This rule enforces that all services providing access to the primary data store (e.g., "Code base", a remote API, local database) must be defined by and accessed through protocol interfaces. This promotes testability, modularity, and adherence to the Dependency Inversion Principle.
+
+<rule>
+name: primary-data-store-protocol-access
+description: Enforce protocol-based access for primary data store services
+message: Primary data store services must be defined by and accessed through protocol types, not concrete implementations.
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $CLASS {
+        let $PROVIDER = ConcreteDataProvider()
+      }
+    message: "Direct instantiation of a concrete data provider ($PROVIDER) detected. Inject it using its protocol type instead."
+
+  - pattern: |
+      struct $STRUCT {
+        let $PROVIDER = ConcreteDataProvider()
+      }
+    message: "Direct instantiation of a concrete data provider ($PROVIDER) detected. Inject it using its protocol type instead."
+
+  - pattern: |
+      class $CLASS {
+        var $PROVIDER: ConcreteDataProvider
+      }
+    message: "Property '$PROVIDER' should use a protocol type for the data provider, not the concrete class 'ConcreteDataProvider'."
+
+  - pattern: |
+      struct $STRUCT {
+        var $PROVIDER: ConcreteDataProvider
+      }
+    message: "Property '$PROVIDER' should use a protocol type for the data provider, not the concrete class 'ConcreteDataProvider'."
+
+  - pattern: |
+      class $CLASS {
+          func someMethod() {
+              let $DATA = ConcreteDataProvider.shared.fetchData()
+          }
+      }
+    message: "Accessing data provider via a concrete shared instance 'ConcreteDataProvider.shared' is discouraged. Inject the provider using its protocol type. (Note: If 'ConcreteDataProvider.shared' is an SDK-provided singleton, ensure it's wrapped by your own protocol-based service.)"
+  
+  - pattern: |
+      class $SERVICE_IMPL {
+          // This class provides data access but does not conform to a specific protocol
+          func fetchData() { /* ... */ }
+          func saveData(_ data: SomeType) { /* ... */ }
+      }
+      // And is NOT followed by `extension $SERVICE_IMPL: $ANY_PROTOCOL {}` in a reasonable proximity
+    message: "Concrete data provider implementation '$SERVICE_IMPL' should conform to a corresponding protocol that defines its contract."
+
+
+examples:
+  - name: Good Example
+    code: |
+      // Define a protocol for data provider operations
+      protocol DataProviderServiceProtocol {
+          func fetchData<T: Decodable>(for type: T.Type, from endpoint: String) async throws -> [T]
+          func saveData<T: Encodable>(_ data: T, to endpoint: String) async throws
+          // ... other data operations
+      }
+      
+      // Concrete implementation of the data provider service
+      // This service might interact with an underlying SDK (e.g., CodeBaseSDK.shared)
+      final class CodeBaseProviderService: DataProviderServiceProtocol {
+          // Example: if the SDK has a singleton
+          // private let codeBaseSDK = CodeBaseSDK.shared 
+          
+          // Or if the SDK client needs to be initialized and injected
+          private let apiClient: APIClientProtocol // Assuming an API client for "Code base"
+
+          init(apiClient: APIClientProtocol) {
+              self.apiClient = apiClient
+              // Or: self.codeBaseSDK = CodeBaseSDK.shared if that's the pattern
+          }
+          
+          func fetchData<T: Decodable>(for type: T.Type, from endpoint: String) async throws -> [T] {
+              // Implementation using apiClient or codeBaseSDK
+              // return try await apiClient.get(from: endpoint)
+              return [] // Placeholder
+          }
+          
+          func saveData<T: Encodable>(_ data: T, to endpoint: String) async throws {
+              // Implementation using apiClient or codeBaseSDK
+              // try await apiClient.post(data, to: endpoint)
+          }
+      }
+      
+      // Repository/ViewModel using the data provider through its protocol
+      struct UserRepository {
+          private let dataProvider: DataProviderServiceProtocol
+          
+          // Dependency is injected via constructor using the protocol
+          init(dataProvider: DataProviderServiceProtocol) {
+              self.dataProvider = dataProvider
+          }
+          
+          func fetchUsers() async throws -> [User] {
+              try await dataProvider.fetchData(for: User.self, from: "/users")
+          }
+      }
+      
+      // At the composition root (e.g., App Delegate or main app struct)
+      // let apiClient = ActualAPIClient() // Initialize the concrete API client
+      // let codeBaseProvider = CodeBaseProviderService(apiClient: apiClient)
+      // let userRepository = UserRepository(dataProvider: codeBaseProvider)
+
+  - name: Bad Example
+    code: |
+      // Concrete data provider implementation without a dedicated protocol widely used
+      final class DirectCodeBaseService {
+          // static let shared = DirectCodeBaseService() // Bad: Creating an app-level singleton for the service
+          
+          private let sdkInstance = CodeBaseSDK.shared // This internal detail is fine
+                                                       // if DirectCodeBaseService itself is not used directly everywhere
+
+          func fetchDataDirectly(from endpoint: String) async throws -> [String] {
+              // Direct implementation
+              return [] // Placeholder
+          }
+      }
+      
+      // ViewModel or Repository directly using the concrete implementation
+      class UserViewModel {
+          // Bad: Direct coupling to the concrete implementation
+          private let dataService = DirectCodeBaseService() 
+          // Or: private let dataService: DirectCodeBaseService 
+
+          func loadUsers() async {
+              // Bad: Makes testing harder and violates DIP
+              // let users = try? await dataService.fetchDataDirectly(from: "/users")
+              // Or if it were a singleton:
+              // let users = try? await DirectCodeBaseService.shared.fetchDataDirectly(from: "/users")
+          }
+      }
+</rule>
+
+## Guidelines
+1.  **Define Protocols**: Always define a Swift protocol for any service that interacts with your primary data store (e.g., "Code base", API, local DB). This protocol outlines the contract for data operations.
+2.  **Protocol-Typed Dependencies**: When a class or struct needs to use a data provider service, its properties and initializer parameters must use the protocol type, not the concrete implementation type.
+3.  **Constructor Injection**: Inject data provider dependencies through initializers using their protocol types. This adheres to the `constructor-based-di-only` rule and makes dependencies explicit.
+4.  **Concrete Implementations Conform to Protocols**: The concrete class that implements the data access logic (e.g., the class that talks to your "Code base" SDK) must conform to the defined protocol.
+5.  **SDK Singletons**: If the underlying SDK for your "Code base" provides a singleton (e.g., `CodeBaseSDK.shared`), your concrete service implementation can use it internally. However, this SDK singleton should not be directly exposed to or used by the rest of your application. Your service acts as a wrapper.
+6.  **Avoid App-Level Singletons for Services**: Do not create your own singletons for data provider services. Instead, instantiate them at your composition root and inject them where needed. (This is reinforced by the `no-singletons-except-primary-data-store` rule, which now clarifies exceptions for SDK-level singletons).
+7.  **Testability**: Using protocols allows you to easily create mock implementations of your data provider services for unit testing your ViewModels, repositories, and other business logic components.
+8.  **Focused Protocols**: Keep data provider protocols focused on a cohesive set of operations related to a specific domain or data type, adhering to the Interface Segregation Principle.
+9.  **Async/Await**: Ensure protocol methods for data operations that are asynchronous are marked with `async` and `throws` as appropriate.
+10. **Documentation**: Clearly document the purpose and usage of both the data provider protocols and their concrete implementations.

@@ -1,0 +1,162 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# Interface Documentation Rule
+
+This rule enforces proper documentation of interfaces and public APIs.
+
+<rule>
+name: interface-documentation
+description: Enforce proper documentation of interfaces and public APIs
+message: Public interfaces must be properly documented
+severity: warning
+languages: [swift]
+files:
+  - "*.swift"
+
+patterns:
+  - pattern: |
+      public protocol $PROTOCOL {
+      }
+    message: "Document protocol purpose and requirements."
+
+  - pattern: |
+      public func $METHOD($PARAMS) -> $RETURN {
+      }
+    message: "Document public method parameters, return value, and throws."
+
+examples:
+  - name: Good Example
+    code: |
+      /// A service that manages media playback and queuing.
+      ///
+      /// The media player service handles:
+      /// - Audio and video playback
+      /// - Playlist management
+      /// - Playback state management
+      /// - Media buffering and caching
+      ///
+      /// ## Thread Safety
+      /// All methods are thread-safe and can be called from any thread.
+      /// State updates are delivered on the main thread.
+      ///
+      /// ## Error Handling
+      /// Methods may throw `MediaPlayerError` for common playback issues.
+      /// Network-related errors are wrapped in `MediaPlayerError.network`.
+      public protocol MediaPlayerServiceProtocol {
+          /// The current playback state.
+          var state: PlaybackState { get }
+          
+          /// The currently playing media item, if any.
+          var currentItem: MediaItem? { get }
+          
+          /// Begins playback of the specified media item.
+          ///
+          /// This method will:
+          /// 1. Load the media item's metadata
+          /// 2. Buffer initial content
+          /// 3. Begin playback when ready
+          ///
+          /// - Parameters:
+          ///   - item: The media item to play
+          ///   - startTime: The time offset to start playback from (default: 0)
+          ///
+          /// - Throws: `MediaPlayerError.invalidItem` if the item cannot be loaded
+          ///          `MediaPlayerError.network` for network-related issues
+          ///
+          /// - Returns: A boolean indicating if playback started successfully
+          func play(
+              _ item: MediaItem,
+              startTime: TimeInterval = 0
+          ) async throws -> Bool
+          
+          /// Pauses the current playback.
+          ///
+          /// - Note: This method is idempotent and can be called multiple times.
+          /// - Important: State updates may be delayed due to buffering.
+          func pause() async
+          
+          /// Stops playback and clears the current item.
+          ///
+          /// - Parameter immediate: If true, stops immediately without fade-out
+          func stop(immediate: Bool = false) async
+      }
+      
+      /// Represents the current state of media playback.
+      ///
+      /// The state transitions follow this pattern:
+      /// ```
+      /// .idle -> .loading -> .playing -> .paused -> .stopped
+      ///                   └-> .failed
+      /// ```
+      public enum PlaybackState: Equatable {
+          /// No media item is loaded
+          case idle
+          
+          /// Media is being loaded or buffered
+          case loading
+          
+          /// Media is currently playing
+          case playing
+          
+          /// Playback is paused
+          case paused
+          
+          /// Playback has stopped
+          case stopped
+          
+          /// Playback failed with an error
+          case failed(MediaPlayerError)
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: No documentation
+      public protocol MediaPlayer {
+          var state: PlaybackState { get }
+          var currentItem: MediaItem? { get }
+          
+          func play(_ item: MediaItem) async throws -> Bool
+          func pause() async
+          func stop() async
+      }
+      
+      // Bad: Minimal documentation
+      /// Handles media playback
+      public class MediaPlayerService: MediaPlayer {
+          /// Current state
+          public private(set) var state: PlaybackState = .idle
+          
+          /// Current item
+          public private(set) var currentItem: MediaItem?
+          
+          /// Plays media
+          public func play(_ item: MediaItem) async throws -> Bool {
+              // Implementation
+          }
+          
+          /// Pauses media
+          public func pause() async {
+              // Implementation
+          }
+          
+          /// Stops media
+          public func stop() async {
+              // Implementation
+          }
+      }
+</rule>
+
+## Guidelines
+1. Document protocol purpose
+2. Document method parameters
+3. Document return values
+4. Document error conditions
+5. Provide usage examples
+6. Document thread safety
+7. Document state transitions
+8. Include important notes
+9. Document side effects
+10. Use proper markup

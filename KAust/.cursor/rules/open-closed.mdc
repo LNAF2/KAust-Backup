@@ -1,0 +1,126 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Open-Closed Principle Rule
+
+This rule enforces that software entities should be open for extension but closed for modification.
+
+<rule>
+name: open-closed
+description: Enforce Open-Closed Principle (OCP)
+message: Types should be open for extension but closed for modification
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $CLASS {
+          func process(type: String) {
+              switch type {
+                  case "type1": // handle type1
+                  case "type2": // handle type2
+              }
+          }
+      }
+    message: "Switch statement on type suggests violation of OCP. Consider using polymorphism instead."
+
+  - pattern: |
+      class $CLASS {
+          func handle$EVENT() {
+              if event is Type1 {
+                  // handle Type1
+              } else if event is Type2 {
+                  // handle Type2
+              }
+          }
+      }
+    message: "Type checking with 'is' operator suggests violation of OCP. Use protocol-based design instead."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define protocol for payment processing
+      protocol PaymentProcessor {
+          func process(amount: Decimal) async throws
+      }
+      
+      // Each payment method extends functionality through new types
+      struct CreditCardProcessor: PaymentProcessor {
+          func process(amount: Decimal) async throws {
+              // Process credit card payment
+          }
+      }
+      
+      struct PayPalProcessor: PaymentProcessor {
+          func process(amount: Decimal) async throws {
+              // Process PayPal payment
+          }
+      }
+      
+      struct ApplePayProcessor: PaymentProcessor {
+          func process(amount: Decimal) async throws {
+              // Process Apple Pay payment
+          }
+      }
+      
+      // Payment service is closed for modification but open for extension
+      class PaymentService {
+          private let processor: PaymentProcessor
+          
+          init(processor: PaymentProcessor) {
+              self.processor = processor
+          }
+          
+          func processPayment(amount: Decimal) async throws {
+              try await processor.process(amount: amount)
+          }
+      }
+      
+      // Adding new payment method doesn't require modifying existing code
+      struct CryptoCurrencyProcessor: PaymentProcessor {
+          func process(amount: Decimal) async throws {
+              // Process cryptocurrency payment
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Requires modification to add new payment types
+      class PaymentService {
+          enum PaymentType {
+              case creditCard
+              case paypal
+              case applePay
+          }
+          
+          func processPayment(type: PaymentType, amount: Decimal) async throws {
+              switch type {
+              case .creditCard:
+                  // Process credit card payment
+              case .paypal:
+                  // Process PayPal payment
+              case .applePay:
+                  // Process Apple Pay payment
+              }
+          }
+      }
+      
+      // Adding new payment type requires modifying existing code:
+      // 1. Add new case to enum
+      // 2. Add new case to switch statement
+      // 3. Recompile all dependent code
+</rule>
+
+## Guidelines
+1. Use protocols and protocol extensions for shared behavior
+2. Prefer composition over inheritance
+3. Design for extensibility through abstractions
+4. Avoid type checking and switching on types
+5. Use protocol-oriented programming
+6. Keep base protocols stable
+7. Extend functionality through new types
+8. Use generics for flexible implementations
+9. Consider using strategy pattern
+10. Document extension points and patterns

@@ -1,0 +1,131 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Exact Dimensions Only Rule
+
+This rule enforces the use of exact dimensions for UI elements rather than relative or estimated sizes.
+
+<rule>
+name: exact-dimensions-only
+description: Enforce exact dimensions for UI elements
+message: UI elements must use exact dimensions for consistency
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      .frame(width: .infinity)
+    message: "Use exact dimensions instead of infinity. Define specific widths for consistency."
+
+  - pattern: |
+      .frame(height: .infinity)
+    message: "Use exact dimensions instead of infinity. Define specific heights for consistency."
+
+  - pattern: |
+      .padding()
+    message: "Specify exact padding values instead of using the default padding."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define standard dimensions
+      enum Dimensions {
+          enum Card {
+              static let width: CGFloat = 320
+              static let height: CGFloat = 180
+              static let padding: CGFloat = 16
+          }
+          
+          enum Avatar {
+              static let size: CGFloat = 44
+          }
+          
+          enum List {
+              static let rowHeight: CGFloat = 60
+              static let spacing: CGFloat = 12
+          }
+      }
+      
+      // View using exact dimensions
+      struct SongCard: View {
+          let song: Song
+          
+          var body: some View {
+              HStack(spacing: Dimensions.Card.padding) {
+                  Image(song.artwork)
+                      .resizable()
+                      .frame(width: 44, height: 44)
+                  
+                  VStack(alignment: .leading, spacing: 4) {
+                      Text(song.title)
+                          .frame(height: 20)
+                      Text(song.artist)
+                          .frame(height: 18)
+                  }
+                  .padding(.vertical, 8)
+              }
+              .frame(width: Dimensions.Card.width, height: Dimensions.Card.height)
+              .padding(Dimensions.Card.padding)
+          }
+      }
+      
+      struct PlaylistRow: View {
+          let playlist: Playlist
+          
+          var body: some View {
+              HStack(spacing: 12) {
+                  Image(playlist.cover)
+                      .frame(width: Dimensions.Avatar.size, height: Dimensions.Avatar.size)
+                  
+                  Text(playlist.name)
+              }
+              .frame(height: Dimensions.List.rowHeight)
+              .padding(.horizontal, 16)
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Using relative or unspecified dimensions
+      struct InconsistentCard: View {
+          var body: some View {
+              HStack {
+                  Image("artwork")
+                      .resizable()
+                      .frame(maxWidth: .infinity)  // Wrong: Undefined width
+                  
+                  VStack {
+                      Text("Title")
+                          .padding()  // Wrong: Unspecified padding
+                      
+                      Text("Artist")
+                          .padding(.horizontal)  // Wrong: Unspecified horizontal padding
+                  }
+              }
+              .frame(maxHeight: .infinity)  // Wrong: Undefined height
+              .padding()  // Wrong: Default padding
+          }
+      }
+</rule>
+
+## Guidelines
+1. Define exact dimensions in a central location
+2. Use specific numeric values for:
+   - Widths and heights
+   - Padding and margins
+   - Spacing between elements
+   - Icon and image sizes
+3. Avoid relative dimensions like .infinity
+4. Specify exact padding values
+5. Maintain consistent spacing
+6. Document dimension constants
+7. Consider device-specific variations
+8. Test dimensions across devices
+9. Use exact dimensions for:
+   - Cards and containers
+   - List rows and cells
+   - Buttons and controls
+   - Media elements
+10. Maintain aspect ratios when scaling

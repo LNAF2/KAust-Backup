@@ -1,0 +1,174 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# Algorithm Explanations Rule
+
+This rule enforces proper documentation of complex algorithms.
+
+<rule>
+name: algorithm-explanations
+description: Enforce proper documentation of algorithms
+message: Complex algorithms must be properly documented
+severity: warning
+languages: [swift]
+files:
+  - "*Algorithm*.swift"
+  - "*Processor*.swift"
+  - "*Calculator*.swift"
+  - "*Solver*.swift"
+  - "*Engine*.swift"
+  - "*Manager*.swift"
+  - "*Service*.swift"
+
+patterns:
+  - pattern: |
+      func $METHOD($PARAMS) -> $RETURN {
+          // Complex algorithm without documentation
+      }
+    message: "Document algorithm purpose, complexity, and implementation details."
+
+examples:
+  - name: Good Example
+    code: |
+      /// A service that implements audio beat detection algorithms.
+      ///
+      /// This service uses multiple algorithms to detect beats in audio:
+      /// 1. Energy-based detection for strong beats
+      /// 2. Spectral flux analysis for subtle changes
+      /// 3. Phase deviation detection for complex patterns
+      ///
+      /// ## Algorithm Details
+      /// The main beat detection combines three approaches:
+      /// - Energy detection: O(n) - Simple but effective for strong beats
+      /// - Spectral analysis: O(n log n) - More accurate but computationally intensive
+      /// - Pattern matching: O(n²) - Used for verification and false positive reduction
+      ///
+      /// ## Performance Considerations
+      /// - Memory usage scales with O(n) where n is the audio buffer size
+      /// - Processing is done in chunks to maintain constant memory usage
+      /// - Heavy operations are performed on background threads
+      class BeatDetectionService {
+          /// Detects beats in the provided audio buffer.
+          ///
+          /// The algorithm works as follows:
+          /// 1. Split audio into frequency bands
+          /// 2. Calculate energy envelope for each band
+          /// 3. Detect peaks in energy envelopes
+          /// 4. Apply onset detection function
+          /// 5. Verify beats with pattern matching
+          ///
+          /// - Complexity: Time O(n log n), Space O(n)
+          ///   where n is the number of samples in the buffer
+          ///
+          /// - Parameters:
+          ///   - buffer: Raw audio samples to analyze
+          ///   - sensitivity: Detection sensitivity (0.0-1.0)
+          ///
+          /// - Returns: Array of beat timestamps in seconds
+          func detectBeats(
+              in buffer: AudioBuffer,
+              sensitivity: Float = 0.5
+          ) -> [TimeInterval] {
+              // 1. Split into frequency bands using FFT
+              let bands = splitFrequencyBands(buffer)
+              
+              // 2. Calculate energy envelope
+              let envelopes = bands.map { band in
+                  calculateEnergyEnvelope(band)
+              }
+              
+              // 3. Detect peaks in each band
+              let peaks = envelopes.map { envelope in
+                  detectPeaks(
+                      in: envelope,
+                      threshold: sensitivity
+                  )
+              }
+              
+              // 4. Apply onset detection
+              let onsets = detectOnsets(peaks)
+              
+              // 5. Verify with pattern matching
+              return verifyBeats(onsets)
+          }
+          
+          /// Calculates the energy envelope of an audio signal.
+          ///
+          /// Uses a sliding window RMS calculation:
+          /// ```
+          /// For each window of size W:
+          ///   E = sqrt(sum(x[i]²) / W)
+          /// ```
+          ///
+          /// - Complexity: O(n) where n is signal length
+          private func calculateEnergyEnvelope(
+              _ signal: [Float]
+          ) -> [Float] {
+              // Implementation
+          }
+          
+          /// Detects peaks in a signal using adaptive thresholding.
+          ///
+          /// Algorithm steps:
+          /// 1. Calculate moving average (MA) of signal
+          /// 2. Find points where signal > (MA * threshold)
+          /// 3. Apply minimum peak distance constraint
+          /// 4. Interpolate peak positions
+          ///
+          /// - Complexity: O(n) where n is signal length
+          private func detectPeaks(
+              in signal: [Float],
+              threshold: Float
+          ) -> [Int] {
+              // Implementation
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: No algorithm documentation
+      class BeatDetector {
+          func findBeats(in audio: [Float]) -> [Double] {
+              var beats: [Double] = []
+              
+              // Complex algorithm without explanation
+              let fft = performFFT(audio)
+              let peaks = findPeaks(fft)
+              let patterns = analyzePatterns(peaks)
+              
+              // More processing without documentation
+              for pattern in patterns {
+                  if pattern.energy > threshold {
+                      beats.append(pattern.time)
+                  }
+              }
+              
+              return beats
+          }
+          
+          // Bad: No explanation of the algorithm or its complexity
+          private func findPeaks(_ data: [Float]) -> [Peak] {
+              var peaks: [Peak] = []
+              for i in 1..<data.count-1 {
+                  if data[i] > data[i-1] && data[i] > data[i+1] {
+                      peaks.append(Peak(time: Double(i), energy: data[i]))
+                  }
+              }
+              return peaks
+          }
+      }
+</rule>
+
+## Guidelines
+1. Document algorithm purpose
+2. Explain implementation steps
+3. Specify time complexity
+4. Specify space complexity
+5. Document edge cases
+6. Provide usage examples
+7. Document limitations
+8. Include performance notes
+9. Document dependencies
+10. Use diagrams when helpful

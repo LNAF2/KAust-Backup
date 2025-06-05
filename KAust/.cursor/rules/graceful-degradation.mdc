@@ -1,0 +1,156 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Graceful Degradation Rule
+
+This rule enforces graceful degradation when handling errors and edge cases.
+
+<rule>
+name: graceful-degradation
+description: Enforce graceful degradation in error handling
+message: Implement graceful degradation for error cases and edge conditions
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      catch {
+          return nil
+      }
+    message: "Provide fallback behavior instead of returning nil in catch blocks."
+
+  - pattern: |
+      catch {
+          print($ERROR)
+      }
+    message: "Implement proper error recovery instead of just printing errors."
+
+examples:
+  - name: Good Example
+    code: |
+      // Error types with recovery options
+      enum ImageLoadError: Error {
+          case networkError(Error)
+          case invalidData
+          case processingError
+          
+          var fallbackImage: UIImage {
+              // Provide appropriate fallback based on error type
+              switch self {
+              case .networkError:
+                  return UIImage(named: "offline-placeholder")!
+              case .invalidData, .processingError:
+                  return UIImage(named: "error-placeholder")!
+              }
+          }
+      }
+      
+      class ImageLoader {
+          func loadImage(from url: URL) async -> UIImage {
+              do {
+                  let (data, _) = try await URLSession.shared.data(from: url)
+                  
+                  // Try to create image from data
+                  if let image = UIImage(data: data) {
+                      return image
+                  } else {
+                      // Fallback to cached version if available
+                      if let cached = ImageCache.shared.getImage(for: url) {
+                          return cached
+                      }
+                      // Final fallback to placeholder
+                      return UIImage(named: "placeholder")!
+                  }
+              } catch {
+                  // Log error for debugging
+                  Logger.error("Failed to load image: \(error)")
+                  
+                  // Try to recover with cached version
+                  if let cached = ImageCache.shared.getImage(for: url) {
+                      return cached
+                  }
+                  
+                  // Provide appropriate fallback
+                  let imageError = error as? ImageLoadError ?? .networkError(error)
+                  return imageError.fallbackImage
+              }
+          }
+      }
+      
+      // Graceful degradation in UI
+      struct ContentView: View {
+          @State private var searchResults: [Song] = []
+          @State private var error: Error?
+          
+          var body: some View {
+              Group {
+                  if !searchResults.isEmpty {
+                      // Show results
+                      List(searchResults) { song in
+                          SongRow(song: song)
+                      }
+                  } else if let error = error {
+                      // Show error with retry option
+                      VStack {
+                          Text("Couldn't load songs")
+                              .font(.headline)
+                          Text(error.localizedDescription)
+                              .font(.subheadline)
+                          Button("Try Again") {
+                              Task {
+                                  await loadSongs()
+                              }
+                          }
+                      }
+                  } else {
+                      // Show loading or empty state
+                      ProgressView()
+                  }
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: No graceful degradation
+      class ImageLoader {
+          func loadImage(from url: URL) async throws -> UIImage {
+              do {
+                  let (data, _) = try await URLSession.shared.data(from: url)
+                  guard let image = UIImage(data: data) else {
+                      throw NSError(domain: "", code: -1)  // Bad: Generic error
+                  }
+                  return image
+              } catch {
+                  print("Failed to load image: \(error)")  // Bad: Just printing error
+                  throw error  // Bad: No recovery attempt
+              }
+          }
+      }
+      
+      struct ContentView: View {
+          @State private var image: UIImage?
+          
+          var body: some View {
+              if let image = image {
+                  Image(uiImage: image)
+              } else {
+                  Text("Error loading image")  // Bad: No recovery or retry option
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Provide meaningful fallback behavior
+2. Implement multiple recovery strategies
+3. Use cached data when available
+4. Show appropriate placeholder content
+5. Offer retry mechanisms
+6. Log errors for debugging
+7. Maintain partial functionality
+8. Handle offline scenarios
+9. Preserve user input
+10. Communicate status to users

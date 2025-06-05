@@ -1,0 +1,118 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# No Force Unwrapping Rule
+
+This rule enforces safe optional handling by prohibiting force unwrapping.
+
+<rule>
+name: no-force-unwrapping
+description: Prohibit force unwrapping of optionals
+message: Force unwrapping is not allowed. Use safe optional handling instead.
+severity: error
+languages: [swift]
+
+patterns:
+  - pattern: |
+      $VARIABLE!
+    message: "Force unwrapping detected. Use optional binding or nil coalescing instead."
+
+  - pattern: |
+      try! $EXPRESSION
+    message: "Force try detected. Use proper error handling instead."
+
+  - pattern: |
+      fatalError($MESSAGE)
+    message: "fatalError detected. Implement proper error handling instead."
+
+examples:
+  - name: Good Example
+    code: |
+      // Safe optional handling with optional binding
+      struct UserProfile {
+          let name: String
+          let email: String?
+          let age: Int?
+          
+          func displayProfile() -> String {
+              // Using optional binding
+              if let email = email {
+                  return "\(name) (\(email))"
+              } else {
+                  return name
+              }
+          }
+          
+          func getAgeGroup() -> String {
+              // Using nil coalescing
+              let userAge = age ?? 0
+              return userAge >= 18 ? "Adult" : "Minor"
+          }
+          
+          // Using optional chaining
+          func getEmailDomain() -> String? {
+              return email?.split(separator: "@").last.map(String.init)
+          }
+      }
+      
+      // Proper error handling
+      enum NetworkError: Error {
+          case invalidURL
+          case noData
+          case decodingError
+      }
+      
+      class NetworkService {
+          func fetchData() throws -> Data {
+              guard let url = URL(string: "https://api.example.com") else {
+                  throw NetworkError.invalidURL
+              }
+              
+              // Proper error handling with try/catch
+              do {
+                  let (data, _) = try await URLSession.shared.data(from: url)
+                  return data
+              } catch {
+                  throw NetworkError.noData
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Using force unwrapping
+      struct UnsafeUserProfile {
+          let name: String
+          let email: String?
+          
+          func displayProfile() -> String {
+              return "\(name) (\(email!))"  // Bad: Force unwrapping
+          }
+          
+          func loadImage() -> UIImage {
+              let url = URL(string: "https://example.com/image.jpg")!  // Bad: Force unwrapping
+              let data = try! Data(contentsOf: url)  // Bad: Force try
+              return UIImage(data: data)!  // Bad: Force unwrapping
+          }
+          
+          func validateAge(_ age: Int?) {
+              guard age != nil else {
+                  fatalError("Age cannot be nil")  // Bad: Using fatalError
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use optional binding (if let, guard let)
+2. Use nil coalescing operator (??)
+3. Implement proper error handling (do/try/catch)
+4. Use optional chaining
+5. Provide default values when appropriate
+6. Handle all possible nil cases
+7. Use type-safe APIs
+8. Document nullable properties
+9. Consider using Result type
+10. Use proper error types and domains

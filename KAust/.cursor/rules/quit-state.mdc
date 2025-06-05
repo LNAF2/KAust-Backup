@@ -1,0 +1,120 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Quit State Rule
+
+This rule enforces proper handling of application quit state.
+
+<rule>
+name: quit-state
+description: Enforce proper handling of application quit state
+message: Application quit state must be handled appropriately
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $CLASS: UIApplicationDelegate {
+          func applicationWillTerminate($APP: UIApplication) {
+          }
+      }
+    message: "Application termination should properly clean up resources and save state."
+
+  - pattern: |
+      class $CLASS {
+          deinit {
+          }
+      }
+    message: "Deinitializers should properly clean up resources and remove observers."
+
+examples:
+  - name: Good Example
+    code: |
+      @main
+      class AppDelegate: UIResponder, UIApplicationDelegate {
+          private let stateManager: StateManaging
+          private let dataManager: DataManaging
+          
+          override init() {
+              self.stateManager = StateManager()
+              self.dataManager = DataManager()
+              super.init()
+              setupNotifications()
+          }
+          
+          private func setupNotifications() {
+              NotificationCenter.default.addObserver(
+                  self,
+                  selector: #selector(handleTermination),
+                  name: UIApplication.willTerminateNotification,
+                  object: nil
+              )
+          }
+          
+          func applicationWillTerminate(_ application: UIApplication) {
+              handleTermination()
+          }
+          
+          @objc private func handleTermination() {
+              // Save any pending changes
+              dataManager.saveContext()
+              
+              // Clean up any temporary files
+              cleanupTemporaryFiles()
+              
+              // Save app state
+              stateManager.saveApplicationState()
+              
+              // Remove notification observers
+              NotificationCenter.default.removeObserver(self)
+              
+              // Cancel any pending operations
+              cancelPendingOperations()
+              
+              // Perform final cleanup
+              performFinalCleanup()
+          }
+          
+          private func cleanupTemporaryFiles() {
+              // Implementation
+          }
+          
+          private func cancelPendingOperations() {
+              // Implementation
+          }
+          
+          private func performFinalCleanup() {
+              // Implementation
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      class BadAppDelegate: UIResponder, UIApplicationDelegate {
+          var coreDataContext: NSManagedObjectContext?
+          
+          func applicationWillTerminate(_ application: UIApplication) {
+              // Bad: No proper cleanup
+              // Bad: No state saving
+              // Bad: Potential memory leaks
+          }
+          
+          deinit {
+              // Bad: Empty deinit without cleanup
+          }
+      }
+</rule>
+
+## Guidelines
+1. Save application state before quitting
+2. Clean up all resources properly
+3. Remove notification observers
+4. Save Core Data context if needed
+5. Cancel pending operations
+6. Clean up temporary files
+7. Handle background tasks
+8. Remove KVO observers
+9. Close network connections
+10. Document cleanup procedures

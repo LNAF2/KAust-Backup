@@ -1,0 +1,155 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# Efficient Operations Rule
+
+This rule enforces efficient file operation practices.
+
+<rule>
+name: efficient-operations
+description: Enforce efficient file operation practices
+message: File operations must be optimized for performance
+severity: warning
+languages: [swift]
+files:
+  - "*File*.swift"
+  - "*Storage*.swift"
+  - "*Data*.swift"
+  - "*Stream*.swift"
+  - "*Buffer*.swift"
+  - "*IO*.swift"
+
+patterns:
+  - pattern: |
+      String(contentsOf: $URL)
+    message: "Use FileHandle or streams for large file operations."
+
+  - pattern: |
+      Data(contentsOf: $URL)
+    message: "Use chunked reading for large data operations."
+
+examples:
+  - name: Good Example
+    code: |
+      // Efficient file operations manager
+      class EfficientFileManager {
+          private let fileManager: FileManager
+          private let bufferSize: Int = 32_768  // 32KB buffer
+          
+          init(fileManager: FileManager = .default) {
+              self.fileManager = fileManager
+          }
+          
+          func readLargeFile(at url: URL) throws -> String {
+              let fileHandle = try FileHandle(forReadingFrom: url)
+              defer { try? fileHandle.close() }
+              
+              var content = ""
+              while let data = try fileHandle.read(upToCount: bufferSize) {
+                  if let chunk = String(data: data, encoding: .utf8) {
+                      content += chunk
+                  }
+              }
+              return content
+          }
+          
+          func copyLargeFile(from sourceURL: URL, to destinationURL: URL) throws {
+              let sourceHandle = try FileHandle(forReadingFrom: sourceURL)
+              let destinationHandle = try FileHandle(forWritingTo: destinationURL)
+              defer {
+                  try? sourceHandle.close()
+                  try? destinationHandle.close()
+              }
+              
+              while let data = try sourceHandle.read(upToCount: bufferSize) {
+                  try destinationHandle.write(contentsOf: data)
+              }
+          }
+          
+          func processLargeFile(at url: URL, processor: (Data) throws -> Data) throws {
+              let sourceHandle = try FileHandle(forReadingFrom: url)
+              let tempURL = url.deletingLastPathComponent()
+                  .appendingPathComponent("temp_\(UUID().uuidString)")
+              
+              fileManager.createFile(atPath: tempURL.path, contents: nil)
+              let destinationHandle = try FileHandle(forWritingTo: tempURL)
+              
+              defer {
+                  try? sourceHandle.close()
+                  try? destinationHandle.close()
+              }
+              
+              while let data = try sourceHandle.read(upToCount: bufferSize) {
+                  let processedData = try processor(data)
+                  try destinationHandle.write(contentsOf: processedData)
+              }
+              
+              try fileManager.removeItem(at: url)
+              try fileManager.moveItem(at: tempURL, to: url)
+          }
+          
+          func streamWrite(to url: URL, content: AsyncSequence<Data>) async throws {
+              let handle = try FileHandle(forWritingTo: url)
+              defer { try? handle.close() }
+              
+              for try await chunk in content {
+                  try handle.write(contentsOf: chunk)
+              }
+          }
+      }
+      
+      // Usage with progress reporting
+      class FileProcessor {
+          private let fileManager: EfficientFileManager
+          
+          func processFile(at url: URL, progress: Progress) async throws {
+              let size = try await url.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+              progress.totalUnitCount = Int64(size)
+              
+              var processedBytes: Int64 = 0
+              
+              try await fileManager.streamWrite(to: url) { chunk in
+                  processedBytes += Int64(chunk.count)
+                  progress.completedUnitCount = processedBytes
+                  return processChunk(chunk)
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Inefficient file operations
+      class InefficientFileManager {
+          func readFile(at url: URL) throws -> String {
+              // Bad: Loads entire file into memory
+              return try String(contentsOf: url)
+          }
+          
+          func copyFile(from source: URL, to destination: URL) throws {
+              // Bad: Loads entire file into memory
+              let data = try Data(contentsOf: source)
+              try data.write(to: destination)
+          }
+          
+          func processFile(at url: URL) throws {
+              // Bad: Multiple full file reads/writes
+              var content = try String(contentsOf: url)
+              content = process(content)
+              try content.write(to: url, atomically: true, encoding: .utf8)
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use appropriate buffer sizes
+2. Implement chunked reading/writing
+3. Use FileHandle for large files
+4. Implement progress reporting
+5. Handle memory efficiently
+6. Use temporary files properly
+7. Implement proper error handling
+8. Clean up resources
+9. Use async/await when appropriate
+10. Document performance considerations

@@ -1,0 +1,165 @@
+---
+description: 
+globs: *View.swift
+alwaysApply: false
+---
+# Light/Dark Mode Support Rule
+
+This rule enforces proper support for both light and dark appearance modes.
+
+<rule>
+name: light-dark-mode-support
+description: Enforce proper support for light and dark modes
+message: Views must support both light and dark appearance modes
+severity: warning
+languages: [swift]
+files:
+  - "*View.swift"
+  - "*Style*.swift"
+  - "*Theme*.swift"
+  - "*Color*.swift"
+  - "*Asset*.swift"
+
+patterns:
+  - pattern: |
+      Color($LITERAL)
+    message: "Use color assets or environment-aware colors instead of literal colors."
+
+  - pattern: |
+      .foregroundColor(.black)
+    message: "Use primary/secondary colors that adapt to appearance mode."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define appearance-aware colors
+      extension Color {
+          static let backgroundPrimary = Color("BackgroundPrimary")
+          static let backgroundSecondary = Color("BackgroundSecondary")
+          static let textPrimary = Color("TextPrimary")
+          static let textSecondary = Color("TextSecondary")
+          static let accentPrimary = Color("AccentPrimary")
+          static let accentSecondary = Color("AccentSecondary")
+      }
+      
+      // View using appearance-aware colors
+      struct AdaptiveCardView: View {
+          var body: some View {
+              VStack(spacing: 16) {
+                  Text("Title")
+                      .font(.title)
+                      .foregroundColor(.textPrimary)
+                  
+                  Text("Description")
+                      .font(.body)
+                      .foregroundColor(.textSecondary)
+                  
+                  Button("Action") {
+                      // Action
+                  }
+                  .foregroundColor(.accentPrimary)
+              }
+              .padding()
+              .background(Color.backgroundPrimary)
+              .cornerRadius(8)
+          }
+      }
+      
+      // Color assets in Assets.xcassets/Colors.xcassets:
+      // BackgroundPrimary.colorset
+      // {
+      //   "colors": [
+      //     {
+      //       "idiom": "universal",
+      //       "color": {
+      //         "color-space": "srgb",
+      //         "components": {
+      //           "red": "1.000",
+      //           "green": "1.000",
+      //           "blue": "1.000",
+      //           "alpha": "1.000"
+      //         }
+      //       }
+      //     },
+      //     {
+      //       "idiom": "universal",
+      //       "appearances": [
+      //         {
+      //           "appearance": "luminosity",
+      //           "value": "dark"
+      //         }
+      //       ],
+      //       "color": {
+      //         "color-space": "srgb",
+      //         "components": {
+      //           "red": "0.110",
+      //           "green": "0.110",
+      //           "blue": "0.118",
+      //           "alpha": "1.000"
+      //         }
+      //       }
+      //     }
+      //   ]
+      // }
+      
+      // Environment-aware view modifiers
+      struct AdaptiveModifiers: ViewModifier {
+          @Environment(\.colorScheme) var colorScheme
+          
+          func body(content: Content) -> some View {
+              content
+                  .background(colorScheme == .dark ? Color.black : Color.white)
+                  .foregroundColor(colorScheme == .dark ? Color.white : Color.black)
+          }
+      }
+      
+      // View using environment-aware modifiers
+      struct AdaptiveView: View {
+          var body: some View {
+              Text("Content")
+                  .modifier(AdaptiveModifiers())
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Hard-coded colors
+      struct NonAdaptiveView: View {
+          var body: some View {
+              VStack {
+                  Text("Title")
+                      .foregroundColor(.black)  // Bad: Fixed color
+                  
+                  Text("Description")
+                      .foregroundColor(Color(red: 0.3, green: 0.3, blue: 0.3))  // Bad: Literal color
+                  
+                  Button("Action") { }
+                      .background(Color.blue)  // Bad: System color without dark mode consideration
+              }
+              .padding()
+              .background(Color.white)  // Bad: Fixed background
+          }
+      }
+      
+      // Bad: Manual dark mode check without reusable colors
+      struct ManualDarkModeView: View {
+          @Environment(\.colorScheme) var colorScheme
+          
+          var body: some View {
+              Text("Content")
+                  .foregroundColor(colorScheme == .dark ? .white : .black)  // Bad: Repeated color logic
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use color assets for theme colors
+2. Define semantic color constants
+3. Support both appearance modes
+4. Use environment-aware modifiers
+5. Test in both modes
+6. Consider contrast ratios
+7. Use system colors appropriately
+8. Handle image assets
+9. Support dynamic type
+10. Document color usage

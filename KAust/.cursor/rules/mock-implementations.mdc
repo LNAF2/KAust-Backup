@@ -1,0 +1,171 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Mock Implementations Rule
+
+This rule enforces the creation of mock implementations for testing.
+
+<rule>
+name: mock-implementations
+description: Enforce mock implementations for testable code
+message: Services and repositories must have corresponding mock implementations for testing
+severity: warning
+languages: [swift]
+files:
+  - "*Service.swift"
+  - "*Repository.swift"
+  - "*Client.swift"
+  - "*Manager.swift"
+  - "*/Tests/**/*.swift"
+  - "*/Testing/**/*.swift"
+  - "*Mock*.swift"
+  - "*Stub*.swift"
+  - "*Fake*.swift"
+  - "*Spy*.swift"
+
+patterns:
+  - pattern: |
+      protocol $PROTOCOL {
+          func $METHOD() async throws -> $RESULT
+      }
+    message: "Protocol should have a corresponding mock implementation for testing."
+
+  - pattern: |
+      class $TEST: XCTestCase {
+          let service = $SERVICE()
+      }
+    message: "Tests should use mock implementations instead of concrete types."
+
+examples:
+  - name: Good Example
+    code: |
+      // Protocol definition
+      protocol NetworkClientProtocol {
+          func fetch(from url: URL) async throws -> Data
+          func post(to url: URL, data: Data) async throws
+          func delete(at url: URL) async throws
+      }
+      
+      // Mock implementation
+      class MockNetworkClient: NetworkClientProtocol {
+          // Mock state
+          var data: Data?
+          var error: Error?
+          var requestedURLs: [URL] = []
+          var postedData: [Data] = []
+          
+          // Mock configuration
+          var shouldFail = false
+          var delaySeconds: Double = 0
+          
+          func fetch(from url: URL) async throws -> Data {
+              requestedURLs.append(url)
+              
+              if shouldFail {
+                  throw error ?? NSError(domain: "", code: -1)
+              }
+              
+              if delaySeconds > 0 {
+                  try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+              }
+              
+              return data ?? Data()
+          }
+          
+          func post(to url: URL, data: Data) async throws {
+              requestedURLs.append(url)
+              postedData.append(data)
+              
+              if shouldFail {
+                  throw error ?? NSError(domain: "", code: -1)
+              }
+          }
+          
+          func delete(at url: URL) async throws {
+              requestedURLs.append(url)
+              
+              if shouldFail {
+                  throw error ?? NSError(domain: "", code: -1)
+              }
+          }
+      }
+      
+      // Tests using mock
+      class NetworkTests: XCTestCase {
+          var mockClient: MockNetworkClient!
+          var service: NetworkService!
+          
+          override func setUp() {
+              super.setUp()
+              mockClient = MockNetworkClient()
+              service = NetworkService(client: mockClient)
+          }
+          
+          func testFetchSuccess() async throws {
+              // Arrange
+              let expectedData = "Test".data(using: .utf8)!
+              mockClient.data = expectedData
+              
+              // Act
+              let result = try await service.fetchData()
+              
+              // Assert
+              XCTAssertEqual(result, expectedData)
+              XCTAssertEqual(mockClient.requestedURLs.count, 1)
+          }
+          
+          func testFetchFailure() async {
+              // Arrange
+              mockClient.shouldFail = true
+              mockClient.error = NSError(domain: "test", code: 404)
+              
+              // Act & Assert
+              await XCTAssertThrowsError(try await service.fetchData())
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: No mock implementation
+      class NetworkTests: XCTestCase {
+          func testFetch() async throws {
+              // Bad: Using real network client in tests
+              let client = NetworkClient()
+              let service = NetworkService(client: client)
+              
+              // Bad: Testing against real network
+              let result = try await service.fetchData()
+              XCTAssertNotNil(result)
+          }
+      }
+      
+      // Bad: Incomplete mock
+      class PartialMockClient: NetworkClientProtocol {
+          func fetch(from url: URL) async throws -> Data {
+              // Bad: Returns hardcoded data without configuration
+              return Data()
+          }
+          
+          func post(to url: URL, data: Data) async throws {
+              // Bad: Empty implementation
+          }
+          
+          func delete(at url: URL) async throws {
+              // Bad: Empty implementation
+          }
+      }
+</rule>
+
+## Guidelines
+1. Create mocks for all protocols
+2. Include state tracking in mocks
+3. Add configuration options
+4. Implement all protocol methods
+5. Track method calls and parameters
+6. Support async/await in mocks
+7. Add failure scenarios
+8. Include delay simulation
+9. Document mock behavior
+10. Reset mock state between tests

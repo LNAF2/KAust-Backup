@@ -1,0 +1,98 @@
+---
+description: 
+globs: *.swift
+alwaysApply: true
+---
+# No iPhone 15 Rule
+
+This rule enforces that iPhone 15 must NOT be used in the project.
+
+<rule>
+name: no-iphone-15
+description: Prohibit the use of iPhone 15 in any context
+message: iPhone 15 is NOT allowed in this project
+severity: error
+languages: [swift]
+
+patterns:
+  - pattern: |
+      "iPhone 15"
+    message: "iPhone 15 is prohibited in this project. Use a different device model."
+
+  - pattern: |
+      iPhone15
+    message: "iPhone 15 references are not allowed. Use alternative device models."
+
+  - pattern: |
+      .iPhone15
+    message: "iPhone 15 enum cases are not allowed. Use alternative device models."
+
+  - pattern: |
+      UIDevice.current.model.contains("iPhone 15")
+    message: "iPhone 15 device detection is not allowed. Use alternative device models."
+
+examples:
+  - name: Good Example
+    code: |
+      // Use alternative device models
+      struct DeviceInfo {
+          static let supportedDevices = [
+              "iPhone 12",
+              "iPhone 13", 
+              "iPhone 14",
+              "iPhone 16",
+              "iPad Pro",
+              "iPad Air"
+          ]
+      }
+      
+      // Device detection without iPhone 15
+      func getCurrentDevice() -> String {
+          let model = UIDevice.current.model
+          if model.contains("iPhone 14") {
+              return "iPhone 14"
+          } else if model.contains("iPhone 16") {
+              return "iPhone 16"
+          }
+          return "Unknown"
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: iPhone 15 usage
+      struct DeviceInfo {
+          static let supportedDevices = [
+              "iPhone 14",
+              "iPhone 15",  // PROHIBITED
+              "iPhone 16"
+          ]
+      }
+      
+      // Bad: iPhone 15 detection
+      func getCurrentDevice() -> String {
+          let model = UIDevice.current.model
+          if model.contains("iPhone 15") {  // PROHIBITED
+              return "iPhone 15"
+          }
+          return "Unknown"
+      }
+      
+      // Bad: iPhone 15 enum case
+      enum DeviceType {
+          case iPhone14
+          case iPhone15  // PROHIBITED
+          case iPhone16
+      }
+</rule>
+
+## Guidelines
+1. Never reference iPhone 15 in any form
+2. Use iPhone 14 or iPhone 16 as alternatives
+3. Skip iPhone 15 in device lists
+4. Use alternative device models for testing
+5. Document why iPhone 15 is excluded
+6. Consider using generic device categories
+7. Use iPad models as alternatives when appropriate
+8. Test on iPhone 14 and iPhone 16 instead
+9. Update device compatibility lists accordingly
+10. Ensure UI works on supported devices only

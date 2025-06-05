@@ -1,0 +1,133 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# No Singletons Except Database Connection Rule
+
+This rule enforces the avoidance of the singleton pattern except for specific database connection cases.
+
+<rule>
+name: no-singletons-except-database-connection
+description: Prohibit unnecessary singleton pattern usage. Encourage dependency injection, with a limited exception for the primary data store's access mechanism if its SDK promotes a singleton pattern.
+message: "Singleton pattern detected. Prefer dependency injection. If this is for accessing the primary data store (e.g., 'Code base') via an SDK-provided singleton, ensure it's wrapped by a protocol-based service in your application. Avoid creating new, general-purpose singletons."
+severity: warning
+languages: [swift]
+
+patterns:
+  - pattern: |
+      class $CLASS {
+          static let shared = $CLASS()
+          private init() { }
+      }
+    message: "Singleton pattern detected. Use dependency injection unless this is specifically for database connection management."
+    
+  - pattern: |
+      class $CLASS {
+          static var shared: $CLASS = {
+              let instance = $CLASS()
+              return instance
+          }()
+      }
+    message: "Singleton pattern detected. Use dependency injection unless this is specifically for database connection management."
+    
+  - pattern: |
+      struct $STRUCT {
+          static let shared = $STRUCT()
+      }
+    message: "Singleton pattern detected in struct. Use dependency injection instead."
+
+exceptions:
+  - pattern: |
+      class DatabaseConnection {
+          static let shared = DatabaseConnection()
+          private init() {
+              // Database initialization
+          }
+      }
+    message: "Acceptable singleton for primary data store access, assuming it's used via a protocol-based service wrapper and dependency injection elsewhere in the app."
+
+examples:
+  - name: Good Example (Database Connection)
+    code: |
+      // Acceptable singleton for database connection
+      final class DatabaseConnection {
+          static let shared = DatabaseConnection()
+          private let dbQueue: DatabaseQueue
+          
+          private init() {
+              // Initialize database connection
+              dbQueue = try! DatabaseQueue(path: "/path/to/db.sqlite")
+          }
+          
+          func execute(_ query: String) throws -> [Row] {
+              // Database operations
+          }
+      }
+      
+      // Service using database connection
+      struct UserRepository {
+          private let db: DatabaseConnection
+          
+          init(database: DatabaseConnection = .shared) {
+              self.db = database
+          }
+      }
+
+  - name: Bad Example (General Service Singleton)
+    code: |
+      // Avoid singletons for general services
+      class UserService {
+          static let shared = UserService()
+          private init() {}
+          
+          func fetchUser(id: String) -> User {
+              // Implementation
+          }
+      }
+      
+      // Usage of bad singleton
+      class UserViewModel {
+          func loadUser() {
+              let user = UserService.shared.fetchUser(id: "123")
+              // This makes testing and dependency injection difficult
+          }
+      }
+      
+  - name: Good Example (Dependency Injection)
+    code: |
+      // Prefer protocol-based dependency injection
+      protocol UserServiceProtocol {
+          func fetchUser(id: String) -> User
+      }
+      
+      struct UserService: UserServiceProtocol {
+          func fetchUser(id: String) -> User {
+              // Implementation
+          }
+      }
+      
+      class UserViewModel {
+          private let userService: UserServiceProtocol
+          
+          init(userService: UserServiceProtocol) {
+              self.userService = userService
+          }
+          
+          func loadUser() {
+              let user = userService.fetchUser(id: "123")
+              // Much easier to test and maintain
+          }
+      }
+</rule>
+
+## Guidelines
+Avoid creating new, general-purpose singletons in your application code. For the primary data store (e.g., 'Code base'), if its SDK provides a singleton access point, encapsulate this within a protocol-based service that is then injected elsewhere.
+Use dependency injection (preferably constructor-based) for all services and repositories.
+If a singleton access pattern is used for the primary data store (either an SDK singleton or a custom wrapper), ensure it is consistently accessed via a protocol you define. This protocol is essential for enabling dependency injection and the use of mock implementations in tests.
+Consider using dedicated dependency containers/registries at the composition root as a more structured alternative to singletons for managing and providing dependencies.
+If you create a wrapper class around an SDK's singleton or define your own access point class for the primary data store that follows a singleton-like pattern, make that class final to prevent inheritance and ensure consistent behavior.
+For any custom singleton classes you define (including wrappers for the primary data store), enforce proper singleton instantiation control (e.g., private init(), static let shared).
+Clearly document the rationale if a singleton pattern (or a direct reference to an SDK singleton via a wrapper) is deemed necessary for accessing the primary data store, explaining why DI of a regular instance isn't suitable in that specific context.
+Ensure thread safety in any custom singleton-like access class for the primary data store, especially if it manages mutable state or orchestrates access to shared resources. (SDK-provided singletons should ideally manage their own thread safety).
+Utilize async/await for all data access operations to the primary data store, as defined in the service protocols. This promotes efficient and modern concurrency.

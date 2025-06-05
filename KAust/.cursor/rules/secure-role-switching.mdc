@@ -1,0 +1,191 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Secure Role Switching Rule
+
+This rule enforces secure role switching mechanisms.
+
+<rule>
+name: secure-role-switching
+description: Enforce secure role switching mechanisms
+message: Role switching must be performed securely with proper verification
+severity: warning
+languages: [swift]
+files:
+  - "*Role*.swift"
+  - "*Auth*.swift"
+  - "*Permission*.swift"
+  - "*Security*.swift"
+  - "*Switch*.swift"
+  - "*Login*.swift"
+  - "*Session*.swift"
+
+patterns:
+  - pattern: |
+      func switchRole($USER, role: $ROLE) {
+          user.role = role  // Direct role assignment
+      }
+    message: "Role switching must include verification and logging."
+
+  - pattern: |
+      user.role = .$NEW_ROLE
+    message: "Direct role assignment is not allowed. Use secure role switching service."
+
+examples:
+  - name: Good Example
+    code: |
+      // Secure role switching protocol
+      protocol RoleSwitchingServiceProtocol {
+          func switchRole(
+              for userId: String,
+              to newRole: UserRole,
+              by adminId: String
+          ) async throws
+          
+          func requestRoleChange(
+              for userId: String,
+              to newRole: UserRole,
+              reason: String
+          ) async throws -> RoleChangeRequest
+          
+          func approveRoleChange(
+              request: RoleChangeRequest,
+              by adminId: String
+          ) async throws
+      }
+      
+      // Secure implementation
+      class RoleSwitchingService: RoleSwitchingServiceProtocol {
+          private let authManager: AuthManagerProtocol
+          private let database: DatabaseProtocol
+          private let logger: LoggerProtocol
+          
+          init(
+              authManager: AuthManagerProtocol,
+              database: DatabaseProtocol,
+              logger: LoggerProtocol
+          ) {
+              self.authManager = authManager
+              self.database = database
+              self.logger = logger
+          }
+          
+          private func verifyAdminAccess(_ adminId: String) throws {
+              guard let admin = try await database.fetchUser(id: adminId),
+                    admin.role == .admin else {
+                  throw SecurityError.unauthorized
+              }
+          }
+          
+          func switchRole(
+              for userId: String,
+              to newRole: UserRole,
+              by adminId: String
+          ) async throws {
+              // Verify admin access
+              try await verifyAdminAccess(adminId)
+              
+              // Fetch current user data
+              let user = try await database.fetchUser(id: userId)
+              
+              // Log the change
+              logger.log(
+                  level: .info,
+                  "Role change from \(user.role) to \(newRole) for user \(userId) by admin \(adminId)"
+              )
+              
+              // Update role in transaction
+              try await database.transaction { db in
+                  try await db.updateUserRole(userId, newRole)
+                  try await db.createAuditLog(
+                      action: .roleChange,
+                      userId: userId,
+                      adminId: adminId,
+                      details: [
+                          "oldRole": user.role.rawValue,
+                          "newRole": newRole.rawValue
+                      ]
+                  )
+              }
+              
+              // Invalidate existing sessions
+              try await authManager.invalidateUserSessions(userId)
+          }
+          
+          func requestRoleChange(
+              for userId: String,
+              to newRole: UserRole,
+              reason: String
+          ) async throws -> RoleChangeRequest {
+              let request = RoleChangeRequest(
+                  userId: userId,
+                  requestedRole: newRole,
+                  reason: reason,
+                  status: .pending
+              )
+              
+              try await database.saveRoleChangeRequest(request)
+              return request
+          }
+          
+          func approveRoleChange(
+              request: RoleChangeRequest,
+              by adminId: String
+          ) async throws {
+              try await switchRole(
+                  for: request.userId,
+                  to: request.requestedRole,
+                  by: adminId
+              )
+              
+              try await database.updateRoleChangeRequest(
+                  request.id,
+                  status: .approved
+              )
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Insecure role switching
+      class UnsafeRoleManager {
+          func changeUserRole(_ user: User, to role: UserRole) {
+              // Bad: Direct role modification
+              user.role = role
+              database.saveUser(user)
+          }
+          
+          func promoteToAdmin(userId: String) {
+              // Bad: No verification or logging
+              database.updateRole(userId, role: "admin")
+          }
+      }
+      
+      // Bad: Exposed role switching
+      struct UserSettingsView: View {
+          @State var user: User
+          
+          var body: some View {
+              Picker("Role", selection: $user.role) {
+                  // Bad: Direct role modification through UI
+                  ForEach(UserRole.allCases) { role in
+                      Text(role.rawValue)
+                  }
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Require admin verification for role changes
+2. Log all role switching attempts
+3. Use role change request workflow
+4. Invalidate sessions on role change
+5. Create audit trail for changes
+6. Implement approval process
+7. Handle role change notifications
+8. Verify role change permissions
+9. Use secure role storage
+10. Document role switching procedures

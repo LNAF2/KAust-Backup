@@ -1,0 +1,139 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Protocol-Based Services Rule
+
+This rule enforces the use of protocols for all services to ensure testability.
+
+<rule>
+name: protocol-based-services
+description: Enforce protocol-based service definitions for testability
+message: Services must be defined with protocols and accessed through protocol types
+severity: warning
+languages: [swift]
+files:
+  - "*Service.swift"
+  - "*Repository.swift"
+  - "*Manager.swift"
+  - "*Client.swift"
+  - "*Provider.swift"
+  - "*Handler.swift"
+
+patterns:
+  - pattern: |
+      class $SERVICE {
+          func $METHOD() {
+              // Direct implementation without protocol
+          }
+      }
+    message: "Service should be defined with a protocol. Create a protocol for the service interface."
+
+  - pattern: |
+      struct $TYPE {
+          let service = $SERVICE()
+      }
+    message: "Service should be accessed through its protocol type, not concrete implementation."
+
+examples:
+  - name: Good Example
+    code: |
+      // Define service protocol
+      protocol MusicServiceProtocol {
+          func fetchSongs() async throws -> [Song]
+          func saveSong(_ song: Song) async throws
+          func deleteSong(id: String) async throws
+      }
+      
+      // Service implementation
+      struct MusicService: MusicServiceProtocol {
+          private let networkClient: NetworkClientProtocol
+          private let database: DatabaseProtocol
+          
+          init(networkClient: NetworkClientProtocol, database: DatabaseProtocol) {
+              self.networkClient = networkClient
+              self.database = database
+          }
+          
+          func fetchSongs() async throws -> [Song] {
+              // Implementation
+          }
+          
+          func saveSong(_ song: Song) async throws {
+              // Implementation
+          }
+          
+          func deleteSong(id: String) async throws {
+              // Implementation
+          }
+      }
+      
+      // Mock implementation for testing
+      struct MockMusicService: MusicServiceProtocol {
+          var songs: [Song] = []
+          var error: Error?
+          
+          func fetchSongs() async throws -> [Song] {
+              if let error = error {
+                  throw error
+              }
+              return songs
+          }
+          
+          func saveSong(_ song: Song) async throws {
+              songs.append(song)
+          }
+          
+          func deleteSong(id: String) async throws {
+              songs.removeAll { $0.id == id }
+          }
+      }
+      
+      // ViewModel using protocol
+      class SongListViewModel: ObservableObject {
+          private let musicService: MusicServiceProtocol
+          
+          init(musicService: MusicServiceProtocol) {
+              self.musicService = musicService
+          }
+          
+          func loadSongs() async throws -> [Song] {
+              try await musicService.fetchSongs()
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Direct service implementation without protocol
+      class MusicService {
+          func fetchSongs() async throws -> [Song] {
+              // Implementation
+          }
+          
+          func saveSong(_ song: Song) async throws {
+              // Implementation
+          }
+      }
+      
+      // Bad: Direct service usage
+      class SongListViewModel {
+          let musicService = MusicService()  // Concrete type, hard to test
+          
+          func loadSongs() async throws -> [Song] {
+              try await musicService.fetchSongs()
+          }
+      }
+</rule>
+
+## Guidelines
+1. Define protocols for all services
+2. Use protocol types in properties and parameters
+3. Keep protocols focused and single-purpose
+4. Include async/await in protocol methods when needed
+5. Create mock implementations for testing
+6. Use dependency injection
+7. Document protocol requirements
+8. Version protocols appropriately
+9. Consider protocol composition
+10. Use protocol extensions for default implementations

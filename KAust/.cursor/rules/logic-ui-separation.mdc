@@ -1,0 +1,164 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Logic-UI Separation Rule
+
+This rule enforces proper separation between business logic and UI code.
+
+<rule>
+name: logic-ui-separation
+description: Enforce separation between business logic and UI code
+message: Business logic must be separated from UI code for testability
+severity: warning
+languages: [swift]
+files:
+  - "*View.swift"
+  - "*Screen.swift"
+  - "*Page.swift"
+  - "*ViewModel.swift"
+  - "*Controller.swift"
+  - "*Presenter.swift"
+
+patterns:
+  - pattern: |
+      struct $VIEW: View {
+          func fetch$DATA() async throws {
+              // Business logic in view
+          }
+      }
+    message: "Move business logic from View to ViewModel."
+
+  - pattern: |
+      struct $VIEW: View {
+          private let networkClient = NetworkClient()
+      }
+    message: "Views should not directly instantiate or own services. Use ViewModel instead."
+
+examples:
+  - name: Good Example
+    code: |
+      // ViewModel containing business logic
+      @MainActor
+      class SongListViewModel: ObservableObject {
+          @Published private(set) var songs: [Song] = []
+          @Published private(set) var isLoading = false
+          @Published private(set) var error: Error?
+          
+          private let musicService: MusicServiceProtocol
+          
+          init(musicService: MusicServiceProtocol) {
+              self.musicService = musicService
+          }
+          
+          func loadSongs() async {
+              isLoading = true
+              error = nil
+              
+              do {
+                  songs = try await musicService.fetchSongs()
+              } catch {
+                  self.error = error
+              }
+              
+              isLoading = false
+          }
+          
+          func deleteSong(_ song: Song) async {
+              do {
+                  try await musicService.deleteSong(id: song.id)
+                  songs.removeAll { $0.id == song.id }
+              } catch {
+                  self.error = error
+              }
+          }
+      }
+      
+      // View only handling UI concerns
+      struct SongListView: View {
+          @StateObject var viewModel: SongListViewModel
+          
+          var body: some View {
+              Group {
+                  if viewModel.isLoading {
+                      ProgressView()
+                  } else if let error = viewModel.error {
+                      ErrorView(error: error) {
+                          Task {
+                              await viewModel.loadSongs()
+                          }
+                      }
+                  } else if viewModel.songs.isEmpty {
+                      EmptyStateView()
+                  } else {
+                      List(viewModel.songs) { song in
+                          SongRowView(song: song)
+                              .swipeActions {
+                                  Button(role: .destructive) {
+                                      Task {
+                                          await viewModel.deleteSong(song)
+                                      }
+                                  } label: {
+                                      Label("Delete", systemImage: "trash")
+                                  }
+                              }
+                      }
+                  }
+              }
+              .task {
+                  await viewModel.loadSongs()
+              }
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Business logic mixed with UI
+      struct SongListView: View {
+          @State private var songs: [Song] = []
+          @State private var isLoading = false
+          @State private var error: Error?
+          
+          // Bad: Direct service usage in view
+          private let musicService = MusicService()
+          
+          var body: some View {
+              List(songs) { song in
+                  SongRowView(song: song)
+              }
+              .task {
+                  // Bad: Business logic in view
+                  isLoading = true
+                  do {
+                      songs = try await musicService.fetchSongs()
+                  } catch {
+                      self.error = error
+                  }
+                  isLoading = false
+              }
+          }
+          
+          // Bad: Business logic methods in view
+          private func deleteSong(_ song: Song) async {
+              do {
+                  try await musicService.deleteSong(id: song.id)
+                  songs.removeAll { $0.id == song.id }
+              } catch {
+                  self.error = error
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Keep Views focused on UI concerns
+2. Move business logic to ViewModels
+3. Use dependency injection for services
+4. Make ViewModels testable
+5. Handle state management in ViewModels
+6. Use published properties for UI updates
+7. Keep Views declarative
+8. Handle errors in ViewModels
+9. Use async/await in ViewModels
+10. Document ViewModel responsibilities

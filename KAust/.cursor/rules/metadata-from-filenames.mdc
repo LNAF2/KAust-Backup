@@ -1,0 +1,146 @@
+---
+description: 
+globs: *.swift
+alwaysApply: false
+---
+# Metadata from Filenames Rule
+
+This rule enforces proper metadata extraction from filenames.
+
+<rule>
+name: metadata-from-filenames
+description: Enforce proper metadata extraction from filenames
+message: File operations must extract metadata from filenames
+severity: warning
+languages: [swift]
+files:
+  - "*File*.swift"
+  - "*Storage*.swift"
+  - "*Document*.swift"
+  - "*Media*.swift"
+  - "*Song*.swift"
+  - "*Track*.swift"
+
+patterns:
+  - pattern: |
+      let filename = $PATH.lastPathComponent
+    message: "Extract metadata from filename using FileMetadataExtractor."
+
+  - pattern: |
+      let name = $STRING.split(separator: "-")
+    message: "Use FileMetadataExtractor for consistent filename parsing."
+
+examples:
+  - name: Good Example
+    code: |
+      // Metadata extractor protocol
+      protocol FileMetadataExtractor {
+          func extractMetadata(from filename: String) -> FileMetadata
+          func generateFilename(from metadata: FileMetadata) -> String
+      }
+      
+      // Song file metadata extractor
+      struct SongFileMetadataExtractor: FileMetadataExtractor {
+          // Format: "Artist - Title (Year) [Quality].extension"
+          func extractMetadata(from filename: String) -> FileMetadata {
+              let components = FilenameParser.parse(
+                  filename,
+                  pattern: "^(.+) - (.+) \\((\\d{4})\\) \\[(.+)\\]\\.(\\w+)$"
+              )
+              
+              return FileMetadata(
+                  artist: components["artist"] ?? "",
+                  title: components["title"] ?? "",
+                  year: Int(components["year"] ?? "") ?? 0,
+                  quality: components["quality"] ?? "",
+                  extension: components["extension"] ?? ""
+              )
+          }
+          
+          func generateFilename(from metadata: FileMetadata) -> String {
+              return [
+                  metadata.artist,
+                  metadata.title,
+                  "(\(metadata.year))",
+                  "[\(metadata.quality)]"
+              ].joined(separator: " ") + "." + metadata.extension
+          }
+      }
+      
+      // File manager with metadata handling
+      class MediaFileManager {
+          private let metadataExtractor: FileMetadataExtractor
+          private let fileManager: FileManager
+          
+          init(
+              metadataExtractor: FileMetadataExtractor,
+              fileManager: FileManager = .default
+          ) {
+              self.metadataExtractor = metadataExtractor
+              self.fileManager = fileManager
+          }
+          
+          func importFile(at url: URL) throws -> MediaFile {
+              let filename = url.lastPathComponent
+              let metadata = metadataExtractor.extractMetadata(from: filename)
+              
+              // Create media file with extracted metadata
+              let mediaFile = MediaFile(
+                  url: url,
+                  metadata: metadata
+              )
+              
+              // Store file with proper metadata
+              try storeFile(mediaFile)
+              
+              return mediaFile
+          }
+          
+          func storeFile(_ file: MediaFile) throws {
+              // Generate proper filename from metadata
+              let filename = metadataExtractor.generateFilename(from: file.metadata)
+              let destinationURL = storageDirectory.appendingPathComponent(filename)
+              
+              // Move file to storage with proper name
+              try fileManager.moveItem(at: file.url, to: destinationURL)
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: Manual filename parsing
+      class UnsafeFileManager {
+          func importFile(named filename: String) {
+              // Bad: Manual string splitting
+              let parts = filename.split(separator: "-")
+              let artist = String(parts[0]).trimmingCharacters(in: .whitespaces)
+              let title = String(parts[1]).trimmingCharacters(in: .whitespaces)
+              
+              // Bad: Inconsistent metadata extraction
+              let yearString = filename.components(separatedBy: "(")[1]
+                  .components(separatedBy: ")")[0]
+              let year = Int(yearString) ?? 0
+              
+              // Bad: No structured metadata handling
+              saveFile(artist: artist, title: title, year: year)
+          }
+          
+          func saveFile(artist: String, title: String, year: Int) {
+              // Bad: Manual filename generation
+              let filename = "\(artist) - \(title) (\(year)).mp3"
+              // Save file...
+          }
+      }
+</rule>
+
+## Guidelines
+1. Use structured metadata extractors
+2. Define clear filename patterns
+3. Handle parsing errors gracefully
+4. Maintain consistent naming conventions
+5. Extract all relevant metadata
+6. Validate extracted data
+7. Generate consistent filenames
+8. Document filename patterns
+9. Handle special characters
+10. Support multiple file types

@@ -1,0 +1,194 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Feature Access Control Rule
+
+This rule enforces proper feature-based access control.
+
+<rule>
+name: feature-access-control
+description: Enforce feature-based access control
+message: Features must implement proper role-based access control
+severity: warning
+languages: [swift]
+files:
+  - "*Feature*.swift"
+  - "*Permission*.swift"
+  - "*Access*.swift"
+  - "*View*.swift"
+  - "*Screen*.swift"
+  - "*Service*.swift"
+  - "*Controller*.swift"
+
+patterns:
+  - pattern: |
+      struct $VIEW: View {
+          func perform$RestrictedAction() {
+              // Action without permission check
+          }
+      }
+    message: "Feature actions must check permissions before execution."
+
+  - pattern: |
+      class $SERVICE {
+          func $RESTRICTED_METHOD() {
+              // Method without access control
+          }
+      }
+    message: "Service methods must implement feature-based access control."
+
+examples:
+  - name: Good Example
+    code: |
+      // Feature permission definitions
+      enum FeaturePermission {
+          case viewAnalytics
+          case manageUsers
+          case editContent
+          case deleteContent
+          case manageRoles
+          
+          var requiredRole: UserRole {
+              switch self {
+              case .viewAnalytics, .manageUsers, .manageRoles:
+                  return .admin
+              case .editContent:
+                  return .editor
+              case .deleteContent:
+                  return .moderator
+              }
+          }
+      }
+      
+      // Feature access control protocol
+      protocol FeatureAccessControlProtocol {
+          func hasPermission(_ permission: FeaturePermission) -> Bool
+          func requirePermission(_ permission: FeaturePermission) throws
+          func checkPermission(_ permission: FeaturePermission) async throws
+      }
+      
+      // Access control implementation
+      class FeatureAccessControl: FeatureAccessControlProtocol {
+          private let authManager: AuthManagerProtocol
+          private let logger: LoggerProtocol
+          
+          init(authManager: AuthManagerProtocol, logger: LoggerProtocol) {
+              self.authManager = authManager
+              self.logger = logger
+          }
+          
+          func hasPermission(_ permission: FeaturePermission) -> Bool {
+              guard let user = authManager.currentUser else {
+                  return false
+              }
+              
+              return user.role >= permission.requiredRole
+          }
+          
+          func requirePermission(_ permission: FeaturePermission) throws {
+              guard hasPermission(permission) else {
+                  logger.log(
+                      level: .warning,
+                      "Permission denied: \(permission) for user \(authManager.currentUser?.id ?? "unknown")"
+                  )
+                  throw SecurityError.permissionDenied
+              }
+          }
+          
+          func checkPermission(_ permission: FeaturePermission) async throws {
+              try requirePermission(permission)
+              
+              // Log access attempt
+              logger.log(
+                  level: .info,
+                  "Feature access: \(permission) by user \(authManager.currentUser?.id ?? "unknown")"
+              )
+          }
+      }
+      
+      // Protected feature view
+      struct AnalyticsView: View {
+          @StateObject private var viewModel: AnalyticsViewModel
+          private let accessControl: FeatureAccessControlProtocol
+          
+          var body: some View {
+              Group {
+                  if accessControl.hasPermission(.viewAnalytics) {
+                      AnalyticsContent(viewModel: viewModel)
+                  } else {
+                      UnauthorizedView()
+                  }
+              }
+              .task {
+                  do {
+                      try await accessControl.checkPermission(.viewAnalytics)
+                      await viewModel.loadData()
+                  } catch {
+                      viewModel.handleError(error)
+                  }
+              }
+          }
+      }
+      
+      // Protected service
+      class ContentService {
+          private let accessControl: FeatureAccessControlProtocol
+          private let database: DatabaseProtocol
+          
+          init(accessControl: FeatureAccessControlProtocol, database: DatabaseProtocol) {
+              self.accessControl = accessControl
+              self.database = database
+          }
+          
+          func deleteContent(_ content: Content) async throws {
+              try await accessControl.checkPermission(.deleteContent)
+              try await database.deleteContent(content.id)
+          }
+          
+          func editContent(_ content: Content) async throws {
+              try await accessControl.checkPermission(.editContent)
+              try await database.updateContent(content)
+          }
+      }
+
+  - name: Bad Example
+    code: |
+      // Bad: No feature access control
+      struct UnsafeAnalyticsView: View {
+          func deleteContent(_ content: Content) {
+              // Bad: Direct action without permission check
+              database.deleteContent(content.id)
+          }
+          
+          var body: some View {
+              Button("Delete") {
+                  // Bad: Exposed restricted action
+                  deleteContent(currentContent)
+              }
+          }
+      }
+      
+      // Bad: Hardcoded role checks
+      class UnsafeService {
+          func performAction() {
+              // Bad: Direct role check without proper access control
+              if currentUser.role == "admin" {
+                  // Perform action
+              }
+          }
+      }
+</rule>
+
+## Guidelines
+1. Define clear feature permissions
+2. Implement role-based access control
+3. Log access attempts
+4. Use permission checking middleware
+5. Handle unauthorized access
+6. Implement feature flags
+7. Document permission requirements
+8. Audit access patterns
+9. Test permission scenarios
+10. Monitor access violations
