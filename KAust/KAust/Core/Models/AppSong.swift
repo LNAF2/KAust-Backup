@@ -8,14 +8,16 @@
 import Foundation
 
 struct AppSong: Identifiable, Equatable {
-    let id: UUID
+    let id = UUID()
     let title: String
     let artist: String
-    let duration: TimeInterval // in seconds
+    let duration: String
+}
 
-    static let mockSongs: [AppSong] = [
-        AppSong(id: UUID(), title: "Bohemian Rhapsody", artist: "Queen", duration: 354),
-        AppSong(id: UUID(), title: "Dancing Queen", artist: "ABBA", duration: 230),
-        AppSong(id: UUID(), title: "Wonderwall", artist: "Oasis", duration: 258)
-    ]
+extension AppSong {
+    var durationSeconds: TimeInterval {
+        let parts = duration.split(separator: ":").compactMap { Double($0) }
+        guard parts.count == 2 else { return 0 }
+        return parts[0] * 60 + parts[1]
+    }
 }

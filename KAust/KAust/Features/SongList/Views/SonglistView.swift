@@ -15,55 +15,48 @@ struct SongListView: View {
     var body: some View {
         VStack(spacing: 0) {
             header
-
             ZStack {
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(Color.purple.opacity(0.08))
+                    .fill(AppTheme.leftPanelListBackground)
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(Color.purple, lineWidth: 1)
-
-                if viewModel.songs.isEmpty {
-                    SonglistEmptyState()
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .padding(.horizontal, panelGap)
-                } else {
-                    songList
+                    .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
+                List {
+                    ForEach(viewModel.songs) { song in
+                        SongListItemView(song: song)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                            .background(AppTheme.leftPanelListBackground)
+                    }
                 }
+                .listStyle(PlainListStyle())
+                .background(Color.clear)
+                .padding(.vertical, 4)
             }
-            .padding(panelGap)
+            // Here is the fix: add extra top padding to the ZStack
+            .padding(.horizontal, panelGap)
+            .padding(.bottom, panelGap)
+            .padding(.top, 8) // <--- Increase this value until the tops align
         }
         .background(Color.white)
         .cornerRadius(cornerRadius)
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(Color.purple, lineWidth: 1)
+                .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
         )
     }
 
     private var header: some View {
-        HStack {
+        HStack(alignment: .firstTextBaseline) {
             Text("SONG LIST")
                 .font(.headline)
-                .foregroundColor(.purple)
+                .foregroundColor(AppTheme.leftPanelAccent)
             Spacer()
-            Image(systemName: "pencil.circle.fill")
-                .font(.title2)
-                .opacity(0)
             Text("\(viewModel.songs.count) Songs")
                 .font(.subheadline)
-                .foregroundColor(.purple)
+                .foregroundColor(AppTheme.leftPanelAccent)
         }
         .padding(.horizontal, panelGap)
-        .padding(.vertical, 8)
-    }
-
-    private var songList: some View {
-        List {
-            ForEach(viewModel.songs) { song in
-                SongListItemView(song: song)
-            }
-        }
-        .listStyle(PlainListStyle())
-        .background(Color.clear)
+        .padding(.top, 12)
+        .padding(.bottom, 4)
     }
 }

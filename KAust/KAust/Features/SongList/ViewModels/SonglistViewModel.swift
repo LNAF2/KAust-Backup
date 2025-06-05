@@ -6,14 +6,11 @@
 //
 
 import Foundation
-import Combine
 
-@MainActor
 class SonglistViewModel: ObservableObject {
-    @Published var songs: [AppSong] = AppSong.mockSongs
-
-    // For tap action
-    func selectSong(_ song: SongEntity) {
-        print("Selected song: \(song.title) by \(song.artist)")
-    }
+    @Published var songs: [AppSong] = [
+        AppSong(title: "Bohemian Rhapsody", artist: "Queen", duration: "5:55"),
+        AppSong(title: "Imagine", artist: "John Lennon", duration: "3:12"),
+        AppSong(title: "Hey Jude", artist: "The Beatles", duration: "7:11")
+    ]
 }

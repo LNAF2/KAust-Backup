@@ -8,16 +8,18 @@
 // Features/Playlist/ViewModels/PlaylistViewModel.swift
 import Foundation
 
-@MainActor
 class PlaylistViewModel: ObservableObject {
-    @Published var playlistItems: [AppSong] = AppSong.mockSongs
+    @Published var playlistItems: [AppSong] = [
+        AppSong(title: "Imagine", artist: "John Lennon", duration: "3:12"),
+        AppSong(title: "Bohemian Rhapsody", artist: "Queen", duration: "5:55"),
+        AppSong(title: "Hey Jude", artist: "The Beatles", duration: "7:11")
+    ]
 
-    func selectPlaylistItem(_ song: AppSong) {
-        print("Tapped playlist item: \(song.title) by \(song.artist)")
-    }
-
-    // Example move function for reordering
     func moveSong(from source: IndexSet, to destination: Int) {
         playlistItems.move(fromOffsets: source, toOffset: destination)
+    }
+
+    func deleteSongs(at offsets: IndexSet) {
+        playlistItems.remove(atOffsets: offsets)
     }
 }

@@ -5,35 +5,43 @@
 //  Created by Erling Breaden on 4/6/2025.
 //
 
+
 import SwiftUI
 
 struct SongListItemView: View {
     let song: AppSong
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(song.title)
+        ZStack {
+            AppTheme.leftPanelListBackground
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(AppTheme.leftPanelAccent.opacity(0.5), lineWidth: 1)
+                )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(song.artist.uppercased())
                     .font(.headline)
-                    .foregroundColor(.purple)
-                Text(song.artist)
-                    .font(.subheadline)
-                    .foregroundColor(.purple.opacity(0.7))
+                    .fontWeight(.bold)
+                    .foregroundColor(AppTheme.leftPanelAccent)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(song.title)
+                        .font(.caption)
+                        .fontWeight(.regular)
+                        .foregroundColor(AppTheme.leftPanelAccent.opacity(0.7))
+                    Spacer()
+                    Text(song.duration)
+                        .font(.caption)
+                        .foregroundColor(AppTheme.leftPanelAccent)
+                        .alignmentGuide(.firstTextBaseline) { d in d[.firstTextBaseline] }
+                }
             }
-            Spacer()
-            Text(formatDuration(song.duration))
-                .font(.caption)
-                .foregroundColor(.purple.opacity(0.7))
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(Color.purple.opacity(0.05))
-        .cornerRadius(6)
-    }
-
-    private func formatDuration(_ duration: TimeInterval) -> String {
-        let minutes = Int(duration) / 60
-        let seconds = Int(duration) % 60
-        return String(format: "%d:%02d", minutes, seconds)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
