@@ -6,6 +6,26 @@
 //
 
 // Features/Playlist/ViewModels/PlaylistViewModel.swift
+
+import Foundation
+
+class PlaylistViewModel: ObservableObject {
+    @Published var playlistItems: [Song] = []
+
+    func addToPlaylist(_ song: Song) {
+        // Prevent duplicates (optional)
+        if !playlistItems.contains(where: { $0.id == song.id }) {
+            playlistItems.append(song)
+        }
+    }
+
+    func removeFromPlaylist(at offsets: IndexSet) {
+        playlistItems.remove(atOffsets: offsets)
+    }
+}
+
+
+/*
 import Foundation
 
 class PlaylistViewModel: ObservableObject {
@@ -23,3 +43,4 @@ class PlaylistViewModel: ObservableObject {
         playlistItems.remove(atOffsets: offsets)
     }
 }
+*/

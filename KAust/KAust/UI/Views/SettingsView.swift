@@ -8,23 +8,22 @@
 import SwiftUI
 
 struct SettingsView: View {
-    // For now, this is a static shell. Add @Environment(\.dismiss) var dismiss if you want to close it later.
+    @Environment(\.presentationMode) var presentationMode
 
     private let cornerRadius: CGFloat = 16
     private let iconSize: CGFloat = 28
     private let gap: CGFloat = 24
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            // Black background
+        ZStack {
+            // Black background fills the whole screen
             Color.black.ignoresSafeArea()
 
             VStack(alignment: .leading, spacing: gap) {
-                // Top row: Blue RESET icon
+                // Top row: RESET and DONE
                 HStack {
                     Button(action: {
-                        // Call your reset action here, e.g.:
-                        // viewModel.resetSettings()
+                        // Call your reset action here
                     }) {
                         Text("RESET")
                             .font(.headline)
@@ -35,11 +34,15 @@ struct SettingsView: View {
                             .cornerRadius(4)
                     }
                     Spacer()
+                    DoneButton {
+                        presentationMode.wrappedValue.dismiss()
+                    }
                 }
                 .padding(.top, 32)
+                .padding(.horizontal, 32)
                 .padding(.bottom, 8)
 
-                // Settings items (static for now)
+                // Settings items (spaced out)
                 Group {
                     Text("User Account")
                     Text("Manage Downloaded Songs")
@@ -54,7 +57,7 @@ struct SettingsView: View {
 
                 Spacer()
             }
-            .padding(.horizontal, 32)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 }

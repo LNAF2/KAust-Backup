@@ -6,11 +6,13 @@
 //
 
 // Features/Playlist/Views/PlaylistView.swift
+
 import SwiftUI
 
 struct PlaylistView: View {
-    @StateObject private var viewModel = PlaylistViewModel()
+    @ObservedObject var viewModel: PlaylistViewModel
     @State private var isEditing = false
+    var onSongSelected: ((Song) -> Void)? = nil
 
     private let cornerRadius: CGFloat = 8
     private let panelGap: CGFloat = 8
@@ -25,30 +27,33 @@ struct PlaylistView: View {
                     .stroke(AppTheme.rightPanelAccent, lineWidth: 1)
                 List {
                     ForEach(viewModel.playlistItems) { song in
-                        PlaylistItemRow(song: song)
+                        PlaylistItemView(song: song)
+                            .onTapGesture {
+                                onSongSelected?(song)
+                            }
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
                             .background(AppTheme.rightPanelListBackground)
                     }
-                    .onMove { from, to in
+                    .onMove { indices, newOffset in
                         if isEditing {
-                            viewModel.moveSong(from: from, to: to)
+                            viewModel.playlistItems.move(fromOffsets: indices, toOffset: newOffset)
                         }
                     }
-                    .onDelete { indexSet in
+                    .onDelete { indices in
                         if isEditing {
-                            viewModel.deleteSongs(at: indexSet)
+                            viewModel.removeFromPlaylist(at: indices)
                         }
                     }
                 }
                 .listStyle(PlainListStyle())
-                .environment(\.editMode, .constant(isEditing ? EditMode.active : EditMode.inactive))
                 .background(Color.clear)
                 .padding(.vertical, 4)
+                .environment(\.editMode, .constant(isEditing ? EditMode.active : EditMode.inactive))
             }
             .padding(.horizontal, panelGap)
             .padding(.bottom, panelGap)
-            .padding(.top, 0) // <-- aligns top with song list
+            .padding(.top, 0)
         }
         .background(Color.white)
         .cornerRadius(cornerRadius)
@@ -82,43 +87,5 @@ struct PlaylistView: View {
         }
         .padding(.horizontal, panelGap)
         .padding(.vertical, 8)
-    }
-}
-
-struct PlaylistItemRow: View {
-    let song: AppSong
-
-    var body: some View {
-        ZStack {
-            AppTheme.rightPanelListBackground
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppTheme.rightPanelAccent.opacity(0.5), lineWidth: 1)
-                )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(song.title.uppercased())
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(AppTheme.rightPanelAccent)
-                HStack(alignment: .firstTextBaseline) {
-                    Text(song.artist)
-                        .font(.caption)
-                        .fontWeight(.regular)
-                        .foregroundColor(AppTheme.rightPanelAccent.opacity(0.7))
-                    Spacer()
-                    Text(song.duration)
-                        .font(.caption)
-                        .foregroundColor(AppTheme.rightPanelAccent)
-                        .alignmentGuide(.firstTextBaseline) { d in d[.firstTextBaseline] }
-                }
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }

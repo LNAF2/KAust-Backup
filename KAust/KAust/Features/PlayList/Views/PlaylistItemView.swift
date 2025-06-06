@@ -9,25 +9,40 @@
 import SwiftUI
 
 struct PlaylistItemView: View {
-    let song: AppSong
+    let song: Song
+    private let cornerRadius: CGFloat = 8
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(song.title)
+        ZStack {
+            AppTheme.rightPanelListBackground
+            RoundedRectangle(cornerRadius: cornerRadius)
+                .fill(Color.white)
+                .overlay(
+                    RoundedRectangle(cornerRadius: cornerRadius)
+                        .stroke(AppTheme.rightPanelAccent.opacity(0.5), lineWidth: 1)
+                )
+            VStack(alignment: .leading, spacing: 2) {
+                Text(song.title.uppercased())
                     .font(.headline)
-                    .foregroundColor(.red)
-                Text(song.artist)
-                    .font(.subheadline)
-                    .foregroundColor(.red.opacity(0.7))
+                    .fontWeight(.bold)
+                    .foregroundColor(AppTheme.rightPanelAccent)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(song.artist)
+                        .font(.caption)
+                        .fontWeight(.regular)
+                        .foregroundColor(AppTheme.rightPanelAccent.opacity(0.7))
+                    Spacer()
+                    Text(song.duration)
+                        .font(.caption)
+                        .foregroundColor(AppTheme.rightPanelAccent)
+                        .alignmentGuide(.firstTextBaseline) { d in d[.firstTextBaseline] }
+                }
             }
-            Spacer()
-            Image(systemName: "trash")
-                .foregroundColor(.red)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 12)
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
-        .background(Color.red.opacity(0.05))
-        .cornerRadius(6)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
 }

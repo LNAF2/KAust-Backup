@@ -59,8 +59,10 @@
 				Core/Managers/FocusManager.swift,
 				Core/Models/AppSong.swift,
 				Core/Models/DemoSongs.swift,
+				Core/Models/Song.swift,
 				Core/Services/AuthenticationServiceProtocol.swift,
 				Core/Services/DataProviderServiceProtocol.swift,
+				Core/Services/SongLoader.swift,
 				Core/Services/UserPreferencesServiceProtocol.swift,
 				Features/PlayList/ViewModels/PlaylistViewModel.swift,
 				Features/PlayList/Views/PlaylistEmptyState.swift,
@@ -71,11 +73,19 @@
 				Features/SongList/Views/SonglistItemView.swift,
 				Features/SongList/Views/SonglistView.swift,
 				KAustApp.swift,
+				Resources/TestMedia/Metadata/songs.json,
+				"Resources/TestMedia/MP4/Chappell Roan - The Giver - ck.mp4",
+				"Resources/TestMedia/MP4/Dragon - Summer - zoom.mp4",
+				"Resources/TestMedia/MP4/Ed Sheeran - Azizam - ck.mp4",
+				"Resources/TestMedia/MP4/Lady Gaga - Abracadabra - zoom.mp4",
+				"Resources/TestMedia/MP4/Mental As Anything - Come Around - zoom.mp4",
+				"Resources/TestMedia/MP4/Post Malone Feat Chris Stapleton - California Sober - Sr.mp4",
 				Shared/Constants.swift,
 				Shared/Theme.swift,
 				UI/Views/ControlsPanelView.swift,
 				UI/Views/CustomButton.swift,
 				UI/Views/CustomTestField.swift,
+				UI/Views/DoneButton.swift,
 				UI/Views/EmptyPanelView.swift,
 				UI/Views/PanelView.swift,
 				UI/Views/SettingsAccessPanelView.swift,
@@ -91,6 +101,13 @@
 				Assets.xcassets,
 				ContentView.swift,
 				KAustApp.swift,
+				Resources/TestMedia/Metadata/songs.json,
+				"Resources/TestMedia/MP4/Chappell Roan - The Giver - ck.mp4",
+				"Resources/TestMedia/MP4/Dragon - Summer - zoom.mp4",
+				"Resources/TestMedia/MP4/Ed Sheeran - Azizam - ck.mp4",
+				"Resources/TestMedia/MP4/Lady Gaga - Abracadabra - zoom.mp4",
+				"Resources/TestMedia/MP4/Mental As Anything - Come Around - zoom.mp4",
+				"Resources/TestMedia/MP4/Post Malone Feat Chris Stapleton - California Sober - Sr.mp4",
 			);
 			target = C0A8FEE32DE9C7AC00459205 /* KAustUITests */;
 		};
@@ -534,6 +551,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -566,6 +584,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

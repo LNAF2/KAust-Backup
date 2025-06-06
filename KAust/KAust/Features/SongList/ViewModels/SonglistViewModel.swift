@@ -7,10 +7,10 @@
 
 import Foundation
 
-class SonglistViewModel: ObservableObject {
-    @Published var songs: [AppSong] = [
-        AppSong(title: "Bohemian Rhapsody", artist: "Queen", duration: "5:55"),
-        AppSong(title: "Imagine", artist: "John Lennon", duration: "3:12"),
-        AppSong(title: "Hey Jude", artist: "The Beatles", duration: "7:11")
-    ]
+class SongListViewModel: ObservableObject {
+    @Published var songs: [Song] = []
+
+    init() {
+        self.songs = SongLoader.loadSongs()
+    }
 }
