@@ -11,55 +11,39 @@ struct ControlsPanelView: View {
     private let panelHeight = AppConstants.Layout.controlsPanelHeight
     private let cornerRadius = AppConstants.Layout.panelCornerRadius
     private let borderWidth = AppConstants.Layout.panelBorderWidth
-    private let gap = AppConstants.Layout.defaultSpacing
-    private let filterButtonWidth = AppConstants.Layout.filterButtonWidth
-    private let panelGap: CGFloat = 8 // Match SongListView's panelGap
+    private let filterButtonWidth: CGFloat = 110
+    private let innerGap: CGFloat = 2 // Half of panelGap
+    private let panelGap: CGFloat = 8 // Must match left panel gap
 
     @State private var searchText: String = ""
+    @FocusState private var isSearchFocused: Bool
 
     var body: some View {
-        HStack(spacing: gap) {
+        HStack(spacing: innerGap) {
             // Filter Button
-            Button(action: {
+            CustomButton(
+                title: "Filter",
+                icon: "line.3.horizontal.decrease.circle",
+                backgroundColor: AppTheme.leftPanelListBackground,
+                accentColor: AppTheme.leftPanelAccent
+            ) {
                 // Filter action
-            }) {
-                HStack {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .foregroundColor(AppTheme.leftPanelAccent)
-                    Text("Filter")
-                        .foregroundColor(AppTheme.leftPanelAccent)
-                }
-                .frame(width: filterButtonWidth, height: panelHeight * 0.8)
             }
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(AppTheme.leftPanelListBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .stroke(AppTheme.leftPanelAccent, lineWidth: borderWidth)
-                    )
-            )
+            .frame(width: filterButtonWidth, height: panelHeight * 0.8)
 
             // Search Bar
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(AppTheme.leftPanelAccent)
-                TextField("Search", text: $searchText)
-                    .foregroundColor(AppTheme.leftPanelAccent)
-                    .accentColor(AppTheme.leftPanelAccent)
-            }
-            .padding(.leading, 2)
-            .frame(height: panelHeight * 0.8)
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(AppTheme.leftPanelListBackground)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: cornerRadius)
-                            .stroke(AppTheme.leftPanelAccent, lineWidth: borderWidth)
-                    )
+            CustomTextField(
+                text: $searchText,
+                placeholder: "Search",
+                icon: "magnifyingglass",
+                backgroundColor: AppTheme.leftPanelListBackground,
+                accentColor: AppTheme.leftPanelAccent,
+                isFocused: isSearchFocused
             )
+            .frame(height: panelHeight * 0.8)
+            .frame(maxWidth: .infinity)
+            .padding(.trailing, panelGap) // <-- This ensures right edge matches left gap
         }
-        .padding(.horizontal, panelGap) // Use panelGap to match SongListView's inner padding
         .frame(height: panelHeight)
         .background(AppTheme.leftPanelBackground)
         .cornerRadius(cornerRadius)
@@ -67,14 +51,6 @@ struct ControlsPanelView: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(AppTheme.leftPanelAccent, lineWidth: borderWidth)
         )
-    }
-}
-
-struct ControlsPanelView_Previews: PreviewProvider {
-    static var previews: some View {
-        ControlsPanelView()
-            .padding()
-            .previewLayout(.sizeThatFits)
-            .background(Color(UIColor.systemGray6))
+        // No .padding(.horizontal) here!
     }
 }
