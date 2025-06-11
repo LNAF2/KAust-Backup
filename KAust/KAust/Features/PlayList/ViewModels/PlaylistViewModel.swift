@@ -8,14 +8,26 @@
 // Features/Playlist/ViewModels/PlaylistViewModel.swift
 
 import Foundation
+import Combine
 
 class PlaylistViewModel: ObservableObject {
     @Published var playlistItems: [Song] = []
+    
+    // Publisher to trigger scroll to bottom when new song is added
+    private let scrollToBottomSubject = PassthroughSubject<Void, Never>()
+    var scrollToBottomPublisher: AnyPublisher<Void, Never> {
+        scrollToBottomSubject.eraseToAnyPublisher()
+    }
 
     func addToPlaylist(_ song: Song) {
         // Prevent duplicates (optional)
         if !playlistItems.contains(where: { $0.id == song.id }) {
             playlistItems.append(song)
+            
+            // Trigger scroll to bottom after a short delay to ensure the new item is rendered
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.scrollToBottomSubject.send()
+            }
         }
     }
 

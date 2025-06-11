@@ -27,13 +27,14 @@ struct PlaylistItemView: View {
                     .fontWeight(.bold)
                     .foregroundColor(AppTheme.rightPanelAccent)
                 HStack(alignment: .firstTextBaseline) {
-                    Text(song.artist)
-                        .font(.caption)
+                    Text(song.artist.uppercased())
+                        .font(.headline)
                         .fontWeight(.regular)
                         .foregroundColor(AppTheme.rightPanelAccent.opacity(0.7))
                     Spacer()
-                    Text(song.duration)
-                        .font(.caption)
+                    Text(song.duration.uppercased())
+                        .font(.headline)
+                        .fontWeight(.regular)
                         .foregroundColor(AppTheme.rightPanelAccent)
                         .alignmentGuide(.firstTextBaseline) { d in d[.firstTextBaseline] }
                 }

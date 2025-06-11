@@ -8,10 +8,12 @@
 // Features/Playlist/Views/PlaylistView.swift
 
 import SwiftUI
+import Combine
 
 struct PlaylistView: View {
     @ObservedObject var viewModel: PlaylistViewModel
     @State private var isEditing = false
+    @State private var cancellables = Set<AnyCancellable>()
     var onSongSelected: ((Song) -> Void)? = nil
 
     private let cornerRadius: CGFloat = 8
@@ -25,31 +27,43 @@ struct PlaylistView: View {
                     .fill(AppTheme.rightPanelListBackground)
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(AppTheme.rightPanelAccent, lineWidth: 1)
-                List {
-                    ForEach(viewModel.playlistItems) { song in
-                        PlaylistItemView(song: song)
-                            .onTapGesture {
-                                onSongSelected?(song)
+                
+                ScrollViewReader { proxy in
+                    List {
+                        ForEach(viewModel.playlistItems) { song in
+                            PlaylistItemView(song: song)
+                                .onTapGesture {
+                                    onSongSelected?(song)
+                                }
+                                .listRowInsets(EdgeInsets())
+                                .listRowSeparator(.hidden)
+                                .background(AppTheme.rightPanelListBackground)
+                                .id(song.id) // Important: Add ID for scrolling
+                        }
+                        .onMove { indices, newOffset in
+                            if isEditing {
+                                viewModel.playlistItems.move(fromOffsets: indices, toOffset: newOffset)
                             }
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .background(AppTheme.rightPanelListBackground)
-                    }
-                    .onMove { indices, newOffset in
-                        if isEditing {
-                            viewModel.playlistItems.move(fromOffsets: indices, toOffset: newOffset)
+                        }
+                        .onDelete { indices in
+                            if isEditing {
+                                viewModel.removeFromPlaylist(at: indices)
+                            }
                         }
                     }
-                    .onDelete { indices in
-                        if isEditing {
-                            viewModel.removeFromPlaylist(at: indices)
+                    .listStyle(PlainListStyle())
+                    .background(Color.clear)
+                    .padding(.vertical, 4)
+                    .environment(\.editMode, .constant(isEditing ? EditMode.active : EditMode.inactive))
+                    .onReceive(viewModel.scrollToBottomPublisher) {
+                        // Scroll to the last item with animation
+                        if let lastSong = viewModel.playlistItems.last {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                proxy.scrollTo(lastSong.id, anchor: .bottom)
+                            }
                         }
                     }
                 }
-                .listStyle(PlainListStyle())
-                .background(Color.clear)
-                .padding(.vertical, 4)
-                .environment(\.editMode, .constant(isEditing ? EditMode.active : EditMode.inactive))
             }
             .padding(.horizontal, panelGap)
             .padding(.bottom, panelGap)

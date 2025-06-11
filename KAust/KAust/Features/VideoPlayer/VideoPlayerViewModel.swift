@@ -14,7 +14,12 @@ final class VideoPlayerViewModel: ObservableObject {
     @Published var duration: Double = 0
     
     // MARK: - Private Properties
-    private var player: AVPlayer?
+    private var _player: AVPlayer?
+    
+    // MARK: - Public Properties
+    var player: AVPlayer? {
+        return _player
+    }
     private var playerItem: AVPlayerItem?
     private var timeObserver: Any?
     private var controlsFadeTimer: Timer?
@@ -36,7 +41,7 @@ final class VideoPlayerViewModel: ObservableObject {
         
         // Create new player item and player
         playerItem = AVPlayerItem(url: url)
-        player = AVPlayer(playerItem: playerItem)
+        _player = AVPlayer(playerItem: playerItem)
         
         // Set current video and start playback
         currentVideo = song
@@ -45,15 +50,15 @@ final class VideoPlayerViewModel: ObservableObject {
         showControls()
         
         // Start playback
-        player?.play()
+        _player?.play()
         
         // Setup time observer
         setupTimeObserver()
     }
     
     func stop() async {
-        player?.pause()
-        player = nil
+        _player?.pause()
+        _player = nil
         playerItem = nil
         currentVideo = nil
         isPlaying = false
@@ -62,9 +67,9 @@ final class VideoPlayerViewModel: ObservableObject {
     
     func togglePlayPause() {
         if isPlaying {
-            player?.pause()
+            _player?.pause()
         } else {
-            player?.play()
+            _player?.play()
         }
         isPlaying.toggle()
         showControls()
@@ -81,7 +86,7 @@ final class VideoPlayerViewModel: ObservableObject {
     }
     
     func seek(to time: Double) {
-        player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+        _player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
         showControls()
     }
     
@@ -96,7 +101,7 @@ final class VideoPlayerViewModel: ObservableObject {
     }
     
     private func setupTimeObserver() {
-        timeObserver = player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
+        timeObserver = _player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
             guard let self = self else { return }
             Task { @MainActor in
                 self.currentTime = time.seconds
@@ -106,7 +111,7 @@ final class VideoPlayerViewModel: ObservableObject {
     
     private func removeTimeObserver() {
         if let observer = timeObserver {
-            player?.removeTimeObserver(observer)
+            _player?.removeTimeObserver(observer)
             timeObserver = nil
         }
     }

@@ -13,10 +13,10 @@
         <relationship name="songs" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="SongEntity" inverseName="genres" inverseEntity="SongEntity"/>
     </entity>
     <entity name="PlayedSongEntity" representedClassName="PlayedSongEntity" syncable="YES" codeGenerationType="class">
+        <attribute name="artistNameSnapshot" attributeType="String"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="playedDate" attributeType="Date" usesScalarValueType="NO"/>
-        <attribute name="songArtist" optional="YES" attributeType="String"/>
-        <attribute name="songTitle" attributeType="String"/>
+        <attribute name="songTitleSnapshot" attributeType="String"/>
         <relationship name="song" maxCount="1" deletionRule="Nullify" destinationEntity="SongEntity" inverseName="playHistory" inverseEntity="SongEntity"/>
         <relationship name="user" maxCount="1" deletionRule="Nullify" destinationEntity="UserEntity" inverseName="playedSongs" inverseEntity="UserEntity"/>
     </entity>
@@ -30,17 +30,29 @@
     </entity>
     <entity name="SongEntity" representedClassName="SongEntity" syncable="YES" codeGenerationType="class">
         <attribute name="artist" optional="YES" attributeType="String"/>
+        <attribute name="audioBitRate" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="audioChannelCount" optional="YES" attributeType="Integer 16" defaultValueString="2" usesScalarValueType="YES"/>
+        <attribute name="contentRating" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="dateAdded" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="duration" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
         <attribute name="event" optional="YES" attributeType="String"/>
         <attribute name="filePath" attributeType="String"/>
+        <attribute name="fileSizeBytes" attributeType="Integer 64" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="id" attributeType="UUID" usesScalarValueType="NO"/>
         <attribute name="isDownloaded" attributeType="Boolean" defaultValueString="NO" usesScalarValueType="YES"/>
         <attribute name="language" optional="YES" attributeType="String"/>
         <attribute name="lastPlayedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="lastUsedDate" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="lrcFilePath" optional="YES" attributeType="String"/>
+        <attribute name="mediaTypes" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData"/>
+        <attribute name="pixelHeight" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="pixelWidth" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="playCount" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="title" attributeType="String"/>
+        <attribute name="totalBitRate" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="useCount" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="usedDates" optional="YES" attributeType="Transformable" valueTransformerName="NSSecureUnarchiveFromData"/>
+        <attribute name="videoBitRate" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
         <attribute name="year" optional="YES" attributeType="Integer 16" defaultValueString="0" usesScalarValueType="YES"/>
         <relationship name="genres" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="GenreEntity" inverseName="songs" inverseEntity="GenreEntity"/>
         <relationship name="playHistory" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PlayedSongEntity" inverseName="song" inverseEntity="PlayedSongEntity"/>
@@ -48,6 +60,9 @@
     </entity>
     <entity name="UserEntity" representedClassName="UserEntity" syncable="YES" codeGenerationType="class">
         <attribute name="appleUserID" attributeType="String"/>
+        <attribute name="displayName" optional="YES" attributeType="String"/>
+        <attribute name="email" optional="YES" attributeType="String"/>
+        <attribute name="joinDate" attributeType="Date" usesScalarValueType="NO"/>
         <attribute name="role" attributeType="String"/>
         <attribute name="userName" optional="YES" attributeType="String"/>
         <relationship name="playedSongs" optional="YES" toMany="YES" deletionRule="Nullify" destinationEntity="PlayedSongEntity" inverseName="user" inverseEntity="PlayedSongEntity"/>

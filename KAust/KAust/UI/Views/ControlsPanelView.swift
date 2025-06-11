@@ -15,12 +15,13 @@ struct ControlsPanelView: View {
     private let innerGap: CGFloat = 2 // Half of panelGap
     private let panelGap: CGFloat = 8 // Must match left panel gap
 
-    @State private var searchText: String = ""
-    @FocusState private var isSearchFocused: Bool
+    // @State private var searchText: String = "" // COMMENTED OUT - not needed
+    // @FocusState private var isSearchFocused: Bool // COMMENTED OUT - not needed
 
     var body: some View {
         HStack(spacing: innerGap) {
-            // Filter Button
+            // Filter Button - COMMENTED OUT
+            /*
             CustomButton(
                 title: "Filter",
                 icon: "line.3.horizontal.decrease.circle",
@@ -30,8 +31,10 @@ struct ControlsPanelView: View {
                 // Filter action
             }
             .frame(width: filterButtonWidth, height: panelHeight * 0.8)
+            */
 
-            // Search Bar
+            // Search Bar - COMMENTED OUT
+            /*
             CustomTextField(
                 text: $searchText,
                 placeholder: "Search",
@@ -43,13 +46,17 @@ struct ControlsPanelView: View {
             .frame(height: panelHeight * 0.8)
             .frame(maxWidth: .infinity)
             .padding(.trailing, panelGap) // <-- This ensures right edge matches left gap
+            */
+            
+            // Empty spacer to maintain panel size and shape
+            Spacer()
         }
         .frame(height: panelHeight)
         .background(AppTheme.leftPanelBackground)
         .cornerRadius(cornerRadius)
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(AppTheme.leftPanelAccent, lineWidth: borderWidth)
+                .stroke(Color.white, lineWidth: borderWidth)
         )
         // No .padding(.horizontal) here!
     }

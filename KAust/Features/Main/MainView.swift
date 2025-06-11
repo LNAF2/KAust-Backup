@@ -5,8 +5,9 @@ struct MainView: View {
         VStack(spacing: AppConstants.Layout.defaultSpacing) {
             TitlePanelView()
             
-            // Placeholder for other panels
-            Spacer()
+            // Song List Display
+            SongListDisplayView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)

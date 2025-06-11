@@ -60,10 +60,10 @@ struct ContentView: View {
             }
             .background(AppTheme.appBackground.ignoresSafeArea())
 
-            // Video Player Overlay
-            if let currentVideo = videoPlayerViewModel.currentVideo {
-                VideoPlayerOverlayView(song: currentVideo)
-            }
+            // Video Player Overlay - Temporarily commented out
+            // if videoPlayerViewModel.currentVideo != nil {
+            //     VideoPlayerOverlayView(viewModel: videoPlayerViewModel)
+            // }
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()

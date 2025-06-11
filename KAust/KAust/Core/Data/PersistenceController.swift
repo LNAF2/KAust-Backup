@@ -95,8 +95,8 @@ struct PersistenceController {
         let playedSong = PlayedSongEntity(context: viewContext)
         playedSong.id = UUID()
         playedSong.playedDate = Date().addingTimeInterval(-3600) // Played an hour ago
-        playedSong.songTitle = sampleSong1.title
-        playedSong.songArtist = sampleSong1.artist
+        playedSong.songTitleSnapshot = sampleSong1.title
+        playedSong.artistNameSnapshot = sampleSong1.artist ?? ""
         playedSong.song = sampleSong1 // Add relationship
         playedSong.user = previewUser // Add relationship
         
