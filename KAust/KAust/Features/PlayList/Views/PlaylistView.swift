@@ -11,6 +11,7 @@ import SwiftUI
 
 struct PlaylistView: View {
     @ObservedObject var viewModel: PlaylistViewModel
+    @EnvironmentObject var videoPlayerViewModel: VideoPlayerViewModel
     @State private var isEditing = false
     var onSongSelected: ((Song) -> Void)? = nil
 
@@ -21,19 +22,24 @@ struct PlaylistView: View {
         VStack(spacing: 0) {
             playlistHeader
             ZStack {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(AppTheme.rightPanelListBackground)
+                // Set the intended background color for the whole panel
+                AppTheme.rightPanelListBackground
+                    .cornerRadius(cornerRadius)
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(AppTheme.rightPanelAccent, lineWidth: 1)
                 List {
                     ForEach(viewModel.playlistItems) { song in
                         PlaylistItemView(song: song)
                             .onTapGesture {
-                                onSongSelected?(song)
+                                if videoPlayerViewModel.currentVideo == nil {
+                                    onSongSelected?(song)
+                                }
                             }
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
-                            .background(AppTheme.rightPanelListBackground)
+                            .background(Color.clear) // Let the panel color show through
+                            .disabled(videoPlayerViewModel.currentVideo != nil)
+                            .opacity(videoPlayerViewModel.currentVideo != nil ? 0.5 : 1.0)
                     }
                     .onMove { indices, newOffset in
                         if isEditing {
@@ -47,6 +53,7 @@ struct PlaylistView: View {
                     }
                 }
                 .listStyle(PlainListStyle())
+                .scrollContentBackground(.hidden) // <-- THIS IS CRITICAL
                 .background(Color.clear)
                 .padding(.vertical, 4)
                 .environment(\.editMode, .constant(isEditing ? EditMode.active : EditMode.inactive))
@@ -55,7 +62,7 @@ struct PlaylistView: View {
             .padding(.bottom, panelGap)
             .padding(.top, 0)
         }
-        .background(Color.white)
+        .background(AppTheme.rightPanelListBackground) // Match the panel color
         .cornerRadius(cornerRadius)
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius)

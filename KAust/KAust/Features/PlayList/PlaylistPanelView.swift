@@ -6,34 +6,8 @@ struct PlaylistPanelView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("PLAYLIST")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                Spacer()
-                Text("\(viewModel.songs.count) songs")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-            .padding()
-            
-            // Song List
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(viewModel.songs) { song in
-                        PlaylistItemView(song: song)
-                            .onTapGesture {
-                                if videoPlayerViewModel.currentVideo == nil {
-                                    videoPlayerViewModel.play(song: song)
-                                    viewModel.removeSong(song)
-                                }
-                            }
-                            .opacity(videoPlayerViewModel.currentVideo == nil ? 1 : 0.5)
-                            .disabled(videoPlayerViewModel.currentVideo != nil)
-                    }
-                }
-            }
+            playlistHeader
+            playlistContent
         }
         .background(Color.black)
         .cornerRadius(12)
@@ -41,12 +15,61 @@ struct PlaylistPanelView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(Color.purple, lineWidth: 1)
         )
+        .onAppear {
+            print("PlaylistPanelView appeared")
+            print("Number of songs in playlist: \(viewModel.playlistItems.count)")
+        }
+    }
+    
+    private var playlistHeader: some View {
+        HStack {
+            Text("PLAYLIST")
+                .font(.headline)
+                .foregroundColor(.white)
+            Spacer()
+            Text("\(viewModel.playlistItems.count) songs")
+                .font(.subheadline)
+                .foregroundColor(.gray)
+        }
+        .padding()
+    }
+    
+    private var playlistContent: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(viewModel.playlistItems) { song in
+                    PlaylistItemRow(song: song)
+                        .contentShape(Rectangle()) // Make entire row tappable
+                        .onTapGesture {
+                            print("Tapped song in playlist: \(song.title)")
+                            print("Song file path: \(song.filePath)")
+                            handleSongTap(song)
+                        }
+                        .opacity(videoPlayerViewModel.currentVideo == nil ? 1 : 0.5)
+                        .disabled(videoPlayerViewModel.currentVideo != nil)
+                }
+            }
+        }
+    }
+    
+    private func handleSongTap(_ song: Song) {
+        print("handleSongTap called for: \(song.title)")
+        print("currentVideo is nil: \(videoPlayerViewModel.currentVideo == nil)")
+        
+        if videoPlayerViewModel.currentVideo == nil {
+            print("Attempting to play song: \(song.title)")
+            videoPlayerViewModel.play(song: song)
+            if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
+                print("Removing song at index: \(index)")
+                viewModel.removeFromPlaylist(at: IndexSet(integer: index))
+            }
+        }
     }
 }
 
-struct PlaylistItemView: View {
+struct PlaylistItemRow: View {
     let song: Song
-    
+
     var body: some View {
         HStack {
             VStack(alignment: .leading) {
@@ -75,4 +98,4 @@ struct PlaylistItemView: View {
 #Preview {
     PlaylistPanelView(viewModel: PlaylistViewModel())
         .environmentObject(VideoPlayerViewModel())
-} 
+}

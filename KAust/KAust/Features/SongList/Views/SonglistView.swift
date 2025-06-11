@@ -18,30 +18,35 @@ struct SongListView: View {
         VStack(spacing: 0) {
             header
             ZStack {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(AppTheme.leftPanelListBackground)
+                // This is the ONLY place you set the purple background!
+                //AppTheme.leftPanelListBackground
+                   // Replace with:
+                   Color.purple.opacity(0.1)
+                    .cornerRadius(cornerRadius)
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
+                // The List
                 List {
                     ForEach(viewModel.songs) { song in
                         SongListItemView(song: song)
                             .listRowInsets(EdgeInsets())
                             .listRowSeparator(.hidden)
-                            .background(AppTheme.leftPanelListBackground)
+                            // DO NOT set .background(Color.white) here!
                             .onTapGesture {
                                 playlistViewModel.addToPlaylist(song)
                             }
                     }
                 }
                 .listStyle(PlainListStyle())
-                .background(Color.clear)
+                .scrollContentBackground(.hidden) // THIS IS CRITICAL
+                // DO NOT set .background() here at all!
                 .padding(.vertical, 4)
             }
             .padding(.horizontal, panelGap)
             .padding(.bottom, panelGap)
             .padding(.top, 8)
         }
-        .background(Color.white)
+        .background(Color.white) // Outer area is white
         .cornerRadius(cornerRadius)
         .overlay(
             RoundedRectangle(cornerRadius: cornerRadius)
@@ -64,8 +69,6 @@ struct SongListView: View {
         .padding(.bottom, 4)
     }
 }
-
-
 
 /*
 struct SongListView: View {

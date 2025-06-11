@@ -9,17 +9,13 @@
 import SwiftUI
 
 struct SongListItemView: View {
-    let song: Song // <-- Change from AppSong to Song
+    let song: Song
 
     var body: some View {
         ZStack {
-            AppTheme.leftPanelListBackground
+            Color.white // Card background
             RoundedRectangle(cornerRadius: 8)
-                .fill(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppTheme.leftPanelAccent.opacity(0.5), lineWidth: 1)
-                )
+                .stroke(AppTheme.leftPanelAccent.opacity(0.5), lineWidth: 1)
             VStack(alignment: .leading, spacing: 2) {
                 Text(song.artist.uppercased())
                     .font(.headline)
@@ -45,7 +41,6 @@ struct SongListItemView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
-
 
 /*
 import SwiftUI

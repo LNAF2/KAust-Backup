@@ -72,6 +72,8 @@
 				Features/SongList/Views/SonglistEmptyState.swift,
 				Features/SongList/Views/SonglistItemView.swift,
 				Features/SongList/Views/SonglistView.swift,
+				Features/VideoPlayer/AVPlayerContainerView.swift,
+				Features/VideoPlayer/VideoPlayerOverlayView.swift,
 				KAustApp.swift,
 				Resources/TestMedia/Metadata/songs.json,
 				"Resources/TestMedia/MP4/Chappell Roan - The Giver - ck.mp4",
@@ -91,7 +93,7 @@
 				UI/Views/SettingsAccessPanelView.swift,
 				UI/Views/SettingsView.swift,
 				UI/Views/TitlePanelView.swift,
-				UI/Views/VideoPlayerOverlayView.swift,
+				UI/Views/VideoPlayerViewModel.swift,
 			);
 			target = C0A8FECC2DE9C7AB00459205 /* KAust */;
 		};
@@ -100,6 +102,8 @@
 			membershipExceptions = (
 				Assets.xcassets,
 				ContentView.swift,
+				Features/VideoPlayer/AVPlayerContainerView.swift,
+				Features/VideoPlayer/VideoPlayerOverlayView.swift,
 				KAustApp.swift,
 				Resources/TestMedia/Metadata/songs.json,
 				"Resources/TestMedia/MP4/Chappell Roan - The Giver - ck.mp4",
