@@ -10,7 +10,6 @@ import SwiftUI
 struct ContentView: View {
     @State private var showSettings = false
     @StateObject private var playlistViewModel = PlaylistViewModel()
-    @State private var currentlyPlaying: Song? = nil
     @StateObject private var videoPlayerViewModel = VideoPlayerViewModel()
 
     var body: some View {
@@ -47,7 +46,9 @@ struct ContentView: View {
                         PlaylistView(
                             viewModel: playlistViewModel,
                             onSongSelected: { song in
-                                currentlyPlaying = song
+                                Task { @MainActor in
+                                    videoPlayerViewModel.play(song: song)
+                                }
                             }
                         )
                         .frame(maxHeight: .infinity)
@@ -59,9 +60,9 @@ struct ContentView: View {
             }
             .background(AppTheme.appBackground.ignoresSafeArea())
 
-            // Video Player Overlay (centered)
-            if let song = currentlyPlaying {
-                VideoPlayerOverlayView(song: song)
+            // Video Player Overlay
+            if let currentVideo = videoPlayerViewModel.currentVideo {
+                VideoPlayerOverlayView(song: currentVideo)
             }
         }
         .sheet(isPresented: $showSettings) {

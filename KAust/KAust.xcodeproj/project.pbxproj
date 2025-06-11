@@ -72,6 +72,7 @@
 				Features/SongList/Views/SonglistEmptyState.swift,
 				Features/SongList/Views/SonglistItemView.swift,
 				Features/SongList/Views/SonglistView.swift,
+				Features/VideoPlayer/VideoPlayerViewModel.swift,
 				KAustApp.swift,
 				Resources/TestMedia/Metadata/songs.json,
 				"Resources/TestMedia/MP4/Chappell Roan - The Giver - ck.mp4",
@@ -100,6 +101,7 @@
 			membershipExceptions = (
 				Assets.xcassets,
 				ContentView.swift,
+				Features/VideoPlayer/VideoPlayerViewModel.swift,
 				KAustApp.swift,
 				Resources/TestMedia/Metadata/songs.json,
 				"Resources/TestMedia/MP4/Chappell Roan - The Giver - ck.mp4",

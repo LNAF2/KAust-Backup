@@ -13,4 +13,8 @@ struct Song: Identifiable, Codable {
     let artist: String
     let duration: String
     let filePath: String
+    
+    var videoURL: URL? {
+        Bundle.main.url(forResource: filePath, withExtension: nil)
+    }
 }

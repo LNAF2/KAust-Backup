@@ -30,7 +30,9 @@ final class VideoPlayerViewModel: ObservableObject {
         guard let url = song.videoURL else { return }
         
         // Stop any existing playback
-        stop()
+        Task { @MainActor in
+            await stop()
+        }
         
         // Create new player item and player
         playerItem = AVPlayerItem(url: url)
@@ -49,7 +51,7 @@ final class VideoPlayerViewModel: ObservableObject {
         setupTimeObserver()
     }
     
-    func stop() {
+    func stop() async {
         player?.pause()
         player = nil
         playerItem = nil
@@ -86,17 +88,19 @@ final class VideoPlayerViewModel: ObservableObject {
     // MARK: - Private Methods
     private func setupBindings() {
         // Observe player item status
-        $playerItem
-            .compactMap { $0 }
-            .sink { [weak self] item in
-                self?.duration = item.duration.seconds
+        if let playerItem = playerItem {
+            Task { @MainActor in
+                self.duration = playerItem.duration.seconds
             }
-            .store(in: &cancellables)
+        }
     }
     
     private func setupTimeObserver() {
         timeObserver = player?.addPeriodicTimeObserver(forInterval: CMTime(seconds: 0.5, preferredTimescale: 600), queue: .main) { [weak self] time in
-            self?.currentTime = time.seconds
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.currentTime = time.seconds
+            }
         }
     }
     
@@ -109,15 +113,26 @@ final class VideoPlayerViewModel: ObservableObject {
     
     private func startControlsFadeTimer() {
         controlsFadeTimer?.invalidate()
-        controlsFadeTimer = Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { [weak self] _ in
-            withAnimation(.easeInOut(duration: 0.3)) {
-                self?.areControlsVisible = false
+        let timer = Timer.scheduledTimer(withTimeInterval: 8, repeats: false) { [weak self] _ in
+            guard let self = self else { return }
+            Task { @MainActor in
+                withAnimation(.easeInOut(duration: 0.3)) {
+                    self.areControlsVisible = false
+                }
             }
         }
+        controlsFadeTimer = timer
     }
     
     deinit {
-        stop()
+        // Invalidate timer first
         controlsFadeTimer?.invalidate()
+        controlsFadeTimer = nil
+        
+        // Then stop playback
+        Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            await self.stop()
+        }
     }
 } 
