@@ -22,7 +22,7 @@ struct SongListView: View {
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(AppTheme.leftPanelListBackground)
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
+                    .stroke(AppTheme.leftPanelListBackground, lineWidth: 1)
                 
                 VStack(spacing: 0) {
                     // Search suggestions
@@ -36,7 +36,7 @@ struct SongListView: View {
             }
             .padding(.horizontal, panelGap)
             .padding(.bottom, panelGap)
-            .padding(.top, 8)
+            .padding(.top, 0)
         }
         .background(Color.white)
         .cornerRadius(cornerRadius)
@@ -110,6 +110,7 @@ struct SongListView: View {
 
         }
         .padding(.horizontal, panelGap)
+        .padding(.top, 10)
         .padding(.bottom, 8)
     }
     

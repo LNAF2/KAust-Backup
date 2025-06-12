@@ -20,19 +20,32 @@ class PlaylistViewModel: ObservableObject {
     }
 
     func addToPlaylist(_ song: Song) {
+        print("🎵 PlaylistViewModel.addToPlaylist - Adding song: '\(song.title)' by '\(song.artist)'")
+        print("📁 Song file path: \(song.filePath)")
+        print("🔗 Song video URL: \(song.videoURL?.absoluteString ?? "nil")")
+        
         // Prevent duplicates (optional)
         if !playlistItems.contains(where: { $0.id == song.id }) {
             playlistItems.append(song)
+            print("✅ Song added to playlist. Total songs: \(playlistItems.count)")
             
             // Trigger scroll to bottom after a short delay to ensure the new item is rendered
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.scrollToBottomSubject.send()
             }
+        } else {
+            print("⚠️ Song already exists in playlist")
         }
     }
 
     func removeFromPlaylist(at offsets: IndexSet) {
         playlistItems.remove(atOffsets: offsets)
+    }
+    
+    func removeFromPlaylist(_ song: Song) {
+        print("🗑️ PlaylistViewModel.removeFromPlaylist - Removing song: '\(song.title)'")
+        playlistItems.removeAll { $0.id == song.id }
+        print("✅ Song removed from playlist. Remaining songs: \(playlistItems.count)")
     }
 }
 

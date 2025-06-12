@@ -190,8 +190,12 @@ class FilePickerService: ObservableObject {
             updateCurrentProgress(0.4, for: index)
             let metadata = try await extractSimpleMetadata(from: url)
             
-            // Import song directly to Core Data (SIMPLIFIED APPROACH)
-            updateCurrentProgress(0.7, for: index)
+            // Copy file to permanent storage FIRST
+            updateCurrentProgress(0.6, for: index)
+            let permanentURL = try await copyFileToDocuments(from: url)
+            
+            // Import song directly to Core Data with permanent path
+            updateCurrentProgress(0.8, for: index)
             let filename = url.deletingPathExtension().lastPathComponent
             
             // Parse title and artist from filename if possible
@@ -207,12 +211,12 @@ class FilePickerService: ObservableObject {
                 artist = "Unknown Artist"
             }
             
-            // Create song entity directly in Core Data
+            // Create song entity with permanent file path
             try await createSongEntity(
                 title: title,
                 artist: artist,
                 duration: metadata.duration,
-                filePath: url.path,
+                filePath: permanentURL.path,
                 fileSize: metadata.fileSize
             )
             
@@ -220,7 +224,7 @@ class FilePickerService: ObservableObject {
             
             let processingTime = Date().timeIntervalSince(startTime)
             let result = FileProcessingResult(
-                url: url,
+                url: permanentURL, // Use permanent URL
                 metadata: metadata,
                 error: nil,
                 processingTime: processingTime
@@ -343,6 +347,32 @@ class FilePickerService: ObservableObject {
         results = []
         currentError = nil
         progress = FileProcessingProgress(totalFiles: 0, processedFiles: 0)
+    }
+    
+    // NEW METHOD: Copy file to permanent Documents/Media directory
+    private func copyFileToDocuments(from sourceURL: URL) async throws -> URL {
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            throw NSError(domain: "FileProcessing", code: -1, userInfo: [NSLocalizedDescriptionKey: "Could not access documents directory"])
+        }
+        
+        let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+        
+        // Create Media directory if it doesn't exist
+        try FileManager.default.createDirectory(at: mediaDirectory, withIntermediateDirectories: true, attributes: nil)
+        
+        let fileName = sourceURL.lastPathComponent
+        let destinationURL = mediaDirectory.appendingPathComponent(fileName)
+        
+        // Remove existing file if it exists
+        if FileManager.default.fileExists(atPath: destinationURL.path) {
+            try FileManager.default.removeItem(at: destinationURL)
+        }
+        
+        // Copy file to permanent location
+        try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+        
+        print("✅ Copied file to permanent storage: \(destinationURL.path)")
+        return destinationURL
     }
 }
 

@@ -12,6 +12,7 @@ import Combine
 
 struct PlaylistView: View {
     @ObservedObject var viewModel: PlaylistViewModel
+    @EnvironmentObject var videoPlayerViewModel: VideoPlayerViewModel
     @State private var isEditing = false
     @State private var cancellables = Set<AnyCancellable>()
     var onSongSelected: ((Song) -> Void)? = nil
@@ -26,13 +27,23 @@ struct PlaylistView: View {
                 RoundedRectangle(cornerRadius: cornerRadius)
                     .fill(AppTheme.rightPanelListBackground)
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(AppTheme.rightPanelAccent, lineWidth: 1)
+                    .stroke(AppTheme.rightPanelListBackground, lineWidth: 1)
                 
                 ScrollViewReader { proxy in
                     List {
                         ForEach(viewModel.playlistItems) { song in
                             PlaylistItemView(song: song)
+                                .opacity(videoPlayerViewModel.currentVideo != nil ? 0.5 : 1.0) // Dim when video playing
                                 .onTapGesture {
+                                    // CRITICAL: Prevent song selection while video is playing
+                                    if videoPlayerViewModel.currentVideo != nil {
+                                        print("🚫 Song selection blocked - Video currently playing: '\(videoPlayerViewModel.currentVideo?.title ?? "Unknown")'")
+                                        // Optional: Add haptic feedback to indicate blocked action
+                                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                                        impactFeedback.impactOccurred()
+                                        return
+                                    }
+                                    print("✅ Song selection allowed - No video currently playing")
                                     onSongSelected?(song)
                                 }
                                 .listRowInsets(EdgeInsets())
@@ -79,9 +90,19 @@ struct PlaylistView: View {
 
     private var playlistHeader: some View {
         HStack {
-            Text("PLAY LIST")
-                .font(.headline)
-                .foregroundColor(AppTheme.rightPanelAccent)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("PLAY LIST")
+                    .font(.headline)
+                    .foregroundColor(AppTheme.rightPanelAccent)
+                
+                // Show status when video is playing
+                if videoPlayerViewModel.currentVideo != nil {
+                    Text("Selection disabled while video playing")
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+            
             Spacer()
             Button(action: { isEditing.toggle() }) {
                 Text(isEditing ? "DONE" : "EDIT")

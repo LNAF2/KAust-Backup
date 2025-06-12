@@ -3,100 +3,193 @@ import AVKit
 
 struct VideoPlayerOverlayView: View {
     @ObservedObject var viewModel: VideoPlayerViewModel
-    @State private var dragOffset: CGSize = .zero
     @State private var isDragging = false
     
-    // Constants for layout
-    private let minimizedWidth: CGFloat = 320
-    private let minimizedHeight: CGFloat = 180
-    private let controlsHeight: CGFloat = 44
-    private let cornerRadius: CGFloat = 12
+    // Constants following app patterns
+    private let cornerRadius: CGFloat = AppConstants.Layout.panelCornerRadius
+    private let minWidth: CGFloat = 320
+    private let maxWidth: CGFloat = 480
+    private let aspectRatio: CGFloat = 16.0 / 9.0
     
     var body: some View {
         if let video = viewModel.currentVideo {
             GeometryReader { geometry in
                 ZStack {
+                    // Full-screen black background when not minimized
+                    if !viewModel.isMinimized {
+                        Color.black
+                            .ignoresSafeArea()
+                    }
+                    
                     // Video Player
                     VideoPlayer(player: viewModel.player)
-                        .cornerRadius(cornerRadius)
+                        .cornerRadius(viewModel.isMinimized ? cornerRadius : 0)
+                    
+                    // Screen Size Message
+                    if viewModel.showScreenSizeMessage {
+                        VStack {
+                            ScreenSizeMessageView()
+                            Spacer()
+                        }
+                        .padding(.top, 20)
+                    }
                     
                     // Controls Overlay
                     if viewModel.areControlsVisible {
                         VStack {
                             Spacer()
                             
-                            // Controls
-                            HStack(spacing: 20) {
-                                // Play/Pause Button
-                                Button(action: viewModel.togglePlayPause) {
-                                    Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                                        .foregroundColor(.white)
-                                        .font(.title2)
+                            // Main Controls Container
+                            VStack(spacing: 16) {
+                                // Play/Pause and Skip Controls
+                                HStack(spacing: 30) {
+                                    SkipButtonsView(
+                                        onSkipBackward: viewModel.skipBackward,
+                                        onSkipForward: viewModel.skipForward
+                                    )
+                                    
+                                    Button(action: viewModel.togglePlayPause) {
+                                        Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+                                            .foregroundColor(.white)
+                                            .font(.title)
+                                    }
                                 }
                                 
-                                // Progress Bar
-                                ProgressBarView(
-                                    currentTime: viewModel.currentTime,
-                                    duration: viewModel.duration,
-                                    onSeek: viewModel.seek
-                                )
-                                
-                                // Volume Control
-                                Button(action: { /* TODO: Implement volume control */ }) {
-                                    Image(systemName: "speaker.wave.2.fill")
-                                        .foregroundColor(.white)
-                                        .font(.title2)
+                                // Progress Bar with Time Display
+                                HStack(spacing: 12) {
+                                    TimeDisplayView(time: viewModel.formattedCurrentTime)
+                                    
+                                    ProgressBarView(
+                                        currentTime: viewModel.currentTime,
+                                        duration: viewModel.duration,
+                                        onSeek: viewModel.seek
+                                    )
+                                    
+                                    TimeDisplayView(time: viewModel.formattedDuration)
                                 }
                                 
-                                // Delete Button
-                                Button(action: viewModel.stop) {
-                                    Image(systemName: "trash.fill")
-                                        .foregroundColor(.white)
-                                        .font(.title2)
+                                // Delete Button (right-aligned)
+                                HStack {
+                                    Spacer()
+                                    Button(action: { Task { await viewModel.stop() } }) {
+                                        Image(systemName: "trash.fill")
+                                            .foregroundColor(.white)
+                                            .font(.title2)
+                                    }
                                 }
                             }
-                            .padding()
-                            .background(Color.black.opacity(0.5))
+                            .padding(20)
+                            .background(Color.black.opacity(0.1)) // Minimal opacity as requested
                             .cornerRadius(cornerRadius)
                         }
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 20)
                     }
                 }
                 .frame(
-                    width: viewModel.isMinimized ? minimizedWidth : geometry.size.width,
-                    height: viewModel.isMinimized ? minimizedHeight : geometry.size.height
+                    width: viewModel.isMinimized ? minimizedSize(in: geometry).width : geometry.size.width,
+                    height: viewModel.isMinimized ? minimizedSize(in: geometry).height : geometry.size.height
                 )
                 .offset(viewModel.isMinimized ? viewModel.overlayOffset : .zero)
+                .animation(
+                    // Only animate when NOT dragging and NOT minimized
+                    isDragging ? .none : .easeInOut(duration: 0.3),
+                    value: viewModel.isMinimized
+                )
+                .animation(
+                    // Only animate controls when NOT dragging
+                    isDragging ? .none : .easeInOut(duration: 0.3),
+                    value: viewModel.areControlsVisible
+                )
                 .gesture(
-                    viewModel.isMinimized ?
-                    DragGesture()
-                        .onChanged { value in
-                            isDragging = true
-                            dragOffset = value.translation
-                        }
-                        .onEnded { value in
-                            isDragging = false
-                            let maxOffset = geometry.size.width * 0.75
-                            let newOffset = CGSize(
-                                width: min(max(value.translation.width, -maxOffset), maxOffset),
-                                height: min(max(value.translation.height, -maxOffset), maxOffset)
-                            )
-                            withAnimation(.spring()) {
-                                viewModel.overlayOffset = newOffset
-                            }
-                        }
-                    : nil
+                    viewModel.isMinimized ? dragGesture(in: geometry) : nil
                 )
                 .onTapGesture {
-                    viewModel.showControls()
+                    if !isDragging {
+                        viewModel.showControls()
+                    }
                 }
                 .onTapGesture(count: 2) {
-                    viewModel.toggleSize()
+                    if !isDragging {
+                        viewModel.toggleSize()
+                    }
                 }
             }
-            .animation(.easeInOut(duration: 0.3), value: viewModel.isMinimized)
-            .animation(.easeInOut(duration: 0.3), value: viewModel.areControlsVisible)
         }
+    }
+    
+    // MARK: - Helper Methods
+    private func minimizedSize(in geometry: GeometryProxy) -> CGSize {
+        let width = min(max(geometry.size.width * 0.25, minWidth), maxWidth)
+        let height = width / aspectRatio
+        return CGSize(width: width, height: height)
+    }
+    
+    private func dragGesture(in geometry: GeometryProxy) -> some Gesture {
+        DragGesture()
+            .onChanged { value in
+                isDragging = true
+                
+                // Calculate the safe bounds to keep video on screen
+                let videoSize = minimizedSize(in: geometry)
+                let maxX = (geometry.size.width - videoSize.width) / 2
+                let maxY = (geometry.size.height - videoSize.height) / 2
+                
+                // Apply the translation directly with bounds checking
+                let newX = max(-maxX, min(maxX, value.translation.x))
+                let newY = max(-maxY, min(maxY, value.translation.y))
+                
+                // Update position immediately - no animation, no delay
+                viewModel.overlayOffset = CGSize(width: newX, height: newY)
+            }
+            .onEnded { _ in
+                isDragging = false
+                // Position is already set, no need for spring animation
+            }
+    }
+}
+
+// MARK: - Component Views
+
+struct TimeDisplayView: View {
+    let time: String
+    
+    var body: some View {
+        Text(time)
+            .font(.system(.body, design: .monospaced))
+            .foregroundColor(.white)
+            .padding(.horizontal, 8)
+    }
+}
+
+struct SkipButtonsView: View {
+    let onSkipBackward: () -> Void
+    let onSkipForward: () -> Void
+    
+    var body: some View {
+        HStack(spacing: 20) {
+            Button(action: onSkipBackward) {
+                Image(systemName: "gobackward.10")
+                    .foregroundColor(.white)
+                    .font(.title2)
+            }
+            
+            Button(action: onSkipForward) {
+                Image(systemName: "goforward.10")
+                    .foregroundColor(.white)
+                    .font(.title2)
+            }
+        }
+    }
+}
+
+struct ScreenSizeMessageView: View {
+    var body: some View {
+        Text("DOUBLE TAP TO CHANGE SCREEN SIZE")
+            .font(.headline)
+            .foregroundColor(.white)
+            .padding(12)
+            .background(Color.black.opacity(0.7))
+            .cornerRadius(AppConstants.Layout.panelCornerRadius)
     }
 }
 
