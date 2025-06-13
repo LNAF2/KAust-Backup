@@ -9,6 +9,7 @@ import SwiftUI
 import Combine
 import UniformTypeIdentifiers
 import AVFoundation
+import AVKit
 import CoreData
 
 // Note: DataProviderService should be available since DataProviderServiceProtocol is already imported via existing protocol file structure
@@ -872,15 +873,23 @@ class EnhancedFilePickerService: ObservableObject {
             
             // Parse title and artist from filename
             let filenameWithoutExt = url.deletingPathExtension().lastPathComponent
-            let components = filenameWithoutExt.components(separatedBy: " - ")
+            
+            // Remove supplier information in parentheses first
+            let cleanFilename = filenameWithoutExt.replacingOccurrences(
+                of: "\\s*\\(.*?\\)\\s*", 
+                with: "", 
+                options: .regularExpression
+            ).trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            let components = cleanFilename.components(separatedBy: " - ")
             let title: String
             let artist: String?
             
             if components.count >= 2 {
-                artist = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
-                title = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
+                title = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
+                artist = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
             } else {
-                title = filenameWithoutExt
+                title = cleanFilename
                 artist = "Unknown Artist"
             }
             
@@ -1410,7 +1419,7 @@ class SettingsViewModel: ObservableObject {
     
     @Published var notificationsEnabled = true
     @Published var autoProcessingEnabled = true
-    @Published var storageOptimizationEnabled = false
+    @Published var storageOptimizationEnabled = true
     @AppStorage("swipeToDeleteEnabled") var swipeToDeleteEnabled = false  // Use @AppStorage for automatic persistence
     
     // Shared access to swipe-to-delete setting
@@ -1655,7 +1664,7 @@ class SettingsViewModel: ObservableObject {
     func resetSettings() {
         notificationsEnabled = true
         autoProcessingEnabled = true
-        storageOptimizationEnabled = false
+        storageOptimizationEnabled = true
         swipeToDeleteEnabled = false  // Reset to default OFF state
         
         // Clear file processing results
@@ -1840,6 +1849,9 @@ struct SettingsView: View {
     
     private var settingsContent: some View {
         VStack(alignment: .leading, spacing: 24) {
+            // AirPlay section - at the top
+            airPlaySection
+            
             // Download MP4 files section
             downloadSection
             
@@ -1875,6 +1887,44 @@ struct SettingsView: View {
             // Storage Management
             Section("Storage") {
             }
+        }
+    }
+    
+    // MARK: - AirPlay Section
+    
+    private var airPlaySection: some View {
+        SettingsSection(title: "AirPlay", icon: "airplayaudio") {
+            HStack(spacing: 12) {
+                Image(systemName: "airplayaudio")
+                    .foregroundColor(.blue)
+                    .font(.system(size: 20, weight: .medium))
+                    .frame(width: 28)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Connect to Apple TV")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppTheme.settingsText)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    
+                    Text("Stream to AirPlay devices")
+                        .font(.system(size: 14))
+                        .foregroundColor(AppTheme.settingsText.opacity(0.7))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                
+                Spacer()
+                
+                // AirPlay picker
+                AirPlayPickerViewWrapper()
+                    .frame(width: 44, height: 44)
+                    .padding(.trailing, -20)  // Negative padding to move the icon further rightay icon
+            }
+            .padding(.horizontal, 32)  // Increased from 16 to 32 to match other sections
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
+                    .fill(AppTheme.settingsText.opacity(0.05))
+            )
         }
     }
     
@@ -1972,13 +2022,11 @@ struct SettingsView: View {
     private var downloadSection: some View {
         SettingsSection(title: "Download MP4 files", icon: "arrow.down.circle") {
             VStack(spacing: 12) {
-                // SIMPLE FILE SELECTION - Just like you want!
                 if viewModel.filePickerService.processingState == .idle {
                     VStack(spacing: 16) {
-                        // Folder access option (RECOMMENDED)
                         FilePickerRow(
                             title: "📁 Access MP4 Folder",
-                            subtitle: "✅ RECOMMENDED: Point to folder with MP4s - no copying needed!",
+                            subtitle: "✅ RECOMMENDED: Select folder with MP4s",
                             icon: "folder.badge.gearshape",
                             isEnabled: true,
                             isLoading: false
@@ -1986,48 +2034,17 @@ struct SettingsView: View {
                             viewModel.selectMP4Folder()
                         }
                         
-                        // Individual file picker (fallback)
                         FilePickerRow(
                             title: "📄 Select Individual Files",
-                            subtitle: "⚠️ iOS Limit: Select 30-50 files max per session to prevent system crashes",
+                            subtitle: "⚠️ Select 1 to 30 files max to prevent system crashes",
                             icon: "folder.badge.plus",
                             isEnabled: viewModel.isFilePickerEnabled,
                             isLoading: false
                         ) {
                             viewModel.openFilePicker()
                         }
-                        
-                        // Information box
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                Image(systemName: "info.circle.fill")
-                                    .foregroundColor(.blue)
-                                    .font(.title3)
-                                Text("How to work within iOS limits")
-                                    .font(.headline)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                            }
-                            
-                            Text("• iOS file picker crashes with 50+ files in one session\n• Select 30-50 files max per session for stability\n• For large collections: repeat the selection process\n• Each session processes files automatically in batches")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white)
-                        }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 16)
-                        .background(
-                            RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
-                                .fill(Color.blue.opacity(0.2))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
-                                        .stroke(Color.blue, lineWidth: 1)
-                                )
-                        )
-                        .padding(.horizontal, 16)
                     }
                 } else {
-                    // Processing mode - show current operation
                     FilePickerRow(
                         title: "Processing Files...",
                         subtitle: viewModel.statusMessage,
@@ -2039,7 +2056,6 @@ struct SettingsView: View {
                 
                 // Control buttons based on processing state
                 HStack(spacing: 12) {
-                    // Show Results button when results are available
                     if !viewModel.filePickerService.results.isEmpty && viewModel.filePickerService.processingState == .idle {
                         Button("Show Last Results") {
                             viewModel.isShowingResults = true
@@ -2048,7 +2064,6 @@ struct SettingsView: View {
                         .foregroundColor(AppTheme.settingsResetIconBlue)
                     }
                     
-                    // Restart button when files are available but processing is not active
                     if viewModel.filePickerService.canRestart {
                         Button("Restart Download") {
                             Task {
@@ -2059,7 +2074,6 @@ struct SettingsView: View {
                         .foregroundColor(.green)
                     }
                     
-                    // Clear all button when not processing
                     if viewModel.filePickerService.processingState != .processing && !viewModel.filePickerService.results.isEmpty {
                         Button("Clear All") {
                             Task {
@@ -2080,62 +2094,6 @@ struct SettingsView: View {
                         filePickerService: viewModel.filePickerService
                     )
                 }
-                
-                // File selection guidance
-                if viewModel.filePickerService.processingState == .idle {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("⚠️ iOS File Picker Limitations")
-                            .font(.headline)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                        
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("• Apple's file picker crashes with large selections")
-                            Text("• Maximum 30-50 files per selection session")
-                            Text("• For 1000+ files: use multiple sessions")
-                            Text("• Each session auto-processes in safe batches")
-                        }
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.white)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8)
-                            .fill(Color.orange.opacity(0.2))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.orange, lineWidth: 1)
-                            )
-                    )
-                }
-                
-                // Additional guidance for large collections
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Image(systemName: "lightbulb.fill")
-                            .foregroundColor(.yellow)
-                        Text("For Large Collections (1000+ files)")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                    }
-                    
-                    Text("1. Select 30-40 files → Wait for processing to complete\n2. Repeat selection → Wait for processing\n3. Continue until all files are processed\n4. Each session adds to your collection")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.9))
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 16)
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color.blue.opacity(0.2))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color.blue, lineWidth: 1)
-                        )
-                )
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -2766,6 +2724,29 @@ struct FolderPickerView: UIViewControllerRepresentable {
 }
 
 // MARK: - Preview
+
+// MARK: - AirPlay Picker Component
+
+/// SwiftUI wrapper for AVRoutePickerView providing standard Apple AirPlay functionality
+struct AirPlayPickerViewWrapper: UIViewRepresentable {
+    
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let routePicker = AVRoutePickerView()
+        
+        // Configure the route picker appearance
+        routePicker.backgroundColor = UIColor.clear
+        routePicker.tintColor = UIColor.systemBlue
+        
+        // Set the priority for AirPlay routes
+        routePicker.prioritizesVideoDevices = true
+        
+        return routePicker
+    }
+    
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {
+        // No updates needed for this implementation
+    }
+}
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {

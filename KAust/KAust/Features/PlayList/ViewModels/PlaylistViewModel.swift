@@ -12,6 +12,7 @@ import Combine
 
 class PlaylistViewModel: ObservableObject {
     @Published var playlistItems: [Song] = []
+    @Published var draggedItem: Song?
     
     // Publisher to trigger scroll to bottom when new song is added
     private let scrollToBottomSubject = PassthroughSubject<Void, Never>()

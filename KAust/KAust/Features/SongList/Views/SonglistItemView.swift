@@ -13,7 +13,9 @@ struct SongListItemView: View {
 
     var body: some View {
         ZStack {
-            AppTheme.leftPanelListBackground
+            // Light purple background for the area around the white rectangle
+            Color.purple.opacity(0.1)
+            
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.white)
                 .overlay(
@@ -21,12 +23,12 @@ struct SongListItemView: View {
                         .stroke(AppTheme.leftPanelAccent.opacity(0.5), lineWidth: 1)
                 )
             VStack(alignment: .leading, spacing: 2) {
-                Text(song.artist.uppercased())
+                Text(song.cleanArtist.uppercased())
                     .font(.headline)
                     .fontWeight(.bold)
                     .foregroundColor(AppTheme.leftPanelAccent)
                 HStack(alignment: .firstTextBaseline) {
-                    Text(song.title.uppercased())
+                    Text(song.cleanTitle.uppercased())
                         .font(.headline)
                         .fontWeight(.regular)
                         .foregroundColor(AppTheme.leftPanelAccent.opacity(0.7))

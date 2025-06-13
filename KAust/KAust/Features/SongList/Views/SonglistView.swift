@@ -12,8 +12,12 @@ struct SongListView: View {
     @ObservedObject var playlistViewModel: PlaylistViewModel
     @FocusState private var isSearchFocused: Bool
     @AppStorage("swipeToDeleteEnabled") private var swipeToDeleteEnabled = false
+    @State private var swipeState: [String: CGFloat] = [:]
+    @State private var songToDelete: Song?
+    @State private var showDeleteConfirmation = false
     private let cornerRadius: CGFloat = 8
     private let panelGap: CGFloat = 8
+    private let swipeThreshold: CGFloat = -80
 
     var body: some View {
         VStack(spacing: 0) {
@@ -45,17 +49,41 @@ struct SongListView: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
         )
+        .alert("Delete Song", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {
+                songToDelete = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let song = songToDelete {
+                    deleteSong(song)
+                }
+                songToDelete = nil
+            }
+        } message: {
+            if let song = songToDelete {
+                Text(deletionMessage(for: song))
+            }
+        }
     }
 
     private var header: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("SONG LIST")
-                .font(.headline)
-                .foregroundColor(AppTheme.leftPanelAccent)
-            Spacer()
-            Text("\(viewModel.displayCount) Songs")
-                .font(.subheadline)
-                .foregroundColor(AppTheme.leftPanelAccent)
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("SONG LIST")
+                    .font(.headline)
+                    .foregroundColor(AppTheme.leftPanelAccent)
+                Spacer()
+                Text("\(viewModel.displayCount) Songs")
+                    .font(.subheadline)
+                    .foregroundColor(AppTheme.leftPanelAccent)
+            }
+            
+            // Show swipe-to-delete status
+            if swipeToDeleteEnabled {
+                Text("Swipe left to delete songs")
+                    .font(.caption)
+                    .foregroundColor(AppTheme.leftPanelAccent.opacity(0.7))
+            }
         }
         .padding(.horizontal, panelGap)
         .padding(.top, 12)
@@ -83,6 +111,8 @@ struct SongListView: View {
                         if !viewModel.searchText.isEmpty {
                             viewModel.showingSuggestions = true
                         }
+                        // Reset all swipe states when search changes
+                        resetAllSwipes()
                     }
                 
                 if !viewModel.searchText.isEmpty {
@@ -186,34 +216,136 @@ struct SongListView: View {
                     .foregroundColor(AppTheme.leftPanelAccent)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(AppTheme.leftPanelListBackground)
+                .background(Color.clear)
             } else {
-                List {
-                    ForEach(viewModel.displaySongs) { song in
-                        SongListItemView(song: song)
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .background(AppTheme.leftPanelListBackground)
-                            .onTapGesture {
-                                playlistViewModel.addToPlaylist(song)
-                                // Hide suggestions when song is selected
-                                viewModel.showingSuggestions = false
-                            }
-                            .if(swipeToDeleteEnabled) { view in
-                                view.swipeActions(edge: .trailing) {
-                                    Button("Delete", role: .destructive) {
-                                        Task {
-                                            await viewModel.deleteSong(song)
-                                        }
-                                    }
-                                }
-                            }
+                // Replace List with ScrollView to fix background issues
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(viewModel.displaySongs) { song in
+                            songListItemRow(for: song)
+                        }
                     }
                 }
-                .listStyle(PlainListStyle())
                 .background(Color.clear)
                 .padding(.vertical, 4)
             }
+        }
+    }
+    
+    // MARK: - Song List Item Row
+    
+    @ViewBuilder
+    private func songListItemRow(for song: Song) -> some View {
+        ZStack {
+            // Delete button revealed when swiping (only if swipe-to-delete is enabled)
+            if swipeToDeleteEnabled {
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        showDeleteConfirmation(for: song)
+                        resetSwipe(for: song.id)
+                    }) {
+                        Image(systemName: "trash.fill")
+                            .foregroundColor(.white)
+                            .padding()
+                            .background(Color.red)
+                            .cornerRadius(8)
+                    }
+                    .frame(width: 60)
+                }
+                .padding(.trailing, 8)
+                .opacity(abs(swipeState[song.id] ?? 0) > 20 ? 1 : 0)
+            }
+            
+            // Main song item
+            SongListItemView(song: song)
+                .offset(x: swipeState[song.id] ?? 0)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if abs(swipeState[song.id] ?? 0) > 10 {
+                        // Reset swipe if item was swiped
+                        resetSwipe(for: song.id)
+                    } else {
+                        // Add to playlist and hide suggestions
+                        playlistViewModel.addToPlaylist(song)
+                        viewModel.showingSuggestions = false
+                    }
+                }
+                .simultaneousGesture(
+                    swipeToDeleteEnabled ? 
+                    DragGesture()
+                        .onChanged { value in
+                            // Only allow left swipe (negative translation)
+                            let translation = min(0, value.translation.width)
+                            swipeState[song.id] = translation
+                        }
+                        .onEnded { value in
+                            let translation = value.translation.width
+                            let velocity = value.velocity.width
+                            
+                            if translation < swipeThreshold || velocity < -500 {
+                                // Snap to delete position
+                                withAnimation(.spring()) {
+                                    swipeState[song.id] = swipeThreshold
+                                }
+                            } else {
+                                // Snap back to original position
+                                resetSwipe(for: song.id)
+                            }
+                        } : nil
+                )
+        }
+        .clipped()
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func resetSwipe(for songId: String) {
+        withAnimation(.spring()) {
+            swipeState[songId] = 0
+        }
+    }
+    
+    private func resetAllSwipes() {
+        withAnimation(.spring()) {
+            swipeState.removeAll()
+        }
+    }
+    
+    private func showDeleteConfirmation(for song: Song) {
+        songToDelete = song
+        showDeleteConfirmation = true
+    }
+    
+    private func deleteSong(_ song: Song) {
+        Task {
+            await viewModel.deleteSong(song)
+        }
+    }
+    
+    private func deletionMessage(for song: Song) -> String {
+        let fileManager = FileManager.default
+        let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+        let mediaPath = mediaDirectory.path
+        
+        // Check if this is an internal file (in app's Media directory) or external (bookmarked)
+        if song.filePath.hasPrefix(mediaPath) {
+            return """
+            This will permanently delete both the song metadata and the MP4 file from your device.
+            
+            Song: "\(song.cleanTitle)" by \(song.cleanArtist)
+            
+            This action cannot be undone.
+            """
+        } else {
+            return """
+            This will remove the song from your library but keep the original file in its location.
+            
+            Song: "\(song.cleanTitle)" by \(song.cleanArtist)
+            
+            Only the song metadata will be deleted.
+            """
         }
     }
 }
