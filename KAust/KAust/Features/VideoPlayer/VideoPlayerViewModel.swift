@@ -20,14 +20,12 @@ final class VideoPlayerViewModel: ObservableObject {
     @Published var overlayOffset: CGSize = .zero
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
-    @Published var showScreenSizeMessage: Bool = false
     @Published var formattedCurrentTime: String = "00:00"
     @Published var formattedDuration: String = "00:00"
     
     // MARK: - Constants
     private let skipInterval: Double = 10.0
     private let controlsFadeDelay: TimeInterval = 5.0
-    private let screenMessageDelay: TimeInterval = 5.0
     
     // MARK: - Private Properties
     private var _player: AVPlayer?
@@ -68,22 +66,23 @@ final class VideoPlayerViewModel: ObservableObject {
             await updateSongFilePath(songId: song.id, newPath: url.path)
         }
         
-        // 3. Setup the new player
+        // 3. Setup the new player and wait for it to be ready
         let newPlayerItem = AVPlayerItem(url: url)
         self.playerItem = newPlayerItem
         self._player = AVPlayer(playerItem: newPlayerItem)
         
-        // 4. Set state for the new video
+        // 4. Wait for player to be ready to play, then show UI immediately
+        await waitForPlayerReady(player: self._player!, playerItem: newPlayerItem)
+        
+        // 5. NOW set state - player is ready, video will appear immediately
         self.currentVideo = song
         self.isPlaying = true
-        self.isMinimized = true // Start minimized as requested
-        self.showScreenSizeMessage = true // Show the helper message
+        self.isMinimized = true
         
-        // 5. Start playback and setup UI
+        // 6. Start playback and setup
         self._player?.play()
         setupTimeObserver()
-        showControls() // This also starts the fade-out timer
-        startScreenSizeMessageTimer()
+        showControls()
         
         print("✅ VideoPlayerViewModel.play - Playback started for: '\(song.title)'")
     }
@@ -131,7 +130,6 @@ final class VideoPlayerViewModel: ObservableObject {
         // overlayOffset = .zero  <-- REMOVED TO PREVENT JUMPING BACK TO CENTER
         currentTime = 0
         duration = 0
-        showScreenSizeMessage = false
         formattedCurrentTime = "00:00"
         formattedDuration = "00:00"
         
@@ -156,17 +154,21 @@ final class VideoPlayerViewModel: ObservableObject {
     }
     
     func toggleSize() {
-        let savedOffset = overlayOffset  // Save position before toggle
         isMinimized.toggle()
         showControls()
         if !isMinimized {
-            showScreenSizeMessage = true
-            startScreenSizeMessageTimer()
             // When going fullscreen, position doesn't matter (fullscreen)
         } else {
-            // When going back to minimized, restore the saved position
-            overlayOffset = savedOffset
+            // When going back to minimized, CENTER the video as default
+            overlayOffset = .zero
+            print("📺 Video toggled to minimized - CENTERED at origin")
         }
+    }
+    
+    func centerVideo() {
+        overlayOffset = .zero
+        showControls()
+        print("🎯 Video manually centered")
     }
     
     func skipForward() async {
@@ -239,15 +241,7 @@ final class VideoPlayerViewModel: ObservableObject {
         }
     }
     
-    private func startScreenSizeMessageTimer() {
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(self?.screenMessageDelay ?? 5.0 * 1_000_000_000))
-            guard let self = self else { return }
-            withAnimation(.easeInOut(duration: 0.3)) {
-                self.showScreenSizeMessage = false
-            }
-        }
-    }
+
     
     private func updateTimeDisplay() {
         formattedCurrentTime = formatTime(currentTime)
@@ -334,6 +328,27 @@ final class VideoPlayerViewModel: ObservableObject {
         
         print("❌ File '\(fileName)' not found in any standard location.")
         return nil
+    }
+    
+    private func waitForPlayerReady(player: AVPlayer, playerItem: AVPlayerItem) async {
+        print("⏳ Waiting for player to be ready...")
+        
+        // Simple polling approach - wait for player to be ready
+        var attempts = 0
+        let maxAttempts = 20 // 1 second total wait time
+        
+        while playerItem.status == .unknown && attempts < maxAttempts {
+            try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
+            attempts += 1
+        }
+        
+        if playerItem.status == .readyToPlay {
+            print("✅ Player is ready to play - showing UI now")
+        } else if playerItem.status == .failed {
+            print("❌ Player failed to load")
+        } else {
+            print("⚠️ Player status still unknown after waiting, proceeding anyway")
+        }
     }
     
     private func updateSongFilePath(songId: String, newPath: String) async {

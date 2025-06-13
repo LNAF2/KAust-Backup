@@ -72,6 +72,9 @@ struct SongListView: View {
                 TextField("Try: artist name, song title, or \"artist song\"", text: $viewModel.searchText)
                     .textFieldStyle(.plain)
                     .focused($isSearchFocused)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.never)
+                    .keyboardType(.default)
                     .onSubmit {
                         isSearchFocused = false
                         viewModel.showingSuggestions = false

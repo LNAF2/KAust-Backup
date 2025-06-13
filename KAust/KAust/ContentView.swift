@@ -99,8 +99,8 @@ struct ContentView_Previews: PreviewProvider {
 // MARK: - Custom Video Player View
 struct CustomVideoPlayerView: View {
     @ObservedObject var viewModel: VideoPlayerViewModel
-    @State private var isDragging = false
-    @State private var dragStartOffset: CGSize = .zero
+    @GestureState private var dragOffset = CGSize.zero
+    @State private var basePosition = CGSize.zero
     
     // Constants following app patterns
     private let cornerRadius: CGFloat = AppConstants.Layout.panelCornerRadius
@@ -123,9 +123,7 @@ struct CustomVideoPlayerView: View {
                                 height: viewModel.isMinimized ? calculateMinimizedHeight(geometry) : geometry.size.height
                             )
                             .cornerRadius(viewModel.isMinimized ? cornerRadius : 0)
-                            .offset(viewModel.isMinimized ? viewModel.overlayOffset : .zero)
-                            .animation(isDragging ? .none : .easeInOut(duration: 0.3), value: viewModel.isMinimized)
-                            .animation(isDragging ? .none : .easeInOut(duration: 0.3), value: viewModel.areControlsVisible)
+                            .offset(viewModel.isMinimized ? CGSize(width: basePosition.width + dragOffset.width, height: basePosition.height + dragOffset.height) : .zero)
                             .gesture(
                                 viewModel.isMinimized ? dragGesture(in: geometry) : nil
                             )
@@ -135,7 +133,16 @@ struct CustomVideoPlayerView: View {
                     }
                     Spacer()
                 }
-                .background(viewModel.isMinimized ? AnyView(Color.clear) : AnyView(Color.black.ignoresSafeArea()))
+                .background(viewModel.isMinimized ? Color.clear : Color.black)
+            }
+            .onAppear {
+                // Initialize local position from viewModel
+                basePosition = viewModel.overlayOffset
+            }
+            .onChange(of: viewModel.overlayOffset) { _, newOffset in
+                // Always sync local position with viewModel (especially when centering)
+                basePosition = newOffset
+                print("🔄 Synced basePosition to: \(newOffset)")
             }
         }
     }
@@ -143,10 +150,11 @@ struct CustomVideoPlayerView: View {
     @ViewBuilder
     private func videoPlayerContainer(_ geometry: GeometryProxy) -> some View {
         ZStack {
-            // ONLY ONE VideoPlayer instance
+            // ONLY ONE VideoPlayer instance - immediate load
             if let player = viewModel.player {
                 VideoPlayer(player: player)
-                    .disabled(true) // Always disable native controls to prevent interference
+                    .disabled(true)
+                    .background(Color.black) // Ensure consistent background
             }
             
             // Invisible overlay to capture all touches (especially for full screen double-tap)
@@ -154,28 +162,31 @@ struct CustomVideoPlayerView: View {
                 .fill(Color.clear)
                 .contentShape(Rectangle())
                 .onTapGesture(count: 1) {
-                    if !isDragging {
+                    if dragOffset == .zero {
                         print("👆 SINGLE TAP detected - showing controls")
                         viewModel.showControls()
                     }
                 }
                 .onTapGesture(count: 2) {
-                    if !isDragging {
+                    if dragOffset == .zero {
                         print("👆👆 DOUBLE TAP detected - toggling size")
                         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
                         impactFeedback.impactOccurred()
                         viewModel.toggleSize()
                     }
                 }
+                .onTapGesture(count: 3) {
+                    if dragOffset == .zero && viewModel.isMinimized {
+                        print("👆👆👆 TRIPLE TAP detected - centering video")
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                        impactFeedback.impactOccurred()
+                        viewModel.centerVideo()
+                    }
+                }
             
             // Custom controls overlay - ALWAYS in the same container
             if viewModel.areControlsVisible {
                 customControlsOverlay()
-            }
-            
-            // Screen Size Message
-            if viewModel.showScreenSizeMessage {
-                screenSizeMessage()
             }
         }
     }
@@ -254,49 +265,22 @@ struct CustomVideoPlayerView: View {
         .allowsHitTesting(true) // CRITICAL: Ensure controls are always tappable
     }
     
-    @ViewBuilder
-    private func screenSizeMessage() -> some View {
-        VStack {
-            Text("DOUBLE TAP TO CHANGE SCREEN SIZE")
-                .font(.headline)
-                .foregroundColor(.white)
-                .padding(12)
-                .background(Color.black.opacity(0.7))
-                .cornerRadius(AppConstants.Layout.panelCornerRadius)
-            Spacer()
-        }
-        .padding(.top, 50)
-        .allowsHitTesting(false)
-    }
+
     
-    // FIXED drag gesture - properly tracks starting position
+    // ZERO @Published access during drag - pure smooth performance
     private func dragGesture(in geometry: GeometryProxy) -> some Gesture {
         DragGesture()
-            .onChanged { value in
-                if !isDragging {
-                    // First touch - store the starting position
-                    isDragging = true
-                    dragStartOffset = viewModel.overlayOffset
-                }
-                
-                // Calculate bounds to keep video on screen
-                let videoSize = CGSize(
-                    width: calculateMinimizedWidth(geometry),
-                    height: calculateMinimizedHeight(geometry)
-                )
-                let maxX = (geometry.size.width - videoSize.width) / 2
-                let maxY = (geometry.size.height - videoSize.height) / 2
-                
-                // Add translation to the starting position
-                let newX = max(-maxX, min(maxX, dragStartOffset.width + value.translation.width))
-                let newY = max(-maxY, min(maxY, dragStartOffset.height + value.translation.height))
-                
-                // Update position immediately - stays under finger
-                viewModel.overlayOffset = CGSize(width: newX, height: newY)
+            .updating($dragOffset) { value, state, _ in
+                // Pure local state - zero @Published property access
+                state = value.translation
             }
-            .onEnded { _ in
-                isDragging = false
-                // Position is already set in viewModel.overlayOffset
+            .onEnded { value in
+                // Commit final position - update both local and viewModel
+                basePosition = CGSize(
+                    width: basePosition.width + value.translation.width,
+                    height: basePosition.height + value.translation.height
+                )
+                viewModel.overlayOffset = basePosition
             }
     }
     
@@ -317,7 +301,6 @@ struct VideoControlButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
             .opacity(configuration.isPressed ? 0.8 : 1.0)
-            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
             .allowsHitTesting(true)
     }
 }
