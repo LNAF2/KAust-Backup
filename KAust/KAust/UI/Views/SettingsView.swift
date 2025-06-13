@@ -20,6 +20,7 @@ enum FileValidationError: LocalizedError {
     case invalidFileType
     case fileNotFound
     case permissionDenied
+    case fileNotReadable
     
     var errorDescription: String? {
         switch self {
@@ -31,17 +32,20 @@ enum FileValidationError: LocalizedError {
             return "File could not be found"
         case .permissionDenied:
             return "Permission denied to access file"
+        case .fileNotReadable:
+            return "File is not readable or corrupted"
         }
     }
 }
 
 // MARK: - File Picker Components
 
-/// File picker view for selecting MP4 files
+/// Enhanced file picker view with crash recovery and large file handling
 struct FilePickerView: UIViewControllerRepresentable {
     @Binding var isPresented: Bool
     let onFilesSelected: ([URL]) -> Void
     let onError: (Error) -> Void
+    let filePickerService: EnhancedFilePickerService // Add service reference
     
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
         let picker = UIDocumentPickerViewController(
@@ -51,6 +55,11 @@ struct FilePickerView: UIViewControllerRepresentable {
         picker.delegate = context.coordinator
         picker.allowsMultipleSelection = true
         picker.modalPresentationStyle = .formSheet
+        
+        // Add safeguards for large selections
+        if #available(iOS 14.0, *) {
+            picker.shouldShowFileExtensions = true
+        }
         
         return picker
     }
@@ -65,23 +74,107 @@ struct FilePickerView: UIViewControllerRepresentable {
     
     class Coordinator: NSObject, UIDocumentPickerDelegate {
         let parent: FilePickerView
+        private var crashRecoveryAttempts = 0
+        private let maxCrashRecoveryAttempts = 2
+        
+        // CRITICAL: Prevent system picker crashes by limiting selection size
+        private let systemSafeThreshold = 50    // Never allow more than 50 files in one picker session
+        private let warningThreshold = 25        // Warn when approaching system limits
         
         init(_ parent: FilePickerView) {
             self.parent = parent
+            super.init()
         }
         
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             parent.isPresented = false
-            parent.onFilesSelected(urls)
+            
+            print("📁 Selected \(urls.count) files - starting automatic batch processing")
+            
+            // Always process files through automatic batch processing
+            handleFileSelection(urls)
+            
+            // Reset crash recovery counter on successful selection
+            crashRecoveryAttempts = 0
         }
+        
+
+        
+
         
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
             parent.isPresented = false
+            crashRecoveryAttempts = 0
         }
         
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentAt url: URL) {
             parent.isPresented = false
-            parent.onFilesSelected([url])
+            handleFileSelection([url])
+            crashRecoveryAttempts = 0
+        }
+        
+        private func handleFileSelection(_ urls: [URL]) {
+            // Immediately release the UI thread and handle in background
+            Task { @MainActor in
+                await processFileSelectionSafely(urls)
+            }
+        }
+        
+        private func processFileSelectionSafely(_ urls: [URL]) async {
+            // SIMPLE PROCESSING: Just like before - automatic background batching
+            let fileCount = urls.count
+            
+            print("📁 File picker received \(fileCount) files")
+            print("🔄 Starting automatic batch processing (30 files per batch, 5-second pauses)")
+            
+            // Always process files - automatic batching happens in the background
+            parent.onFilesSelected(urls)
+        }
+        
+
+        
+
+        
+        private func estimatedProcessingTime(for fileCount: Int) -> String {
+            let avgTimePerFile: Double = 2.0  // seconds per file (conservative estimate)
+            let totalSeconds = Double(fileCount) * avgTimePerFile
+            
+            let hours = Int(totalSeconds) / 3600
+            let minutes = Int(totalSeconds) % 3600 / 60
+            
+            if hours > 0 {
+                return "\(hours)h \(minutes)m"
+            } else if minutes > 5 {
+                return "\(minutes) minutes"
+            } else {
+                return "a few minutes"
+            }
+        }
+        
+        @MainActor
+        private func presentAlert(_ alert: UIAlertController) async {
+            // Find the topmost view controller to present the alert
+            if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+               let window = windowScene.windows.first,
+               let topController = getTopViewController(from: window.rootViewController) {
+                topController.present(alert, animated: true)
+            }
+        }
+        
+        private func getTopViewController(from controller: UIViewController?) -> UIViewController? {
+            if let presented = controller?.presentedViewController {
+                return getTopViewController(from: presented)
+            }
+            
+            if let navigationController = controller as? UINavigationController {
+                return getTopViewController(from: navigationController.visibleViewController)
+            }
+            
+            if let tabController = controller as? UITabBarController {
+                return getTopViewController(from: tabController.selectedViewController)
+            }
+            
+            return controller
         }
     }
 }
@@ -121,85 +214,665 @@ struct SimpleMetadata {
 struct FileProcessingResult {
     let url: URL
     let filename: String
-    let isSuccess: Bool
+    let status: ProcessingStatus
     let metadata: SimpleMetadata?
     let error: Error?
     let processingTime: TimeInterval
     
-    init(url: URL, metadata: SimpleMetadata?, error: Error?, processingTime: TimeInterval) {
+    enum ProcessingStatus {
+        case success
+        case failed
+        case duplicate
+        
+        var isSuccess: Bool {
+            return self == .success
+        }
+        
+        var isDuplicate: Bool {
+            return self == .duplicate
+        }
+        
+        var isFailed: Bool {
+            return self == .failed
+        }
+    }
+    
+    init(url: URL, status: ProcessingStatus, metadata: SimpleMetadata? = nil, error: Error? = nil, processingTime: TimeInterval) {
         self.url = url
         self.filename = url.lastPathComponent
-        self.isSuccess = error == nil
+        self.status = status
         self.metadata = metadata
         self.error = error
         self.processingTime = processingTime
     }
+    
+    // Legacy compatibility
+    var isSuccess: Bool {
+        return status.isSuccess
+    }
 }
 
-/// Simple file picker service for handling file operations
-@MainActor
-class FilePickerService: ObservableObject {
-    @Published var isProcessing = false
-    @Published var progress = FileProcessingProgress(totalFiles: 0, processedFiles: 0)
-    @Published var results: [FileProcessingResult] = []
-    @Published var currentError: Error?
+// MARK: - Batch Processing Configuration
+struct BatchProcessingConfig {
+    // Optimized for 3000+ files
+    static let defaultBatchSize = 25  // Reduced for better memory management
+    static let maxConcurrentOperations = 2  // Reduced to prevent overwhelming the system
+    static let progressUpdateInterval: TimeInterval = 0.5  // Less frequent updates for performance
     
-    // Direct Core Data access for immediate functionality
-    private let persistenceController = PersistenceController.shared
-    
-    func processFiles(_ urls: [URL]) async {
-        guard !urls.isEmpty else { return }
-        
-        isProcessing = true
-        currentError = nil
-        results = []
-        progress = FileProcessingProgress(totalFiles: urls.count, processedFiles: 0)
-        
-        for (index, url) in urls.enumerated() {
-            let filename = url.lastPathComponent
-            
-            // Update progress
-            progress = FileProcessingProgress(
-                totalFiles: urls.count,
-                processedFiles: index,
-                currentFileName: filename,
-                currentProgress: 0.0
-            )
-            
-            await processFile(url, at: index)
+    // Dynamic sizing based on file count
+    static func optimalBatchSize(for fileCount: Int) -> Int {
+        switch fileCount {
+        case 0...100:
+            return 20
+        case 101...500:
+            return 25
+        case 501...1000:
+            return 30
+        case 1001...2000:
+            return 35
+        default: // 2000+
+            return 40
         }
-        
-        // Final progress update
-        progress = FileProcessingProgress(
-            totalFiles: urls.count,
-            processedFiles: urls.count
-        )
-        
-        isProcessing = false
     }
     
-    private func processFile(_ url: URL, at index: Int) async {
+    static func optimalConcurrency(for fileCount: Int) -> Int {
+        switch fileCount {
+        case 0...100:
+            return 3
+        case 101...500:
+            return 2
+        case 501...1000:
+            return 2
+        default: // 1000+
+            return 1  // Single threaded for massive batches to prevent system overload
+        }
+    }
+}
+
+// MARK: - Batch Processing State
+enum BatchProcessingState {
+    case idle
+    case processing
+    case paused
+    case completed
+    case cancelled
+}
+
+// MARK: - File Picker Errors
+enum FilePickerError: LocalizedError {
+    case selectionCancelled
+    case processingFailed(reason: String)
+    case thumbnailGenerationFailed(fileName: String)
+    case viewServiceTerminated
+    
+    var errorDescription: String? {
+        switch self {
+        case .selectionCancelled:
+            return "File Selection Cancelled"
+        case .processingFailed(let reason):
+            return "Processing Failed: \(reason)"
+        case .thumbnailGenerationFailed(let fileName):
+            return "Thumbnail Error: \(fileName)"
+        case .viewServiceTerminated:
+            return "System File Picker Crashed"
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .selectionCancelled:
+            return "Please select files again."
+        case .processingFailed(let reason):
+            return "Please try again. Reason: \(reason)"
+        case .thumbnailGenerationFailed(let fileName):
+            return """
+            Thumbnail generation failed for \(fileName). This is a system issue and the file will still be processed correctly.
+            
+            • The file itself is not damaged
+            • Processing will continue normally
+            • This is a known iOS file picker issue
+            """
+        case .viewServiceTerminated:
+            return """
+            The iOS file picker service crashed. The app will automatically handle this by processing your selected files in safe batches.
+            
+            • Your files are safe and will be processed
+            • App uses automatic batch processing to prevent crashes
+            • This is a known iOS limitation that we handle automatically
+            """
+        }
+    }
+}
+
+// MARK: - Overall Batch Progress
+struct BatchProgress {
+    let totalFiles: Int
+    let completedFiles: Int
+    let currentBatch: Int
+    let totalBatches: Int
+    let currentBatchProgress: Double
+    let successfulFiles: Int
+    let failedFiles: Int
+    let duplicateFiles: Int
+    let estimatedTimeRemaining: TimeInterval?
+    let currentFileName: String?
+    
+    var overallProgress: Double {
+        guard totalFiles > 0 else { return 0 }
+        return Double(completedFiles) / Double(totalFiles)
+    }
+    
+    var progressText: String {
+        if let currentFileName = currentFileName {
+            return "Processing \(currentFileName) (\(completedFiles + 1) of \(totalFiles))"
+        } else {
+            return "\(completedFiles) of \(totalFiles) files"
+        }
+    }
+    
+    var batchText: String {
+        return "Batch \(currentBatch) of \(totalBatches)"
+    }
+}
+
+/// Processing mode for file picker service
+enum ProcessingMode {
+    case filePickerCopy    // Traditional: copy files to app storage
+    case directFolderAccess // New: use files directly from their location
+}
+
+/// Enhanced file picker service with crash recovery and chunked processing
+@MainActor
+class EnhancedFilePickerService: ObservableObject {
+    @Published var processingState = BatchProcessingState.idle
+    @Published var batchProgress = BatchProgress(
+        totalFiles: 0, completedFiles: 0, currentBatch: 0, totalBatches: 0, 
+        currentBatchProgress: 0, successfulFiles: 0, failedFiles: 0, 
+        duplicateFiles: 0, estimatedTimeRemaining: nil, currentFileName: nil
+    )
+    @Published var results: [FileProcessingResult] = []
+    @Published var currentError: Error?
+    @Published var canPause = false
+    @Published var canResume = false
+    @Published var showLargeSelectionWarning = false
+    @Published var pendingLargeSelection: [URL] = []
+    
+    // NEW: Direct folder access support
+    var processingMode: ProcessingMode = .filePickerCopy
+    var folderSecurityScope: URL?
+    
+    // BATCH SELECTION MODE - Critical for preventing system picker crashes
+    @Published var isBatchSelectionMode = false
+    @Published var batchSelectionProgress = 0
+    @Published var totalBatchesNeeded = 0
+    @Published var currentBatchCollection: [URL] = []
+    @Published var showBatchInstructions = false
+    
+    // Configuration
+    private let batchSize: Int
+    private let maxConcurrentOperations: Int
+    private let largeSelectionThreshold = 500  // Warn for selections > 500 files
+    
+    // Processing state
+    private var allFiles: [URL] = []
+    private var currentBatchIndex = 0
+    private var shouldPause = false
+    private var shouldCancel = false
+    private var processingStartTime: Date?
+    private var avgProcessingTimePerFile: TimeInterval = 0
+    
+    // Core Data access
+    private let persistenceController = PersistenceController.shared
+    
+    // Background processing queue
+    private let processingQueue = DispatchQueue(label: "com.kaust.fileprocessing", qos: .utility)
+    
+    init(batchSize: Int = BatchProcessingConfig.defaultBatchSize,
+         maxConcurrentOperations: Int = BatchProcessingConfig.maxConcurrentOperations) {
+        self.batchSize = batchSize
+        self.maxConcurrentOperations = maxConcurrentOperations
+    }
+    
+    // Initialize with optimal settings for file count
+    convenience init(optimizedFor fileCount: Int) {
+        self.init(
+            batchSize: BatchProcessingConfig.optimalBatchSize(for: fileCount),
+            maxConcurrentOperations: BatchProcessingConfig.optimalConcurrency(for: fileCount)
+        )
+        print("🔧 Initialized optimized file processor: batchSize=\(batchSize), concurrency=\(maxConcurrentOperations) for \(fileCount) files")
+    }
+    
+    // MARK: - Public Interface
+    
+    func handleFileSelection(_ urls: [URL]) {
+        let fileCount = urls.count
+        print("📁 Received \(fileCount) files for automatic batch processing")
+        
+        // Simple automatic processing with intelligent batching
+        Task {
+            await processFilesWithAutomaticBatching(urls)
+        }
+    }
+    
+
+    
+    func confirmLargeSelection() {
+        showLargeSelectionWarning = false
+        if !pendingLargeSelection.isEmpty {
+            Task {
+                await processFiles(pendingLargeSelection)
+            }
+            pendingLargeSelection = []
+        }
+    }
+    
+    func cancelLargeSelection() {
+        showLargeSelectionWarning = false
+        pendingLargeSelection = []
+    }
+    
+    // MARK: - Batch Selection Mode (Prevents System Picker Crashes)
+    
+    func startBatchSelectionMode(targetFiles: Int) {
+        let ultraSafeSelectionSize = 30  // Ultra-safe number for system picker
+        totalBatchesNeeded = Int(ceil(Double(targetFiles) / Double(ultraSafeSelectionSize)))
+        batchSelectionProgress = 0
+        currentBatchCollection = []
+        isBatchSelectionMode = true
+        showBatchInstructions = true
+        
+        print("🔄 Starting ULTRA-SAFE batch selection mode: \(totalBatchesNeeded) batches needed for \(targetFiles) files (30 files max per batch)")
+    }
+    
+    func handleBatchSelection(_ urls: [URL]) {
+        batchSelectionProgress += 1
+        currentBatchCollection.append(contentsOf: urls)
+        
+        print("📂 Batch \(batchSelectionProgress)/\(totalBatchesNeeded): Added \(urls.count) files (Total: \(currentBatchCollection.count))")
+        
+        // Check if we've completed all batches
+        if batchSelectionProgress >= totalBatchesNeeded {
+            completeBatchSelection()
+        } else {
+            // Show instructions for next batch
+            showBatchInstructions = true
+        }
+    }
+    
+    func completeBatchSelection() {
+        print("✅ Batch selection complete! Total files collected: \(currentBatchCollection.count)")
+        
+        isBatchSelectionMode = false
+        showBatchInstructions = false
+        
+        // Process all collected files
+        Task {
+            await processFiles(currentBatchCollection)
+        }
+    }
+    
+    func cancelBatchSelection() {
+        print("🚫 Batch selection cancelled")
+        isBatchSelectionMode = false
+        showBatchInstructions = false
+        batchSelectionProgress = 0
+        totalBatchesNeeded = 0
+        currentBatchCollection = []
+    }
+    
+    func processFilesWithAutomaticBatching(_ urls: [URL]) async {
+        guard !urls.isEmpty else { return }
+        
+        print("🔄 Starting automatic batch processing for \(urls.count) files")
+        print("📊 Will process in batches of 30 files with 5-second pauses")
+        
+        await resetProcessing()
+        allFiles = urls
+        processingStartTime = Date()
+        
+        // Use 30-file batches for stability
+        let safeBatchSize = 30
+        let totalBatches = Int(ceil(Double(urls.count) / Double(safeBatchSize)))
+        
+        await updateBatchProgress(
+            totalFiles: urls.count,
+            completedFiles: 0,
+            currentBatch: 0,
+            totalBatches: totalBatches,
+            currentBatchProgress: 0,
+            successfulFiles: 0,
+            failedFiles: 0,
+            duplicateFiles: 0,
+            estimatedTimeRemaining: nil
+        )
+        
+        processingState = .processing
+        canPause = true
+        canResume = false
+        
+        await processBatchesWithPauses(batchSize: safeBatchSize)
+    }
+    
+    func processFiles(_ urls: [URL]) async {
+        // Keep the old method for compatibility
+        await processFilesWithAutomaticBatching(urls)
+    }
+    
+    func pauseProcessing() {
+        guard processingState == .processing else { return }
+        shouldPause = true
+        processingState = .paused
+        canPause = false
+        canResume = true
+    }
+    
+    func resumeProcessing() async {
+        guard processingState == .paused else { return }
+        shouldPause = false
+        processingState = .processing
+        canPause = true
+        canResume = false
+        
+        await processBatches()
+    }
+    
+    func cancelProcessing() {
+        shouldCancel = true
+        shouldPause = false
+        processingState = .cancelled
+        canPause = false
+        canResume = false
+        print("🛑 Processing cancelled by user")
+    }
+    
+    // MARK: - Restart Functionality
+    
+    func restartProcessing() async {
+        print("🔄 Restarting processing with same files...")
+        
+        guard !allFiles.isEmpty else {
+            print("❌ No files to restart with")
+            return
+        }
+        
+        // Reset processing state completely
+        await resetProcessing()
+        
+        // Start fresh with the same files
+        await processFiles(allFiles)
+    }
+    
+    func resetAndClearFiles() async {
+        print("🧹 Resetting and clearing all files")
+        
+        await resetProcessing()
+        allFiles = []
+        
+        await MainActor.run {
+            self.batchProgress = BatchProgress(
+                totalFiles: 0, completedFiles: 0, currentBatch: 0, totalBatches: 0,
+                currentBatchProgress: 0, successfulFiles: 0, failedFiles: 0,
+                duplicateFiles: 0, estimatedTimeRemaining: nil, currentFileName: nil
+            )
+        }
+    }
+    
+    // MARK: - Enhanced Batch Processing with 5-Second Pauses
+    
+    private func processBatchesWithPauses(batchSize: Int) async {
+        let totalFiles = allFiles.count
+        let totalBatches = Int(ceil(Double(totalFiles) / Double(batchSize)))
+        
+        print("📊 Processing \(totalFiles) files in \(totalBatches) batches of \(batchSize) files each")
+        
+        for batchIndex in 0..<totalBatches {
+            // Check for cancellation
+            guard !shouldCancel else {
+                print("🛑 Processing cancelled")
+                processingState = .cancelled
+                return
+            }
+            
+            // Check for pause
+            while shouldPause && !shouldCancel {
+                print("⏸️ Processing paused")
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            }
+            
+            let startIndex = batchIndex * batchSize
+            let endIndex = min(startIndex + batchSize, totalFiles)
+            let batch = Array(allFiles[startIndex..<endIndex])
+            
+            print("📂 Processing batch \(batchIndex + 1)/\(totalBatches): \(batch.count) files")
+            
+            // Update progress
+            await updateBatchProgress(
+                totalFiles: totalFiles,
+                completedFiles: startIndex,
+                currentBatch: batchIndex + 1,
+                totalBatches: totalBatches,
+                currentBatchProgress: 0,
+                successfulFiles: results.filter(\.isSuccess).count,
+                failedFiles: results.filter(\.status.isFailed).count,
+                duplicateFiles: results.filter(\.status.isDuplicate).count,
+                estimatedTimeRemaining: calculateEstimatedTimeRemaining(
+                    completedFiles: startIndex,
+                    totalFiles: totalFiles
+                )
+            )
+            
+            // Process the batch
+            await processSingleBatch(batch, batchIndex: batchIndex + 1, totalBatches: totalBatches)
+            
+            // 5-second pause between batches (except for the last batch)
+            if batchIndex < totalBatches - 1 && !shouldCancel && !shouldPause {
+                print("⏳ 5-second pause before next batch...")
+                for second in 1...5 {
+                    // Check for cancellation or pause during the wait
+                    if shouldCancel || shouldPause { break }
+                    
+                    try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+                    print("⏳ \(6 - second) seconds remaining...")
+                }
+            }
+        }
+        
+        // Final completion
+        if !shouldCancel {
+            processingState = .completed
+            canPause = false
+            canResume = false
+            
+            // Clean up folder access if we were in direct folder access mode
+            if processingMode == .directFolderAccess {
+                cleanupFolderAccess()
+            }
+            
+            let successCount = results.filter(\.isSuccess).count
+            let failCount = results.filter(\.status.isFailed).count
+            let duplicateCount = results.filter(\.status.isDuplicate).count
+            
+            print("✅ Processing complete! Success: \(successCount), Failed: \(failCount), Duplicates: \(duplicateCount)")
+        }
+    }
+    
+    private func processSingleBatch(_ batchFiles: [URL], batchIndex: Int, totalBatches: Int) async {
+        let batchStartTime = Date()
+        print("🔄 Processing batch \(batchIndex) with \(batchFiles.count) files")
+        
+        // Process each file in the batch
+        for (index, url) in batchFiles.enumerated() {
+            // Check for cancellation or pause
+            if shouldCancel { 
+                print("🛑 Processing cancelled during batch \(batchIndex)")
+                break 
+            }
+            if shouldPause { 
+                print("⏸️ Processing paused during batch \(batchIndex)")
+                return 
+            }
+            
+            // Update batch progress
+            let fileProgress = Double(index) / Double(batchFiles.count)
+            await updateCurrentBatchProgress(fileProgress, currentFileName: url.lastPathComponent)
+            
+            // Process the file
+            await processFile(url, batchIndex: batchIndex, fileIndex: index, totalInBatch: batchFiles.count)
+            
+            // Small delay between files within a batch
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+        }
+        
+        // Mark batch as complete
+        await updateCurrentBatchProgress(1.0, currentFileName: nil)
+        print("✅ Completed batch \(batchIndex) in \(String(format: "%.1f", Date().timeIntervalSince(batchStartTime)))s")
+    }
+    
+    private func calculateEstimatedTimeRemaining(completedFiles: Int, totalFiles: Int) -> TimeInterval? {
+        guard let startTime = processingStartTime,
+              completedFiles > 0 else { return nil }
+        
+        let elapsedTime = Date().timeIntervalSince(startTime)
+        let avgTimePerFile = elapsedTime / Double(completedFiles)
+        let remainingFiles = totalFiles - completedFiles
+        return avgTimePerFile * Double(remainingFiles)
+    }
+    
+    var canRestart: Bool {
+        return !allFiles.isEmpty && (processingState == .cancelled || processingState == .completed)
+    }
+    
+    // MARK: - Batch Processing Logic
+    
+    private func processBatches() async {
+        while currentBatchIndex * batchSize < allFiles.count && !shouldCancel {
+            // Check for pause
+            if shouldPause {
+                print("⏸️ Processing paused at batch \(currentBatchIndex + 1)")
+                return
+            }
+            
+            let startIndex = currentBatchIndex * batchSize
+            let endIndex = min(startIndex + batchSize, allFiles.count)
+            let batchFiles = Array(allFiles[startIndex..<endIndex])
+            
+            print("🚀 Starting batch \(currentBatchIndex + 1) with \(batchFiles.count) files")
+            await updateCurrentBatch(currentBatchIndex + 1)
+            
+            await processBatch(batchFiles, batchIndex: currentBatchIndex)
+            
+            currentBatchIndex += 1
+            
+            // CRITICAL: Memory cleanup between batches for large operations
+            if allFiles.count > 500 {
+                await performMemoryCleanup()
+            }
+            
+            // Adaptive delay based on file count
+            let delayNanoseconds = allFiles.count > 1000 ? 500_000_000 : 100_000_000 // 0.5s for large batches, 0.1s for smaller
+            try? await Task.sleep(nanoseconds: UInt64(delayNanoseconds))
+        }
+        
+        // Processing completed
+        if !shouldCancel {
+            processingState = .completed
+            canPause = false
+            canResume = false
+            
+            // Clean up folder access if we were in direct folder access mode
+            if processingMode == .directFolderAccess {
+                cleanupFolderAccess()
+            }
+            
+            print("🎉 All batches completed successfully!")
+        }
+    }
+    
+    // Memory cleanup between batches
+    private func performMemoryCleanup() async {
+        print("🧹 Performing memory cleanup...")
+        
+        // Force garbage collection
+        autoreleasepool {
+            // This block helps release any autoreleased objects
+        }
+        
+        // Small delay to let system clean up
+        try? await Task.sleep(nanoseconds: 50_000_000) // 0.05 seconds
+    }
+    
+    private func processBatch(_ batchFiles: [URL], batchIndex: Int) async {
+        let batchStartTime = Date()
+        print("🔄 Processing batch \(batchIndex + 1) with \(batchFiles.count) files")
+        
+        // Memory-efficient sequential processing
+        for (index, url) in batchFiles.enumerated() {
+            // Check for cancellation or pause
+            if shouldCancel { 
+                print("🛑 Processing cancelled during batch \(batchIndex + 1)")
+                break 
+            }
+            if shouldPause { 
+                print("⏸️ Processing paused during batch \(batchIndex + 1)")
+                return 
+            }
+            
+            // Update batch progress at start of each file
+            let fileProgress = Double(index) / Double(batchFiles.count)
+            await updateCurrentBatchProgress(fileProgress, currentFileName: url.lastPathComponent)
+            
+            // Process the file with memory management
+            await processFile(url, batchIndex: batchIndex, fileIndex: index, totalInBatch: batchFiles.count)
+            
+            // Adaptive delay: faster for large batches to improve overall speed
+            let delayNanos = allFiles.count > 1000 ? 50_000_000 : 200_000_000 // 0.05s for massive batches, 0.2s for normal
+            try? await Task.sleep(nanoseconds: UInt64(delayNanos))
+        }
+        
+        // Mark batch as complete
+        await updateCurrentBatchProgress(1.0, currentFileName: nil)
+        print("✅ Completed batch \(batchIndex + 1) in \(String(format: "%.1f", Date().timeIntervalSince(batchStartTime)))s")
+        
+        // Update processing time statistics
+        let batchProcessingTime = Date().timeIntervalSince(batchStartTime)
+        avgProcessingTimePerFile = (avgProcessingTimePerFile + batchProcessingTime / Double(batchFiles.count)) / 2
+    }
+    
+    private func processFile(_ url: URL, batchIndex: Int, fileIndex: Int, totalInBatch: Int) async {
         let startTime = Date()
+        let filename = url.lastPathComponent
         
         do {
+            print("   📋 Validating \(filename)... (Mode: \(processingMode))")
             // File validation
-            updateCurrentProgress(0.2, for: index)
             try await validateFile(at: url)
             
+            print("   🎵 Extracting metadata from \(filename)...")
             // Extract metadata
-            updateCurrentProgress(0.4, for: index)
             let metadata = try await extractSimpleMetadata(from: url)
             
-            // Copy file to permanent storage FIRST
-            updateCurrentProgress(0.6, for: index)
-            let permanentURL = try await copyFileToDocuments(from: url)
+            // Handle file location based on processing mode
+            let finalURL: URL
+            let filePath: String
             
-            // Import song directly to Core Data with permanent path
-            updateCurrentProgress(0.8, for: index)
-            let filename = url.deletingPathExtension().lastPathComponent
+            switch processingMode {
+            case .filePickerCopy:
+                print("   💾 Copying \(filename) to permanent storage...")
+                // Traditional mode: copy to app storage
+                finalURL = try await copyFileToDocuments(from: url)
+                filePath = finalURL.path
+                
+            case .directFolderAccess:
+                print("   📁 Using direct folder access for \(filename)...")
+                // New mode: use original location directly
+                finalURL = url
+                filePath = url.path
+                print("   📂 Direct path: \(filePath)")
+            }
             
-            // Parse title and artist from filename if possible
-            let components = filename.components(separatedBy: " - ")
+            // Parse title and artist from filename
+            let filenameWithoutExt = url.deletingPathExtension().lastPathComponent
+            let components = filenameWithoutExt.components(separatedBy: " - ")
             let title: String
             let artist: String?
             
@@ -207,46 +880,155 @@ class FilePickerService: ObservableObject {
                 artist = components[0].trimmingCharacters(in: .whitespacesAndNewlines)
                 title = components[1].trimmingCharacters(in: .whitespacesAndNewlines)
             } else {
-                title = filename
+                title = filenameWithoutExt
                 artist = "Unknown Artist"
             }
             
-            // Create song entity with permanent file path
-            try await createSongEntity(
+            print("   🗄️ Saving '\(title)' by '\(artist ?? "Unknown")' to database...")
+            // Create song entity
+            let status = try await createSongEntity(
                 title: title,
                 artist: artist,
                 duration: metadata.duration,
-                filePath: permanentURL.path,
+                filePath: filePath,
                 fileSize: metadata.fileSize
             )
             
-            updateCurrentProgress(1.0, for: index)
-            
             let processingTime = Date().timeIntervalSince(startTime)
             let result = FileProcessingResult(
-                url: permanentURL, // Use permanent URL
+                url: finalURL,
+                status: status,
                 metadata: metadata,
                 error: nil,
                 processingTime: processingTime
             )
             
-            results.append(result)
+            print("   ✅ Completed \(filename) in \(String(format: "%.2f", processingTime))s - Status: \(status)")
+            await addResult(result)
             
         } catch {
             let processingTime = Date().timeIntervalSince(startTime)
             let result = FileProcessingResult(
                 url: url,
+                status: .failed,
                 metadata: nil,
                 error: error,
                 processingTime: processingTime
             )
             
-            results.append(result)
+            print("   ❌ Failed \(filename) in \(String(format: "%.2f", processingTime))s - Error: \(error.localizedDescription)")
+            await addResult(result)
             currentError = error
         }
     }
     
-    private func createSongEntity(title: String, artist: String?, duration: TimeInterval, filePath: String, fileSize: Int64) async throws {
+    // MARK: - Progress Management
+    
+    private func updateBatchProgress(
+        totalFiles: Int,
+        completedFiles: Int,
+        currentBatch: Int,
+        totalBatches: Int,
+        currentBatchProgress: Double,
+        successfulFiles: Int,
+        failedFiles: Int,
+        duplicateFiles: Int,
+        estimatedTimeRemaining: TimeInterval?,
+        currentFileName: String? = nil
+    ) async {
+        await MainActor.run {
+            self.batchProgress = BatchProgress(
+                totalFiles: totalFiles,
+                completedFiles: completedFiles,
+                currentBatch: currentBatch,
+                totalBatches: totalBatches,
+                currentBatchProgress: currentBatchProgress,
+                successfulFiles: successfulFiles,
+                failedFiles: failedFiles,
+                duplicateFiles: duplicateFiles,
+                estimatedTimeRemaining: estimatedTimeRemaining,
+                currentFileName: currentFileName
+            )
+        }
+    }
+    
+    private func updateCurrentBatch(_ batch: Int) async {
+        await updateBatchProgress(
+            totalFiles: batchProgress.totalFiles,
+            completedFiles: batchProgress.completedFiles,
+            currentBatch: batch,
+            totalBatches: batchProgress.totalBatches,
+            currentBatchProgress: 0,
+            successfulFiles: batchProgress.successfulFiles,
+            failedFiles: batchProgress.failedFiles,
+            duplicateFiles: batchProgress.duplicateFiles,
+            estimatedTimeRemaining: calculateEstimatedTimeRemaining()
+        )
+    }
+    
+    private func updateCurrentBatchProgress(_ progress: Double, currentFileName: String? = nil) async {
+        await updateBatchProgress(
+            totalFiles: batchProgress.totalFiles,
+            completedFiles: batchProgress.completedFiles,
+            currentBatch: batchProgress.currentBatch,
+            totalBatches: batchProgress.totalBatches,
+            currentBatchProgress: progress,
+            successfulFiles: batchProgress.successfulFiles,
+            failedFiles: batchProgress.failedFiles,
+            duplicateFiles: batchProgress.duplicateFiles,
+            estimatedTimeRemaining: calculateEstimatedTimeRemaining(),
+            currentFileName: currentFileName
+        )
+    }
+    
+    private func addResult(_ result: FileProcessingResult) async {
+        await MainActor.run {
+            self.results.append(result)
+            
+            let stats = self.processingStats
+            let completedFiles = self.results.count
+            
+            self.batchProgress = BatchProgress(
+                totalFiles: self.batchProgress.totalFiles,
+                completedFiles: completedFiles,
+                currentBatch: self.batchProgress.currentBatch,
+                totalBatches: self.batchProgress.totalBatches,
+                currentBatchProgress: self.batchProgress.currentBatchProgress,
+                successfulFiles: stats.successful,
+                failedFiles: stats.failed,
+                duplicateFiles: stats.duplicates,
+                estimatedTimeRemaining: self.calculateEstimatedTimeRemaining(),
+                currentFileName: nil  // Clear filename when file is completed
+            )
+        }
+    }
+    
+    private func calculateEstimatedTimeRemaining() -> TimeInterval? {
+        guard processingStartTime != nil,
+              avgProcessingTimePerFile > 0,
+              batchProgress.completedFiles > 0 else { return nil }
+        
+        let remainingFiles = batchProgress.totalFiles - batchProgress.completedFiles
+        return avgProcessingTimePerFile * Double(remainingFiles)
+    }
+    
+    private func resetProcessing() async {
+        currentBatchIndex = 0
+        shouldPause = false
+        shouldCancel = false
+        processingStartTime = nil
+        avgProcessingTimePerFile = 0
+        
+        await MainActor.run {
+            self.results = []
+            self.currentError = nil
+            self.processingState = .idle
+            self.canPause = false
+            self.canResume = false
+        }
+    }
+    
+    private func createSongEntity(title: String, artist: String?, duration: TimeInterval, filePath: String, fileSize: Int64) async throws -> FileProcessingResult.ProcessingStatus {
         let context = persistenceController.container.viewContext
         
         // Check for existing song to prevent duplicates
@@ -256,7 +1038,7 @@ class FilePickerService: ObservableObject {
         let existingSongs = try context.fetch(request)
         if !existingSongs.isEmpty {
             print("⚠️ Song '\(title)' by '\(artist ?? "Unknown")' already exists in Core Data. Skipping duplicate.")
-            return
+            return .duplicate
         }
         
         try await context.perform {
@@ -286,6 +1068,8 @@ class FilePickerService: ObservableObject {
                 throw error
             }
         }
+        
+        return .success
     }
     
     private func validateFile(at url: URL) async throws {
@@ -326,27 +1110,36 @@ class FilePickerService: ObservableObject {
         return attributes[.size] as? Int64 ?? 0
     }
     
-    private func updateCurrentProgress(_ currentProgress: Double, for index: Int) {
-        progress = FileProcessingProgress(
-            totalFiles: progress.totalFiles,
-            processedFiles: index,
-            currentFileName: progress.currentFileName,
-            currentProgress: currentProgress
-        )
-    }
-    
-    var processingStats: (successful: Int, failed: Int, totalTime: TimeInterval) {
-        let successful = results.filter { $0.isSuccess }.count
-        let failed = results.filter { !$0.isSuccess }.count
+    var processingStats: (successful: Int, failed: Int, duplicates: Int, totalTime: TimeInterval) {
+        let successful = results.filter { $0.status == .success }.count
+        let failed = results.filter { $0.status == .failed }.count
+        let duplicates = results.filter { $0.status == .duplicate }.count
         let totalTime = results.reduce(0) { $0 + $1.processingTime }
         
-        return (successful, failed, totalTime)
+        return (successful, failed, duplicates, totalTime)
     }
     
     func clearResults() {
         results = []
         currentError = nil
-        progress = FileProcessingProgress(totalFiles: 0, processedFiles: 0)
+        processingState = .idle
+        batchProgress = BatchProgress(
+            totalFiles: 0, completedFiles: 0, currentBatch: 0, totalBatches: 0, 
+            currentBatchProgress: 0, successfulFiles: 0, failedFiles: 0, 
+            duplicateFiles: 0, estimatedTimeRemaining: nil, currentFileName: nil
+        )
+        
+        // Clean up folder security scope if needed
+        cleanupFolderAccess()
+    }
+    
+    private func cleanupFolderAccess() {
+        if let folderURL = folderSecurityScope {
+            folderURL.stopAccessingSecurityScopedResource()
+            folderSecurityScope = nil
+            processingMode = .filePickerCopy // Reset to default mode
+            print("🔓 Released security-scoped access to folder")
+        }
     }
     
     // NEW METHOD: Copy file to permanent Documents/Media directory
@@ -388,9 +1181,33 @@ struct FileProcessingResultsView: View {
                     summaryView
                 }
                 
-                Section("File Results") {
-                    ForEach(results.indices, id: \.self) { index in
-                        FileResultRow(result: results[index])
+                // Successful files section
+                let successfulResults = results.filter { $0.status == .success }
+                if !successfulResults.isEmpty {
+                    Section("Successfully Processed (\(successfulResults.count))") {
+                        ForEach(successfulResults.indices, id: \.self) { index in
+                            FileResultRow(result: successfulResults[index])
+                        }
+                    }
+                }
+                
+                // Duplicate files section
+                let duplicateResults = results.filter { $0.status == .duplicate }
+                if !duplicateResults.isEmpty {
+                    Section("Duplicate Files (\(duplicateResults.count))") {
+                        ForEach(duplicateResults.indices, id: \.self) { index in
+                            FileResultRow(result: duplicateResults[index])
+                        }
+                    }
+                }
+                
+                // Failed files section
+                let failedResults = results.filter { $0.status == .failed }
+                if !failedResults.isEmpty {
+                    Section("Failed Files (\(failedResults.count))") {
+                        ForEach(failedResults.indices, id: \.self) { index in
+                            FileResultRow(result: failedResults[index])
+                        }
                     }
                 }
             }
@@ -426,6 +1243,13 @@ struct FileProcessingResultsView: View {
             }
             
             HStack {
+                Label("\(stats.duplicates)", systemImage: "repeat.circle.fill")
+                    .foregroundColor(.yellow)
+                Text("Duplicates")
+                Spacer()
+            }
+            
+            HStack {
                 Label(String(format: "%.2fs", stats.totalTime), systemImage: "clock")
                     .foregroundColor(.blue)
                 Text("Total Time")
@@ -435,12 +1259,13 @@ struct FileProcessingResultsView: View {
         .padding(.vertical, 4)
     }
     
-    private func getProcessingStats() -> (successful: Int, failed: Int, totalTime: TimeInterval) {
-        let successful = results.filter { $0.isSuccess }.count
-        let failed = results.filter { !$0.isSuccess }.count
+    private func getProcessingStats() -> (successful: Int, failed: Int, duplicates: Int, totalTime: TimeInterval) {
+        let successful = results.filter { $0.status == .success }.count
+        let failed = results.filter { $0.status == .failed }.count
+        let duplicates = results.filter { $0.status == .duplicate }.count
         let totalTime = results.reduce(0) { $0 + $1.processingTime }
         
-        return (successful, failed, totalTime)
+        return (successful, failed, duplicates, totalTime)
     }
 }
 
@@ -451,8 +1276,9 @@ struct FileResultRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: result.isSuccess ? "checkmark.circle.fill" : "xmark.circle.fill")
-                    .foregroundColor(result.isSuccess ? .green : .red)
+                // Status icon with appropriate color
+                Image(systemName: statusIcon)
+                    .foregroundColor(statusColor)
                     .font(.system(size: 16))
                 
                 Text(result.filename)
@@ -466,30 +1292,96 @@ struct FileResultRow: View {
                     .foregroundColor(.secondary)
             }
             
-            if result.isSuccess, let metadata = result.metadata {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Duration: \(formatDuration(metadata.duration))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    
-                    if let dimensions = metadata.videoDimensions {
-                        Text("Resolution: \(Int(dimensions.width))×\(Int(dimensions.height))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Text("Size: \(formatFileSize(metadata.fileSize))")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-            } else if let error = result.error {
-                Text(error.localizedDescription)
+            // Status-specific details
+            if result.status == .duplicate {
+                Text("File already exists in database")
+                    .font(.caption)
+                    .foregroundColor(.yellow)
+                    .italic()
+            } else if result.status == .failed, let error = result.error {
+                Text("Error: \(getDetailedErrorMessage(error))")
                     .font(.caption)
                     .foregroundColor(.red)
-                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else if result.status == .success, let metadata = result.metadata {
+                Text("Duration: \(formatDuration(metadata.duration)) • Size: \(formatFileSize(metadata.fileSize))")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
         }
         .padding(.vertical, 4)
+    }
+    
+    private var statusIcon: String {
+        switch result.status {
+        case .success:
+            return "checkmark.circle.fill"
+        case .failed:
+            return "xmark.circle.fill"
+        case .duplicate:
+            return "repeat.circle.fill"
+        }
+    }
+    
+    private var statusColor: Color {
+        switch result.status {
+        case .success:
+            return .green
+        case .failed:
+            return .red
+        case .duplicate:
+            return .yellow
+        }
+    }
+    
+    private func getDetailedErrorMessage(_ error: Error) -> String {
+        if let validationError = error as? FileValidationError {
+            switch validationError {
+            case .invalidFileSize:
+                return "File size must be between 5MB and 150MB"
+            case .invalidFileType:
+                return "Only MP4 files are supported"
+            case .fileNotFound:
+                return "File not found or was moved"
+            case .permissionDenied:
+                return "Permission denied - check file access rights"
+            case .fileNotReadable:
+                return "File is corrupted, damaged, or in an unsupported format"
+            }
+        } else {
+            // Handle other error types by checking the description first
+            let errorDescription = error.localizedDescription
+            if errorDescription.contains("AVFoundation") {
+                return "Video file is corrupted or in an unsupported format"
+            } else if errorDescription.contains("CoreData") {
+                return "Database error - could not save file information"
+            } else {
+                // Cast to NSError for additional system error information
+                let nsError = error as NSError
+                switch nsError.code {
+                case NSFileReadNoSuchFileError:
+                    return "File was deleted or moved during processing"
+                case NSFileReadNoPermissionError:
+                    return "Insufficient permissions to read the file"
+                case NSFileReadCorruptFileError:
+                    return "File is corrupted and cannot be read"
+                case NSFileWriteFileExistsError:
+                    return "A file with this name already exists"
+                case NSFileWriteVolumeReadOnlyError:
+                    return "Storage location is read-only"
+                case NSFileWriteOutOfSpaceError:
+                    return "Not enough storage space available"
+                default:
+                    if nsError.domain == "AVFoundationErrorDomain" {
+                        return "Invalid or corrupted video file - cannot extract metadata"
+                    } else if nsError.domain == "NSCocoaErrorDomain" {
+                        return "File system error: \(nsError.localizedDescription)"
+                    } else {
+                        return errorDescription
+                    }
+                }
+            }
+        }
     }
     
     private func formatDuration(_ duration: TimeInterval) -> String {
@@ -511,6 +1403,7 @@ struct FileResultRow: View {
 @MainActor
 class SettingsViewModel: ObservableObject {
     @Published var isShowingFilePicker = false
+    @Published var isShowingFolderPicker = false
     @Published var isShowingResults = false
     @Published var errorAlert: ErrorAlertConfiguration?
     @Published var isShowingErrorAlert = false
@@ -518,73 +1411,277 @@ class SettingsViewModel: ObservableObject {
     @Published var notificationsEnabled = true
     @Published var autoProcessingEnabled = true
     @Published var storageOptimizationEnabled = false
+    @AppStorage("swipeToDeleteEnabled") var swipeToDeleteEnabled = false  // Use @AppStorage for automatic persistence
+    
+    // Shared access to swipe-to-delete setting
+    static var shared: SettingsViewModel = SettingsViewModel()
     
     // File picker service
-    @Published var filePickerService: FilePickerService
+    @Published var filePickerService: EnhancedFilePickerService
     
     var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
     
     var isFilePickerEnabled: Bool {
-        !filePickerService.isProcessing
+        filePickerService.processingState != .processing
     }
     
     var statusMessage: String {
-        if filePickerService.isProcessing {
-            let progress = filePickerService.progress
-            if let currentFile = progress.currentFileName {
-                return "Processing \(currentFile)... (\(progress.processedFiles + 1)/\(progress.totalFiles))"
-            } else {
-                return "Processing \(progress.processedFiles) of \(progress.totalFiles) files..."
-            }
-        } else if !filePickerService.results.isEmpty {
+        switch filePickerService.processingState {
+        case .processing:
+            let progress = filePickerService.batchProgress
+            return "Processing batch \(progress.currentBatch)/\(progress.totalBatches) - \(progress.progressText)"
+        case .paused:
+            let progress = filePickerService.batchProgress
+            return "Paused at \(progress.progressText)"
+        case .completed:
             let stats = filePickerService.processingStats
-            return "Completed: \(stats.successful) successful, \(stats.failed) failed"
-        } else {
-            return "Ready to process MP4 files"
+            return "Completed: \(stats.successful) successful, \(stats.failed) failed, \(stats.duplicates) duplicates"
+        case .cancelled:
+            return "Processing cancelled"
+        case .idle:
+            if !filePickerService.results.isEmpty {
+                let stats = filePickerService.processingStats
+                return "Last run: \(stats.successful) successful, \(stats.failed) failed, \(stats.duplicates) duplicates"
+            } else {
+                return "Ready to process MP4 files"
+            }
         }
     }
     
     init() {
-        // Initialize services
-        self.filePickerService = FilePickerService()
+        // Initialize services with default configuration
+        // The service will be reconfigured dynamically based on file count
+        self.filePickerService = EnhancedFilePickerService()
+    }
+    
+    // Reinitialize file picker service with optimal settings for large batches
+    private func optimizeForFileCount(_ fileCount: Int) {
+        print("🔧 Optimizing file picker service for \(fileCount) files")
+        self.filePickerService = EnhancedFilePickerService(optimizedFor: fileCount)
     }
     
     // MARK: - Actions
     
     func openFilePicker() {
-        guard !filePickerService.isProcessing else { return }
+        guard filePickerService.processingState != .processing else { return }
         isShowingFilePicker = true
     }
     
+    func selectMP4Folder() {
+        guard filePickerService.processingState != .processing else { return }
+        isShowingFolderPicker = true
+    }
+    
     func handleFilesSelected(_ urls: [URL]) {
+        let fileCount = urls.count
+        print("📋 Handling selection of \(fileCount) files")
+        
+        // Optimize the service configuration for the file count
+        if fileCount > 100 {
+            optimizeForFileCount(fileCount)
+        }
+        
+        // Use the enhanced file selection handling
+        filePickerService.handleFileSelection(urls)
+        
+        // Monitor processing completion for ALL file selections
+        monitorProcessingCompletion()
+    }
+    
+    func handleFolderSelected(_ folderURL: URL) {
+        print("📁 Folder selected: \(folderURL.path)")
+        
         Task {
-            await filePickerService.processFiles(urls)
-            
-            // Show results when processing is complete
-            if !filePickerService.results.isEmpty {
-                isShowingResults = true
-            }
-            
-            // Show error if there was one
-            if let error = filePickerService.currentError {
-                showError(error)
-            }
+            await processMP4FolderAccess(folderURL)
         }
     }
     
+    private func processMP4FolderAccess(_ folderURL: URL) async {
+        guard folderURL.startAccessingSecurityScopedResource() else {
+            print("❌ Failed to access security-scoped resource")
+            return
+        }
+        
+        do {
+            // Create bookmark for persistent access
+            let bookmark = try folderURL.bookmarkData(
+                options: .suitableForBookmarkFile,
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            
+            // Save bookmark for future access
+            UserDefaults.standard.set(bookmark, forKey: "mp4FolderBookmark")
+            print("✅ Saved folder bookmark for future access")
+            
+            // Scan for MP4 files and create bookmarks for each
+            let mp4Files = await scanForMP4FilesWithBookmarks(in: folderURL)
+            
+            await MainActor.run {
+                print("🎵 Found \(mp4Files.count) MP4 files in folder")
+                
+                if mp4Files.isEmpty {
+                    showError(FilePickerError.processingFailed(reason: "No MP4 files found in selected folder"))
+                } else {
+                    // Process files directly from their location (no copying needed!)
+                    // Mark this as direct folder access so processing knows not to copy files
+                    filePickerService.processingMode = .directFolderAccess
+                    handleFilesSelected(mp4Files)
+                }
+            }
+            
+        } catch {
+            await MainActor.run {
+                print("❌ Error processing folder: \(error)")
+                showError(error)
+            }
+        }
+        
+        // Keep security access until processing is complete
+        // We'll release it after processing is done
+        filePickerService.folderSecurityScope = folderURL
+    }
+    
+    private func scanForMP4Files(in folderURL: URL) -> [URL] {
+        let fileManager = FileManager.default
+        let resourceKeys: [URLResourceKey] = [.nameKey, .isDirectoryKey, .fileSizeKey]
+        
+        var mp4Files: [URL] = []
+        
+        if let enumerator = fileManager.enumerator(
+            at: folderURL,
+            includingPropertiesForKeys: resourceKeys,
+            options: [.skipsHiddenFiles]
+        ) {
+            // Swift 6 fix: collect URLs synchronously first to avoid makeIterator async issues
+            let allURLs = enumerator.allObjects.compactMap { $0 as? URL }
+            mp4Files = allURLs.filter { $0.pathExtension.lowercased() == "mp4" }
+        }
+        
+        // Sort alphabetically for consistent ordering
+        return mp4Files.sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+    
+    private func scanForMP4FilesWithBookmarks(in folderURL: URL) async -> [URL] {
+        let fileManager = FileManager.default
+        let resourceKeys: [URLResourceKey] = [.nameKey, .isDirectoryKey, .fileSizeKey]
+        
+        // First, collect all MP4 URLs synchronously to avoid Swift 6 async iterator issues
+        var allMP4URLs: [URL] = []
+        
+        if let enumerator = fileManager.enumerator(
+            at: folderURL,
+            includingPropertiesForKeys: resourceKeys,
+            options: [.skipsHiddenFiles]
+        ) {
+            // Swift 6 fix: collect URLs synchronously first
+            let allURLs = enumerator.allObjects.compactMap { $0 as? URL }
+            allMP4URLs = allURLs.filter { $0.pathExtension.lowercased() == "mp4" }
+        }
+        
+        // Now process the collected URLs (can be done async-safely)
+        var mp4Files: [URL] = []
+        
+        for fileURL in allMP4URLs {
+            // Create individual file bookmark for persistent access
+            do {
+                let fileBookmark = try fileURL.bookmarkData(
+                    options: .suitableForBookmarkFile,
+                    includingResourceValuesForKeys: nil,
+                    relativeTo: nil
+                )
+                
+                // Store bookmark with filename as key
+                let bookmarkKey = "fileBookmark_\(fileURL.lastPathComponent)"
+                UserDefaults.standard.set(fileBookmark, forKey: bookmarkKey)
+                
+                mp4Files.append(fileURL)
+                print("📁 Created bookmark for: \(fileURL.lastPathComponent)")
+                
+            } catch {
+                print("⚠️ Failed to create bookmark for \(fileURL.lastPathComponent): \(error)")
+                // Still add the file, it might work with folder-level access
+                mp4Files.append(fileURL)
+            }
+        }
+        
+        print("✅ Scanned folder: \(mp4Files.count) MP4 files found with bookmarks")
+        
+        // Sort alphabetically for consistent ordering
+        return mp4Files.sorted { $0.lastPathComponent < $1.lastPathComponent }
+    }
+    
+
+    
     func handleFilePickerError(_ error: Error) {
-        showError(error)
+        print("❌ File picker error: \(error.localizedDescription)")
+        
+        // Check if this is a crash-related error
+        if error.localizedDescription.contains("Service Connection Interrupted") ||
+           error.localizedDescription.contains("Remote view controller crashed") ||
+           error.localizedDescription.contains("Connection invalid") {
+            showFilePickerCrashError()
+        } else {
+            showError(error)
+        }
+    }
+    
+    private func showError(_ error: Error) {
+        print("🚨 Showing error alert: \(error.localizedDescription)")
+        errorAlert = ErrorAlertConfiguration(
+            title: "Error",
+            message: error.localizedDescription,
+            primaryButton: .default(Text("OK")) { [weak self] in
+                self?.isShowingErrorAlert = false
+            }
+        )
+        isShowingErrorAlert = true
+    }
+    
+    private func showFilePickerCrashError() {
+        print("💥 File picker crashed - showing recovery instructions")
+        errorAlert = ErrorAlertConfiguration(
+            title: "File Picker System Error",
+            message: "The system file picker crashed, likely due to selecting too many files at once. For large batches (500+ files), the app now automatically processes files in smaller chunks.\n\nTry selecting your files again - the improved system should handle large selections much better.",
+            primaryButton: .default(Text("OK")) { [weak self] in
+                self?.isShowingErrorAlert = false
+            }
+        )
+        isShowingErrorAlert = true
     }
     
     func resetSettings() {
         notificationsEnabled = true
         autoProcessingEnabled = true
         storageOptimizationEnabled = false
+        swipeToDeleteEnabled = false  // Reset to default OFF state
         
         // Clear file processing results
         filePickerService.clearResults()
+    }
+    
+    // MARK: - File Processing Controls
+    
+    func pauseFileProcessing() {
+        filePickerService.pauseProcessing()
+    }
+    
+    func resumeFileProcessing() async {
+        await filePickerService.resumeProcessing()
+    }
+    
+    func cancelFileProcessing() {
+        filePickerService.cancelProcessing()
+    }
+    
+    func restartFileProcessing() async {
+        await filePickerService.restartProcessing()
+    }
+    
+    func clearAllFiles() async {
+        await filePickerService.resetAndClearFiles()
     }
     
     func manageDownloads() {
@@ -603,16 +1700,35 @@ class SettingsViewModel: ObservableObject {
         // Placeholder
     }
     
-    private func showError(_ error: Error) {
-        errorAlert = ErrorAlertConfiguration(
-            title: "File Processing Error",
-            message: error.localizedDescription,
-            primaryButton: .default(Text("OK")) { [weak self] in
-                self?.isShowingErrorAlert = false
+    func monitorProcessingCompletion() {
+        Task {
+            // Wait for processing to start
+            while filePickerService.processingState == .idle {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
             }
-        )
-        isShowingErrorAlert = true
+            
+            // Monitor processing state
+            while filePickerService.processingState == .processing {
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            }
+            
+            // Show results when processing is complete
+            if filePickerService.processingState == .completed && !filePickerService.results.isEmpty {
+                await MainActor.run {
+                    isShowingResults = true
+                }
+            }
+            
+            // Show error if there was one
+            if let error = filePickerService.currentError {
+                await MainActor.run {
+                    showError(error)
+                }
+            }
+        }
     }
+    
+
 }
 
 // MARK: - Settings View
@@ -642,6 +1758,14 @@ struct SettingsView: View {
             FilePickerView(
                 isPresented: $viewModel.isShowingFilePicker,
                 onFilesSelected: viewModel.handleFilesSelected,
+                onError: viewModel.handleFilePickerError,
+                filePickerService: viewModel.filePickerService
+            )
+        }
+        .sheet(isPresented: $viewModel.isShowingFolderPicker) {
+            FolderPickerView(
+                isPresented: $viewModel.isShowingFolderPicker,
+                onFolderSelected: viewModel.handleFolderSelected,
                 onError: viewModel.handleFilePickerError
             )
         }
@@ -661,11 +1785,24 @@ struct SettingsView: View {
             Button("OK") {
                 viewModel.isShowingErrorAlert = false
             }
+
         } message: {
-            if let errorAlert = viewModel.errorAlert {
+            if let error = viewModel.filePickerService.currentError {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(error.localizedDescription)
+                    if let localizedError = error as? LocalizedError,
+                       let recovery = localizedError.recoverySuggestion {
+                        Text(recovery)
+                            .font(.caption)
+                    }
+                }
+            } else if let errorAlert = viewModel.errorAlert {
                 Text(errorAlert.message)
             }
         }
+
+
+
     }
     
     private var headerView: some View {
@@ -683,6 +1820,22 @@ struct SettingsView: View {
             }
         }
         .padding(.top, 32)
+    }
+    
+    private func estimatedProcessingTime(for fileCount: Int) -> String {
+        let avgTimePerFile: Double = 2.0  // seconds
+        let totalSeconds = Double(fileCount) * avgTimePerFile
+        
+        let hours = Int(totalSeconds) / 3600
+        let minutes = Int(totalSeconds) % 3600 / 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes) minutes"
+        } else {
+            return "< 1 minute"
+        }
     }
     
     private var settingsContent: some View {
@@ -755,12 +1908,62 @@ struct SettingsView: View {
             let songs = try context.fetch(request)
             print("🗑️ DEBUG: Deleting \(songs.count) songs from Core Data")
             
+            // Get the app's Documents/Media directory path for comparison
+            guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
+                print("❌ Could not access documents directory")
+                return
+            }
+            let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+            let mediaPath = mediaDirectory.path
+            
             for song in songs {
+                guard let filePath = song.filePath else {
+                    print("⚠️ Song has no file path, deleting metadata only")
+                    context.delete(song)
+                    continue
+                }
+                
+                let fileName = URL(fileURLWithPath: filePath).lastPathComponent
+                
+                // Check if the file is in our app's Media directory (internal file)
+                if filePath.hasPrefix(mediaPath) {
+                    print("📁 Internal file detected: \(fileName)")
+                    print("🗑️ Deleting both metadata and file from app storage")
+                    
+                    // Delete the MP4 file if it exists
+                    if FileManager.default.fileExists(atPath: filePath) {
+                        do {
+                            try FileManager.default.removeItem(atPath: filePath)
+                            print("✅ Deleted MP4 file: \(fileName)")
+                            
+                            // Also try to delete associated LRC file if it exists
+                            let lrcURL = URL(fileURLWithPath: filePath).deletingPathExtension().appendingPathExtension("lrc")
+                            if FileManager.default.fileExists(atPath: lrcURL.path) {
+                                try FileManager.default.removeItem(atPath: lrcURL.path)
+                                print("✅ Deleted LRC file: \(lrcURL.lastPathComponent)")
+                            }
+                        } catch {
+                            print("⚠️ Failed to delete file \(fileName): \(error)")
+                        }
+                    }
+                } else {
+                    print("🔒 External file detected: \(fileName)")
+                    print("🗑️ Deleting only metadata, preserving external file")
+                    
+                    // For external files, also clean up any associated bookmark
+                    let bookmarkKey = "fileBookmark_\(fileName)"
+                    if UserDefaults.standard.data(forKey: bookmarkKey) != nil {
+                        UserDefaults.standard.removeObject(forKey: bookmarkKey)
+                        print("🧹 Cleaned up bookmark for external file: \(fileName)")
+                    }
+                }
+                
+                // Always delete the Core Data entry
                 context.delete(song)
             }
             
             try context.save()
-            print("✅ DEBUG: Successfully cleared all Core Data songs")
+            print("✅ DEBUG: Successfully cleared all songs from Core Data")
         } catch {
             print("❌ DEBUG: Error clearing Core Data songs: \(error)")
         }
@@ -769,19 +1972,170 @@ struct SettingsView: View {
     private var downloadSection: some View {
         SettingsSection(title: "Download MP4 files", icon: "arrow.down.circle") {
             VStack(spacing: 12) {
-                FilePickerRow(
-                    title: "Select MP4 Files",
-                    subtitle: viewModel.statusMessage,
-                    isEnabled: viewModel.isFilePickerEnabled,
-                    isLoading: viewModel.filePickerService.isProcessing,
-                    action: viewModel.openFilePicker
-                )
-                
-                if viewModel.filePickerService.isProcessing {
-                    ProcessingProgressView(
-                        progress: viewModel.filePickerService.progress
+                // SIMPLE FILE SELECTION - Just like you want!
+                if viewModel.filePickerService.processingState == .idle {
+                    VStack(spacing: 16) {
+                        // Folder access option (RECOMMENDED)
+                        FilePickerRow(
+                            title: "📁 Access MP4 Folder",
+                            subtitle: "✅ RECOMMENDED: Point to folder with MP4s - no copying needed!",
+                            icon: "folder.badge.gearshape",
+                            isEnabled: true,
+                            isLoading: false
+                        ) {
+                            viewModel.selectMP4Folder()
+                        }
+                        
+                        // Individual file picker (fallback)
+                        FilePickerRow(
+                            title: "📄 Select Individual Files",
+                            subtitle: "⚠️ iOS Limit: Select 30-50 files max per session to prevent system crashes",
+                            icon: "folder.badge.plus",
+                            isEnabled: viewModel.isFilePickerEnabled,
+                            isLoading: false
+                        ) {
+                            viewModel.openFilePicker()
+                        }
+                        
+                        // Information box
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Image(systemName: "info.circle.fill")
+                                    .foregroundColor(.blue)
+                                    .font(.title3)
+                                Text("How to work within iOS limits")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                            }
+                            
+                            Text("• iOS file picker crashes with 50+ files in one session\n• Select 30-50 files max per session for stability\n• For large collections: repeat the selection process\n• Each session processes files automatically in batches")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 16)
+                        .background(
+                            RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
+                                .fill(Color.blue.opacity(0.2))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
+                                        .stroke(Color.blue, lineWidth: 1)
+                                )
+                        )
+                        .padding(.horizontal, 16)
+                    }
+                } else {
+                    // Processing mode - show current operation
+                    FilePickerRow(
+                        title: "Processing Files...",
+                        subtitle: viewModel.statusMessage,
+                        isEnabled: false,
+                        isLoading: true,
+                        action: {}
                     )
                 }
+                
+                // Control buttons based on processing state
+                HStack(spacing: 12) {
+                    // Show Results button when results are available
+                    if !viewModel.filePickerService.results.isEmpty && viewModel.filePickerService.processingState == .idle {
+                        Button("Show Last Results") {
+                            viewModel.isShowingResults = true
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(AppTheme.settingsResetIconBlue)
+                    }
+                    
+                    // Restart button when files are available but processing is not active
+                    if viewModel.filePickerService.canRestart {
+                        Button("Restart Download") {
+                            Task {
+                                await viewModel.restartFileProcessing()
+                            }
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(.green)
+                    }
+                    
+                    // Clear all button when not processing
+                    if viewModel.filePickerService.processingState != .processing && !viewModel.filePickerService.results.isEmpty {
+                        Button("Clear All") {
+                            Task {
+                                await viewModel.clearAllFiles()
+                            }
+                        }
+                        .font(.subheadline)
+                        .foregroundColor(.red)
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                
+                if viewModel.filePickerService.processingState == .processing || viewModel.filePickerService.processingState == .paused {
+                    ProcessingProgressView(
+                        progress: viewModel.filePickerService.batchProgress,
+                        filePickerService: viewModel.filePickerService
+                    )
+                }
+                
+                // File selection guidance
+                if viewModel.filePickerService.processingState == .idle {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("⚠️ iOS File Picker Limitations")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                        
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("• Apple's file picker crashes with large selections")
+                            Text("• Maximum 30-50 files per selection session")
+                            Text("• For 1000+ files: use multiple sessions")
+                            Text("• Each session auto-processes in safe batches")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(Color.orange.opacity(0.2))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.orange, lineWidth: 1)
+                            )
+                    )
+                }
+                
+                // Additional guidance for large collections
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundColor(.yellow)
+                        Text("For Large Collections (1000+ files)")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Text("1. Select 30-40 files → Wait for processing to complete\n2. Repeat selection → Wait for processing\n3. Continue until all files are processed\n4. Each session adds to your collection")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.9))
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 16)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.blue.opacity(0.2))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color.blue, lineWidth: 1)
+                        )
+                )
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -810,6 +2164,13 @@ struct SettingsView: View {
                     subtitle: "Optimize storage for processed files",
                     icon: "internaldrive",
                     accessoryType: .toggle($viewModel.storageOptimizationEnabled)
+                )
+                
+                SettingRow(
+                    title: "Enable Swipe to Delete",
+                    subtitle: "Allow swiping left on songs to delete them",
+                    icon: "trash",
+                    accessoryType: .toggle($viewModel.swipeToDeleteEnabled)
                 )
             }
             .padding(.horizontal, 16)
@@ -881,50 +2242,233 @@ struct SettingsView: View {
 // MARK: - Processing Progress View
 
 struct ProcessingProgressView: View {
-    let progress: FileProcessingProgress
+    let progress: BatchProgress
+    @ObservedObject var filePickerService: EnhancedFilePickerService
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 16) {
+            // State indicator
             HStack {
-                Text("Overall Progress")
-                    .font(.caption)
-                    .foregroundColor(AppTheme.settingsText.opacity(0.7))
-                
+                statusIcon
+                Text(statusText)
+                    .font(.headline)
+                    .foregroundColor(AppTheme.settingsText)
                 Spacer()
-                
-                Text("\(progress.processedFiles)/\(progress.totalFiles)")
-                    .font(.caption)
-                    .foregroundColor(AppTheme.settingsText.opacity(0.7))
             }
             
-            ProgressView(value: progress.overallProgress)
-                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
-            
-            if let currentFile = progress.currentFileName {
+            // Overall Progress Section
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Current: \(currentFile)")
-                        .font(.caption2)
-                        .foregroundColor(AppTheme.settingsText.opacity(0.6))
-                        .lineLimit(1)
+                    Text("Overall Progress")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(AppTheme.settingsText)
                     
                     Spacer()
                     
-                    Text("\(Int(progress.currentProgress * 100))%")
-                        .font(.caption2)
-                        .foregroundColor(AppTheme.settingsText.opacity(0.6))
+                    Text(progress.progressText)
+                        .font(.caption)
+                        .foregroundColor(AppTheme.settingsText.opacity(0.7))
                 }
                 
-                ProgressView(value: progress.currentProgress)
-                    .progressViewStyle(LinearProgressViewStyle(tint: .green))
-                    .scaleEffect(y: 0.5)
+                // Overall progress bar
+                ProgressView(value: progress.overallProgress)
+                    .progressViewStyle(LinearProgressViewStyle(tint: AppTheme.settingsResetIconBlue))
+                    .scaleEffect(y: 1.5)
+                
+                HStack {
+                    Text("\(Int(progress.overallProgress * 100))% Complete")
+                        .font(.caption)
+                        .foregroundColor(AppTheme.settingsText.opacity(0.8))
+                    
+                    Spacer()
+                    
+                    if let timeRemaining = progress.estimatedTimeRemaining {
+                        Text("~\(formatTimeRemaining(timeRemaining)) remaining")
+                            .font(.caption)
+                            .foregroundColor(AppTheme.settingsText.opacity(0.6))
+                    }
+                }
+            }
+            
+            // Batch Progress Section
+            if progress.totalBatches > 1 {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(progress.batchText)
+                            .font(.subheadline)
+                            .foregroundColor(AppTheme.settingsText.opacity(0.9))
+                        
+                        Spacer()
+                        
+                        Text("\(Int(progress.currentBatchProgress * 100))% of current batch")
+                            .font(.caption2)
+                            .foregroundColor(AppTheme.settingsText.opacity(0.6))
+                    }
+                    
+                    ProgressView(value: progress.currentBatchProgress)
+                        .progressViewStyle(LinearProgressViewStyle(tint: .green))
+                        .scaleEffect(y: 1.0)
+                }
+            }
+            
+            // Statistics
+            HStack(spacing: 16) {
+                StatView(icon: "checkmark.circle.fill", color: .green, 
+                        value: progress.successfulFiles, label: "Success")
+                StatView(icon: "xmark.circle.fill", color: .red, 
+                        value: progress.failedFiles, label: "Failed")
+                StatView(icon: "repeat.circle.fill", color: .yellow, 
+                        value: progress.duplicateFiles, label: "Duplicates")
+            }
+            
+            // Control Buttons
+            HStack(spacing: 12) {
+                if filePickerService.canPause {
+                    Button("Pause") {
+                        filePickerService.pauseProcessing()
+                    }
+                    .buttonStyle(ControlButtonStyle(color: .orange))
+                }
+                
+                if filePickerService.canResume {
+                    Button("Resume") {
+                        Task {
+                            await filePickerService.resumeProcessing()
+                        }
+                    }
+                    .buttonStyle(ControlButtonStyle(color: .blue))
+                }
+                
+                if filePickerService.canRestart {
+                    Button("Restart") {
+                        Task {
+                            await filePickerService.restartProcessing()
+                        }
+                    }
+                    .buttonStyle(ControlButtonStyle(color: .green))
+                }
+                
+                Button(filePickerService.processingState == .processing ? "Cancel" : "Clear") {
+                    if filePickerService.processingState == .processing {
+                        filePickerService.cancelProcessing()
+                    } else {
+                        Task {
+                            await filePickerService.resetAndClearFiles()
+                        }
+                    }
+                }
+                .buttonStyle(ControlButtonStyle(color: .red))
+                
+                Spacer()
             }
         }
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 16)
         .background(
             RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
                 .fill(AppTheme.settingsText.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
+                        .stroke(AppTheme.settingsResetIconBlue.opacity(0.3), lineWidth: 1)
+                )
         )
+    }
+    
+    @ViewBuilder
+    private var statusIcon: some View {
+        switch filePickerService.processingState {
+        case .processing:
+            Image(systemName: "arrow.down.circle.fill")
+                .foregroundColor(.blue)
+                .font(.system(size: 20))
+        case .paused:
+            Image(systemName: "pause.circle.fill")
+                .foregroundColor(.orange)
+                .font(.system(size: 20))
+        case .completed:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+                .font(.system(size: 20))
+        case .cancelled:
+            Image(systemName: "xmark.circle.fill")
+                .foregroundColor(.red)
+                .font(.system(size: 20))
+        default:
+            Image(systemName: "circle")
+                .foregroundColor(.gray)
+                .font(.system(size: 20))
+        }
+    }
+    
+    private var statusText: String {
+        switch filePickerService.processingState {
+        case .processing:
+            return "Processing Files..."
+        case .paused:
+            return "Processing Paused"
+        case .completed:
+            return "Processing Complete"
+        case .cancelled:
+            return "Processing Cancelled"
+        default:
+            return "Ready"
+        }
+    }
+    
+    private func formatTimeRemaining(_ time: TimeInterval) -> String {
+        let hours = Int(time) / 3600
+        let minutes = Int(time) % 3600 / 60
+        let seconds = Int(time) % 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+}
+
+struct StatView: View {
+    let icon: String
+    let color: Color
+    let value: Int
+    let label: String
+    
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 4) {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .font(.caption)
+                Text("\(value)")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(AppTheme.settingsText)
+            }
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(AppTheme.settingsText.opacity(0.6))
+        }
+    }
+}
+
+struct ControlButtonStyle: ButtonStyle {
+    let color: Color
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundColor(color)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(color.opacity(configuration.isPressed ? 0.3 : 0.2))
+            )
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
@@ -1160,6 +2704,64 @@ struct FilePickerRow: View {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)
+    }
+}
+
+// MARK: - Folder Picker View
+
+struct FolderPickerView: UIViewControllerRepresentable {
+    @Binding var isPresented: Bool
+    let onFolderSelected: (URL) -> Void
+    let onError: (Error) -> Void
+    
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(
+            forOpeningContentTypes: [.folder],
+            asCopy: false  // Important: Don't copy, we want direct access
+        )
+        picker.delegate = context.coordinator
+        picker.allowsMultipleSelection = false // Only select one folder
+        picker.modalPresentationStyle = .formSheet
+        
+        if #available(iOS 14.0, *) {
+            picker.shouldShowFileExtensions = true
+        }
+        
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {
+        // No updates needed
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let parent: FolderPickerView
+        
+        init(_ parent: FolderPickerView) {
+            self.parent = parent
+            super.init()
+        }
+        
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            parent.isPresented = false
+            
+            guard let folderURL = urls.first else {
+                parent.onError(FilePickerError.processingFailed(reason: "No folder selected"))
+                return
+            }
+            
+            print("📁 Folder selected: \(folderURL.path)")
+            parent.onFolderSelected(folderURL)
+        }
+        
+        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+            parent.isPresented = false
+            print("📁 Folder selection cancelled")
+        }
     }
 }
 

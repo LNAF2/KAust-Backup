@@ -18,6 +18,13 @@ class PlaylistViewModel: ObservableObject {
     var scrollToBottomPublisher: AnyPublisher<Void, Never> {
         scrollToBottomSubject.eraseToAnyPublisher()
     }
+    
+    init() {
+        // Restore songs from saved bookmarks on app startup
+        Task {
+            await restoreSongsFromBookmarks()
+        }
+    }
 
     func addToPlaylist(_ song: Song) {
         print("🎵 PlaylistViewModel.addToPlaylist - Adding song: '\(song.title)' by '\(song.artist)'")
@@ -46,6 +53,86 @@ class PlaylistViewModel: ObservableObject {
         print("🗑️ PlaylistViewModel.removeFromPlaylist - Removing song: '\(song.title)'")
         playlistItems.removeAll { $0.id == song.id }
         print("✅ Song removed from playlist. Remaining songs: \(playlistItems.count)")
+    }
+    
+    // MARK: - Bookmark Restoration
+    
+    @MainActor
+    private func restoreSongsFromBookmarks() async {
+        print("🔄 PlaylistViewModel - Restoring songs from saved bookmarks...")
+        
+        // Get all saved file bookmarks from UserDefaults
+        let userDefaults = UserDefaults.standard
+        let allKeys = userDefaults.dictionaryRepresentation().keys
+        let bookmarkKeys = allKeys.filter { $0.hasPrefix("fileBookmark_") }
+        
+        print("📁 Found \(bookmarkKeys.count) saved file bookmarks")
+        
+        var restoredSongs: [Song] = []
+        
+        for bookmarkKey in bookmarkKeys {
+            guard let bookmarkData = userDefaults.data(forKey: bookmarkKey) else {
+                continue
+            }
+            
+            do {
+                // Restore URL from bookmark
+                var isStale = false
+                let fileURL = try URL(
+                    resolvingBookmarkData: bookmarkData,
+                    options: .withoutUI,
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+                
+                // Check if file still exists
+                guard FileManager.default.fileExists(atPath: fileURL.path) else {
+                    print("⚠️ File no longer exists, removing bookmark: \(fileURL.lastPathComponent)")
+                    userDefaults.removeObject(forKey: bookmarkKey)
+                    continue
+                }
+                
+                // Start accessing security scoped resource
+                guard fileURL.startAccessingSecurityScopedResource() else {
+                    print("❌ Failed to access security-scoped resource: \(fileURL.lastPathComponent)")
+                    continue
+                }
+                
+                // Create Song object
+                let fileName = fileURL.lastPathComponent
+                let title = fileName.replacingOccurrences(of: ".mp4", with: "")
+                
+                let song = Song(
+                    id: UUID().uuidString,
+                    title: title,
+                    artist: "Unknown Artist",
+                    duration: "0:00", // Duration will be calculated when played
+                    filePath: fileURL.path
+                )
+                
+                restoredSongs.append(song)
+                print("✅ Restored song: \(title)")
+                
+                // Stop accessing security scoped resource (will be re-accessed when played)
+                fileURL.stopAccessingSecurityScopedResource()
+                
+            } catch {
+                print("❌ Failed to restore bookmark for key \(bookmarkKey): \(error)")
+                // Remove invalid bookmark
+                userDefaults.removeObject(forKey: bookmarkKey)
+            }
+        }
+        
+        // Add restored songs to playlist
+        if !restoredSongs.isEmpty {
+            // Sort songs alphabetically by title
+            restoredSongs.sort { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+            
+            playlistItems.append(contentsOf: restoredSongs)
+            print("🎵 Restored \(restoredSongs.count) songs to playlist")
+        } else {
+            print("📭 No songs to restore from bookmarks")
+        }
     }
 }
 

@@ -11,6 +11,7 @@ struct SongListView: View {
     @StateObject private var viewModel = SongListViewModel()
     @ObservedObject var playlistViewModel: PlaylistViewModel
     @FocusState private var isSearchFocused: Bool
+    @AppStorage("swipeToDeleteEnabled") private var swipeToDeleteEnabled = false
     private let cornerRadius: CGFloat = 8
     private let panelGap: CGFloat = 8
 
@@ -195,6 +196,15 @@ struct SongListView: View {
                                 // Hide suggestions when song is selected
                                 viewModel.showingSuggestions = false
                             }
+                            .if(swipeToDeleteEnabled) { view in
+                                view.swipeActions(edge: .trailing) {
+                                    Button("Delete", role: .destructive) {
+                                        Task {
+                                            await viewModel.deleteSong(song)
+                                        }
+                                    }
+                                }
+                            }
                     }
                 }
                 .listStyle(PlainListStyle())
@@ -205,7 +215,19 @@ struct SongListView: View {
     }
 }
 
+// MARK: - View Extensions
 
+extension View {
+    /// Conditionally applies a view modifier
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+}
 
 /*
 struct SongListView: View {

@@ -205,17 +205,52 @@ final class DataProviderService: DataProviderServiceProtocol {
     func deleteSong(_ song: SongEntity) async throws {
         let context = persistenceController.container.viewContext
         
-        // Delete associated MP4 file
-        if fileManager.fileExists(atPath: song.filePath ?? "") {
-            try fileManager.removeItem(atPath: song.filePath!)
+        guard let filePath = song.filePath else {
+            // No file path, just delete the Core Data entity
+            context.delete(song)
+            try context.save()
+            return
         }
         
-        // Delete associated LRC file if exists
-        if let lrcPath = song.lrcFilePath, fileManager.fileExists(atPath: lrcPath) {
-            try fileManager.removeItem(atPath: lrcPath)
+        // Get the app's Documents/Media directory path for comparison
+        let documentsDirectory = try fileManager.url(
+            for: .documentDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+        let mediaPath = mediaDirectory.path
+        let fileName = URL(fileURLWithPath: filePath).lastPathComponent
+        
+        // Check if the file is in our app's Media directory (internal file)
+        if filePath.hasPrefix(mediaPath) {
+            print("📁 Deleting internal file: \(fileName)")
+            
+            // Delete associated MP4 file if it exists
+            if fileManager.fileExists(atPath: filePath) {
+                try fileManager.removeItem(atPath: filePath)
+                print("✅ Deleted MP4 file: \(fileName)")
+            }
+            
+            // Delete associated LRC file if exists
+            if let lrcPath = song.lrcFilePath, fileManager.fileExists(atPath: lrcPath) {
+                try fileManager.removeItem(atPath: lrcPath)
+                print("✅ Deleted LRC file: \(URL(fileURLWithPath: lrcPath).lastPathComponent)")
+            }
+        } else {
+            print("🔒 Deleting external file reference: \(fileName)")
+            print("🗑️ Preserving external file, deleting only metadata")
+            
+            // For external files, clean up any associated bookmark
+            let bookmarkKey = "fileBookmark_\(fileName)"
+            if UserDefaults.standard.data(forKey: bookmarkKey) != nil {
+                UserDefaults.standard.removeObject(forKey: bookmarkKey)
+                print("🧹 Cleaned up bookmark for external file: \(fileName)")
+            }
         }
         
-        // Delete Core Data entity
+        // Always delete the Core Data entity
         context.delete(song)
         try context.save()
     }

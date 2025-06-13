@@ -303,6 +303,75 @@ class SongListViewModel: ObservableObject {
         searchText = suggestion.text
         showingSuggestions = false
     }
+    
+    // MARK: - Song Management
+    
+    func deleteSong(_ song: Song) async {
+        await MainActor.run {
+            let context = persistenceController.container.viewContext
+            
+            do {
+                // Find the corresponding SongEntity in Core Data
+                let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+                let songUUID = UUID(uuidString: song.id) ?? UUID()
+                request.predicate = NSPredicate(format: "id == %@", songUUID as CVarArg)
+                
+                guard let songEntity = try context.fetch(request).first else {
+                    print("❌ Could not find SongEntity for song: \(song.title)")
+                    return
+                }
+                
+                // Get file path before deleting the entity
+                guard let filePath = songEntity.filePath else {
+                    // No file path, just delete the Core Data entity
+                    context.delete(songEntity)
+                    try context.save()
+                    print("✅ Deleted song metadata: \(song.title)")
+                    return
+                }
+                
+                // Determine if this is an internal or external file
+                let fileManager = FileManager.default
+                let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+                let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+                let mediaPath = mediaDirectory.path
+                let fileName = URL(fileURLWithPath: filePath).lastPathComponent
+                
+                // Check if the file is in our app's Media directory (internal file)
+                if filePath.hasPrefix(mediaPath) {
+                    print("📁 Deleting internal file: \(fileName)")
+                    
+                    // Delete associated MP4 file if it exists
+                    if fileManager.fileExists(atPath: filePath) {
+                        try fileManager.removeItem(atPath: filePath)
+                        print("✅ Deleted MP4 file: \(fileName)")
+                    }
+                    
+                    // Delete associated LRC file if exists
+                    if let lrcPath = songEntity.lrcFilePath, fileManager.fileExists(atPath: lrcPath) {
+                        try fileManager.removeItem(atPath: lrcPath)
+                        print("✅ Deleted LRC file: \(URL(fileURLWithPath: lrcPath).lastPathComponent)")
+                    }
+                } else {
+                    print("📁 External file detected: \(fileName) - only deleting metadata")
+                    
+                    // Clean up bookmark for external file
+                    let bookmarkKey = "fileBookmark_\(fileName)"
+                    UserDefaults.standard.removeObject(forKey: bookmarkKey)
+                    print("🧹 Cleaned up bookmark: \(bookmarkKey)")
+                }
+                
+                // Delete the Core Data entity
+                context.delete(songEntity)
+                try context.save()
+                
+                print("✅ Successfully deleted song: \(song.title) by \(song.artist)")
+                
+            } catch {
+                print("❌ Error deleting song: \(error)")
+            }
+        }
+    }
 }
 
 // MARK: - Search Suggestion Model

@@ -74,17 +74,6 @@ struct ContentView: View {
         }
         .environmentObject(videoPlayerViewModel)
         .onAppear {
-            // Add a test song with a bundle resource path
-            let bundleTestSong = Song(
-                id: "bundle-test-456",
-                title: "Bundle Test Video",
-                artist: "Bundle Test Artist", 
-                duration: "02:00",
-                filePath: "SampleVideo" // This will look for SampleVideo.mp4 in the app bundle
-            )
-            playlistViewModel.addToPlaylist(bundleTestSong)
-            print("🧪 Bundle test song added to playlist for debugging")
-            
             // Set up notification observer for delete song
             NotificationCenter.default.addObserver(
                 forName: .deleteSongFromPlaylist,

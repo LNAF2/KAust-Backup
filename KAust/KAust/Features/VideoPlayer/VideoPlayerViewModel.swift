@@ -64,7 +64,7 @@ final class VideoPlayerViewModel: ObservableObject {
         print("✅ VideoPlayerViewModel.play - Found video URL: \(url.path)")
 
         // If we migrated the file, update the database with the new path
-        if url.path != song.filePath, !song.filePath.hasPrefix("SampleVideo") {
+        if url.path != song.filePath {
             await updateSongFilePath(songId: song.id, newPath: url.path)
         }
         

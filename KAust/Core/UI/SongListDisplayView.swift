@@ -9,6 +9,7 @@ struct SongListDisplayView: View {
     @State private var showingFilterSheet = false
     @State private var showingSortSheet = false
     @State private var selectedSong: SongEntity?
+    @AppStorage("swipeToDeleteEnabled") private var swipeToDeleteEnabled = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -142,10 +143,12 @@ struct SongListDisplayView: View {
             }
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-            .swipeActions(edge: .trailing) {
-                Button("Delete", role: .destructive) {
-                    Task {
-                        await viewModel.deleteSong(song)
+            .if(swipeToDeleteEnabled) { view in
+                view.swipeActions(edge: .trailing) {
+                    Button("Delete", role: .destructive) {
+                        Task {
+                            await viewModel.deleteSong(song)
+                        }
                     }
                 }
             }
@@ -535,5 +538,19 @@ struct LoadingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(AppTheme.appBackground)
+    }
+}
+
+// MARK: - View Extensions
+
+extension View {
+    /// Conditionally applies a view modifier
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
     }
 } 

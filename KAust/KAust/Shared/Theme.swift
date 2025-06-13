@@ -48,7 +48,7 @@ struct AppTheme {
     // MARK: - Settings Window
     static let settingsBackground = Color.black
     static let settingsText = Color.white
-    static let settingsResetIconBlue = Color("SettingsResetBlue")
+    static let settingsResetIconBlue = Color("SettingResetBlue")
 
     // MARK: - ScrollBar Colors (for custom scrollbars)
     static let leftPanelScrollbarThumb = Color("LeftPanelAccent").opacity(0.7)
