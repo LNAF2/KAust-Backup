@@ -17,6 +17,7 @@ final class VideoPlayerViewModel: ObservableObject {
     @Published var isPlaying: Bool = false
     @Published var isMinimized: Bool = true
     @Published var areControlsVisible: Bool = true
+    @Published var isAirPlayActive: Bool = false
     @Published var overlayOffset: CGSize = .zero
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
@@ -82,6 +83,7 @@ final class VideoPlayerViewModel: ObservableObject {
         // 6. Start playback and setup
         self._player?.play()
         setupTimeObserver()
+        setupAirPlayMonitoring()
         showControls()
         
         print("✅ VideoPlayerViewModel.play - Playback started for: '\(song.title)'")
@@ -377,5 +379,35 @@ final class VideoPlayerViewModel: ObservableObject {
         } catch {
             print("❌ Failed to update song file path: \(error)")
         }
+    }
+    
+    private func setupAirPlayMonitoring() {
+        guard let player = _player else { return }
+        
+        // Initial state check
+        isAirPlayActive = player.isExternalPlaybackActive
+        print("📺 Initial AirPlay state: \(isAirPlayActive ? "Active" : "Inactive")")
+        
+        // Observe changes to external playback state
+        player.publisher(for: \.isExternalPlaybackActive)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isActive in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    self.isAirPlayActive = isActive
+                    print("📺 AirPlay state changed: \(isActive ? "Active" : "Inactive")")
+                    
+                    if isActive {
+                        // Hide custom controls when AirPlay is active
+                        self.areControlsVisible = false
+                        print("🎛️ Custom controls hidden - AirPlay native controls active")
+                    } else {
+                        // Show custom controls when AirPlay is inactive
+                        self.showControls()
+                        print("🎛️ Custom controls restored - AirPlay disconnected")
+                    }
+                }
+            }
+            .store(in: &cancellables)
     }
 } 

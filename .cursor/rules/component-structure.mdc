@@ -1,0 +1,49 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Enforce one-file-one-component, single responsibility, and centralized constants for SwiftUI code.
+globs: "*.swift"
+alwaysApply: true
+
+# Component Structure and Responsibility Rules
+
+## One File, One Component
+- Each SwiftUI view (panel, card, button, etc.) must be defined in its own file.
+- **Examples:**
+  - `SongListView.swift` — only the full song list panel.
+  - `SongListItemView.swift` — only the view for a single song card/row.
+  - `PlaylistView.swift` — only the full playlist panel.
+  - `PlaylistItemView.swift` — only the view for a single playlist card/row.
+
+## No Overlapping Responsibilities
+- Each file should have a single, clear responsibility.
+  - **Panel files:** only layout, background, and structure of the panel.
+  - **Item/card files:** only the appearance and layout of a single row/card.
+- To change the look of a card, only edit the item/card file.
+- To change the panel background or layout, only edit the panel file.
+
+## Use Constants and Theme Files
+- All colors, corner radii, spacing, and other design constants must be defined in a single source of truth, such as `AppTheme.swift` or `AppConstants.swift`.
+- Never hardcode colors, spacing, or radii in view files.
+- Always reference constants from the theme/constants file.
+
+---
+
+## Enforcement
+
+- **Code reviews** must check that new components follow these rules.
+- **Refactor** any existing code that violates these rules as you touch it.
+- **Document** these rules in your project README or CONTRIBUTING guide.
+
+---
+## Summary Table
+
+| Change you want to make         | File to edit                |
+|---------------------------------|-----------------------------|
+| Song list panel look            | SongListView.swift          |
+| Song card look                  | SongListItemView.swift      |
+| Playlist panel look             | PlaylistView.swift          |
+| Playlist card look              | PlaylistItemView.swift      |
+| Colors, spacing, corner radius  | AppTheme.swift / AppConstants.swift |

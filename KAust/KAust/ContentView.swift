@@ -153,40 +153,48 @@ struct CustomVideoPlayerView: View {
             // ONLY ONE VideoPlayer instance - immediate load
             if let player = viewModel.player {
                 VideoPlayer(player: player)
-                    .disabled(true)
+                    .disabled(!viewModel.isAirPlayActive) // Enable during AirPlay, disabled otherwise
                     .background(Color.black) // Ensure consistent background
             }
             
-            // Invisible overlay to capture all touches (especially for full screen double-tap)
-            Rectangle()
-                .fill(Color.clear)
-                .contentShape(Rectangle())
-                .onTapGesture(count: 1) {
-                    if dragOffset == .zero {
-                        print("👆 SINGLE TAP detected - showing controls")
-                        viewModel.showControls()
+            // Only add our gesture overlay when NOT in AirPlay mode
+            if !viewModel.isAirPlayActive {
+                Rectangle()
+                    .fill(Color.clear)
+                    .contentShape(Rectangle())
+                    .onTapGesture(count: 1) {
+                        if dragOffset == .zero {
+                            print("👆 SINGLE TAP detected - showing controls")
+                            viewModel.showControls()
+                        }
                     }
-                }
-                .onTapGesture(count: 2) {
-                    if dragOffset == .zero {
-                        print("👆👆 DOUBLE TAP detected - toggling size")
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                        impactFeedback.impactOccurred()
-                        viewModel.toggleSize()
+                    .onTapGesture(count: 2) {
+                        if dragOffset == .zero {
+                            print("👆👆 DOUBLE TAP detected - toggling size")
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            viewModel.toggleSize()
+                        }
                     }
-                }
-                .onTapGesture(count: 3) {
-                    if dragOffset == .zero && viewModel.isMinimized {
-                        print("👆👆👆 TRIPLE TAP detected - centering video")
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
-                        impactFeedback.impactOccurred()
-                        viewModel.centerVideo()
+                    .onTapGesture(count: 3) {
+                        if dragOffset == .zero && viewModel.isMinimized {
+                            print("👆👆👆 TRIPLE TAP detected - centering video")
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                            impactFeedback.impactOccurred()
+                            viewModel.centerVideo()
+                        }
                     }
-                }
+            }
             
             // Custom controls overlay - ALWAYS in the same container
-            if viewModel.areControlsVisible {
+            // Hide custom controls when AirPlay is active, let native controls take over
+            if viewModel.areControlsVisible && !viewModel.isAirPlayActive {
                 customControlsOverlay()
+            }
+            
+            // Show AirPlay indicator when streaming
+            if viewModel.isAirPlayActive {
+                airPlayIndicator()
             }
         }
     }
@@ -265,7 +273,38 @@ struct CustomVideoPlayerView: View {
         .allowsHitTesting(true) // CRITICAL: Ensure controls are always tappable
     }
     
-
+    @ViewBuilder
+    private func airPlayIndicator() -> some View {
+        VStack {
+            Spacer()
+            
+            HStack(spacing: 12) {
+                Image(systemName: "airplayvideo")
+                    .foregroundColor(.white)
+                    .font(.title2)
+                
+                Text("Streaming to AirPlay")
+                    .font(.headline)
+                    .foregroundColor(.white)
+                
+                Spacer()
+                
+                // Delete button in AirPlay mode
+                Button(action: { 
+                    viewModel.deleteSong()
+                }) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.white)
+                        .font(.title2)
+                }
+            }
+            .padding(20)
+            .background(Color.black.opacity(0.7))
+            .cornerRadius(12)
+            .padding(.bottom, 40)
+            .padding(.horizontal, 20)
+        }
+    }
     
     // ZERO @Published access during drag - pure smooth performance
     private func dragGesture(in geometry: GeometryProxy) -> some Gesture {
