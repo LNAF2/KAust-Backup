@@ -10,6 +10,7 @@ import SwiftUI
 struct SongListView: View {
     @StateObject private var viewModel = SongListViewModel()
     @ObservedObject var playlistViewModel: PlaylistViewModel
+    @EnvironmentObject var videoPlayerViewModel: VideoPlayerViewModel
     @FocusState private var isSearchFocused: Bool
     @AppStorage("swipeToDeleteEnabled") private var swipeToDeleteEnabled = false
     @State private var swipeState: [String: CGFloat] = [:]
@@ -313,17 +314,31 @@ struct SongListView: View {
             }
             
             // Main song item
-            SongListItemView(song: song)
+            SongListItemView(
+                song: song, 
+                isInPlaylist: playlistViewModel.playlistItems.contains { $0.id == song.id },
+                isCurrentlyPlaying: videoPlayerViewModel.currentVideo?.id == song.id
+            )
                 .offset(x: swipeState[song.id] ?? 0)
                 .contentShape(Rectangle())
                 .onTapGesture {
                     print("👆 DEBUG: Song item tapped")
                     print("  - Song: '\(song.cleanTitle)'")
                     print("  - Current swipe: \(swipeState[song.id] ?? 0)")
+                    print("  - Is in playlist: \(playlistViewModel.playlistItems.contains { $0.id == song.id })")
+                    print("  - Is currently playing: \(videoPlayerViewModel.currentVideo?.id == song.id)")
                     
                     if abs(swipeState[song.id] ?? 0) > 10 {
                         print("  - Resetting swipe")
                         resetSwipe(for: song.id)
+                    } else if isInPlaylist(song) {
+                        if videoPlayerViewModel.currentVideo?.id == song.id {
+                            print("  - Song is currently playing, providing haptic feedback")
+                        } else {
+                            print("  - Song already in playlist, providing haptic feedback")
+                        }
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                        impactFeedback.impactOccurred()
                     } else {
                         print("  - Adding to playlist")
                         playlistViewModel.addToPlaylist(song)
@@ -411,6 +426,14 @@ struct SongListView: View {
             Only the song metadata will be deleted.
             """
         }
+    }
+    
+    private func isInPlaylist(_ song: Song) -> Bool {
+        // Check if song is in the playlist OR currently playing
+        let inPlaylist = playlistViewModel.playlistItems.contains { $0.id == song.id }
+        let isCurrentlyPlaying = videoPlayerViewModel.currentVideo?.id == song.id
+        
+        return inPlaylist || isCurrentlyPlaying
     }
 }
 
