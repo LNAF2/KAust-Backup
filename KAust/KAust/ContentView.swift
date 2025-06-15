@@ -9,21 +9,29 @@ import SwiftUI
 import AVKit
 
 struct ContentView: View {
-    @State private var showSettings = false
-    @StateObject private var playlistViewModel = PlaylistViewModel()
     @StateObject private var videoPlayerViewModel = VideoPlayerViewModel()
-
+    @StateObject private var playlistViewModel: PlaylistViewModel
+    @State private var showSettings = false
+    
+    // Layout constants
+    private let outerPadding: CGFloat = 16
+    private let centerGap: CGFloat = 16
+    private let topPanelHeight: CGFloat = 60
+    private let middlePanelHeight: CGFloat = 80
+    
+    init() {
+        let videoPlayerVM = VideoPlayerViewModel()
+        _videoPlayerViewModel = StateObject(wrappedValue: videoPlayerVM)
+        _playlistViewModel = StateObject(wrappedValue: PlaylistViewModel(videoPlayerViewModel: videoPlayerVM))
+    }
+    
     var body: some View {
-        ZStack {
-            GeometryReader { geometry in
-                let totalWidth = geometry.size.width
-                let totalHeight = geometry.size.height
-                let outerPadding = AppConstants.Layout.outerUIPadding
-                let centerGap = AppConstants.Layout.defaultSpacing
-                let columnWidth = (totalWidth - outerPadding * 2 - centerGap) / 2
-                let topPanelHeight = AppConstants.Layout.titlePanelHeight
-                let middlePanelHeight = AppConstants.Layout.controlsPanelHeight
-
+        GeometryReader { geometry in
+            let totalHeight = geometry.size.height
+            let columnWidth = (geometry.size.width - (outerPadding * 2 + centerGap)) / 2
+            
+            ZStack {
+                // Main content
                 HStack(spacing: centerGap) {
                     // LEFT COLUMN
                     VStack(spacing: 0) {
@@ -48,11 +56,7 @@ struct ContentView: View {
                             viewModel: playlistViewModel,
                             onSongSelected: { song in
                                 print("🎬 ContentView.onSongSelected - Song tapped: '\(song.title)'")
-                                Task {
-                                    await videoPlayerViewModel.play(song: song)
-                                    // Remove song from playlist when it starts playing
-                                    playlistViewModel.removeFromPlaylist(song)
-                                }
+                                playlistViewModel.playSong(song)
                             }
                         )
                         .frame(maxHeight: .infinity)
@@ -61,13 +65,14 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, outerPadding)
                 .padding(.vertical, outerPadding)
+
+                // Video Player Overlay
+                if videoPlayerViewModel.currentVideo != nil {
+                    CustomVideoPlayerView(viewModel: videoPlayerViewModel)
+                        .ignoresSafeArea()
+                }
             }
             .background(AppTheme.appBackground.ignoresSafeArea())
-
-            // Video Player Overlay
-            if videoPlayerViewModel.currentVideo != nil {
-                CustomVideoPlayerView(viewModel: videoPlayerViewModel)
-            }
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
@@ -82,9 +87,17 @@ struct ContentView: View {
             ) { notification in
                 if let song = notification.object as? Song {
                     print("🗑️ ContentView - Removing song from playlist: \(song.title)")
-                    playlistViewModel.removeFromPlaylist(song)
+                    Task {
+                        await playlistViewModel.removeFromPlaylist(song)
+                    }
                 }
             }
+        }
+    }
+    
+    private func startPlayback(_ song: Song) {
+        Task {
+            await videoPlayerViewModel.play(song: song)
         }
     }
 }

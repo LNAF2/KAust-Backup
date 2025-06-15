@@ -10,9 +10,14 @@
 import Foundation
 import Combine
 
+@MainActor
 class PlaylistViewModel: ObservableObject {
     @Published var playlistItems: [Song] = []
     @Published var draggedItem: Song?
+    @Published var isShowingError = false
+    @Published var errorMessage: String = ""
+    
+    private weak var videoPlayerViewModel: VideoPlayerViewModel?
     
     // Publisher to trigger scroll to bottom when new song is added
     private let scrollToBottomSubject = PassthroughSubject<Void, Never>()
@@ -20,19 +25,21 @@ class PlaylistViewModel: ObservableObject {
         scrollToBottomSubject.eraseToAnyPublisher()
     }
     
-    init() {
+    init(videoPlayerViewModel: VideoPlayerViewModel? = nil) {
+        self.videoPlayerViewModel = videoPlayerViewModel
         // Restore songs from saved bookmarks on app startup
         Task {
             await restoreSongsFromBookmarks()
         }
     }
 
+    // MARK: - Playlist Management
+    
     func addToPlaylist(_ song: Song) {
         print("🎵 PlaylistViewModel.addToPlaylist - Adding song: '\(song.title)' by '\(song.artist)'")
         print("📁 Song file path: \(song.filePath)")
         print("🔗 Song video URL: \(song.videoURL?.absoluteString ?? "nil")")
         
-        // Prevent duplicates (optional)
         if !playlistItems.contains(where: { $0.id == song.id }) {
             playlistItems.append(song)
             print("✅ Song added to playlist. Total songs: \(playlistItems.count)")
@@ -42,23 +49,46 @@ class PlaylistViewModel: ObservableObject {
                 self.scrollToBottomSubject.send()
             }
         } else {
-            print("⚠️ Song already exists in playlist")
+            print("⚠️ Song already in playlist")
         }
     }
 
-    func removeFromPlaylist(at offsets: IndexSet) {
-        playlistItems.remove(atOffsets: offsets)
+    func removeFromPlaylist(_ song: Song) async {
+        await MainActor.run {
+            playlistItems.removeAll { $0.id == song.id }
+            print("✅ Song removed from playlist. Remaining songs: \(playlistItems.count)")
+        }
     }
     
-    func removeFromPlaylist(_ song: Song) {
-        print("🗑️ PlaylistViewModel.removeFromPlaylist - Removing song: '\(song.title)'")
-        playlistItems.removeAll { $0.id == song.id }
-        print("✅ Song removed from playlist. Remaining songs: \(playlistItems.count)")
+    func removeFromPlaylist(at offsets: IndexSet) async {
+        await MainActor.run {
+            playlistItems.remove(atOffsets: offsets)
+            print("✅ Songs removed from playlist. Remaining songs: \(playlistItems.count)")
+        }
+    }
+    
+    func moveItem(from source: IndexSet, to destination: Int) async {
+        await MainActor.run {
+            playlistItems.move(fromOffsets: source, toOffset: destination)
+            print("✅ Songs reordered in playlist")
+        }
+    }
+    
+    // MARK: - Playback Control
+    
+    func playSong(_ song: Song) {
+        Task {
+            if let videoPlayerViewModel = videoPlayerViewModel {
+                await videoPlayerViewModel.play(song: song)
+                if let index = playlistItems.firstIndex(where: { $0.id == song.id }) {
+                    await removeFromPlaylist(at: IndexSet(integer: index))
+                }
+            }
+        }
     }
     
     // MARK: - Bookmark Restoration
     
-    @MainActor
     private func restoreSongsFromBookmarks() async {
         print("🔄 PlaylistViewModel - Restoring songs from saved bookmarks...")
         
@@ -134,6 +164,18 @@ class PlaylistViewModel: ObservableObject {
         } else {
             print("📭 No songs to restore from bookmarks")
         }
+    }
+
+    // MARK: - Error Handling
+    
+    func showError(_ message: String) {
+        errorMessage = message
+        isShowingError = true
+    }
+    
+    func dismissError() {
+        errorMessage = ""
+        isShowingError = false
     }
 }
 

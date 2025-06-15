@@ -22,12 +22,12 @@ struct PlaylistItemView: View {
                         .stroke(AppTheme.rightPanelAccent.opacity(0.5), lineWidth: 1)
                 )
             VStack(alignment: .leading, spacing: 2) {
-                Text(song.cleanTitle.uppercased())
+                Text(song.cleanArtist.uppercased())
                     .font(.headline)
                     .fontWeight(.bold)
                     .foregroundColor(AppTheme.rightPanelAccent)
                 HStack(alignment: .firstTextBaseline) {
-                    Text(song.cleanArtist.uppercased())
+                    Text(song.cleanTitle.uppercased())
                         .font(.headline)
                         .fontWeight(.regular)
                         .foregroundColor(AppTheme.rightPanelAccent.opacity(0.7))

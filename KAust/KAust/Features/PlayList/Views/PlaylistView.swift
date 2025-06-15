@@ -34,6 +34,13 @@ struct PlaylistView: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(AppTheme.rightPanelAccent, lineWidth: 1)
         )
+        .alert("Error", isPresented: $viewModel.isShowingError) {
+            Button("OK") {
+                viewModel.dismissError()
+            }
+        } message: {
+            Text(viewModel.errorMessage)
+        }
     }
     
     private var playlistContent: some View {
@@ -202,19 +209,100 @@ struct PlaylistView: View {
     }
     
     private func handleSongTap(_ song: Song) {
+        print("\n🎵 DEBUG: Song tapped in playlist")
+        print("  - Song: '\(song.cleanTitle)' by '\(song.cleanArtist)'")
+        print("  - File: \(song.filePath)")
+        
         if videoPlayerViewModel.currentVideo != nil {
-            print("🚫 Song selection blocked - Video currently playing: '\(videoPlayerViewModel.currentVideo?.title ?? "Unknown")'")
+            print("🚫 DEBUG: Video currently playing, ignoring tap")
             let impactFeedback = UIImpactFeedbackGenerator(style: .light)
             impactFeedback.impactOccurred()
             return
         }
-        print("✅ Song selection allowed - Playing: '\(song.cleanTitle)' by '\(song.cleanArtist)'")
+        
+        // First, try to verify file exists
+        let fileManager = FileManager.default
+        if !fileManager.fileExists(atPath: song.filePath) {
+            print("❌ DEBUG: MP4 file not found at: \(song.filePath)")
+            
+            // Try to restore folder access if this looks like a folder-based file
+            if song.filePath.contains("File Provider Storage") {
+                print("🔄 DEBUG: Attempting to restore folder access for File Provider Storage file")
+                
+                // Try to restore folder access using the settings view model
+                let settingsViewModel = SettingsViewModel.shared
+                if settingsViewModel.filePickerService.restoreFolderAccess() {
+                    print("✅ DEBUG: Folder access restored, retrying file access")
+                    
+                    // Retry file access after restoring folder access
+                    if fileManager.fileExists(atPath: song.filePath) {
+                        print("✅ DEBUG: File now accessible after folder access restoration")
+                        // Try to access the file data
+                        if (try? Data(contentsOf: URL(fileURLWithPath: song.filePath), options: .alwaysMapped)) != nil {
+                            print("✅ DEBUG: File verified after folder restoration, starting playback")
+                            onSongSelected?(song)
+                            return
+                        }
+                    }
+                }
+                
+                print("❌ DEBUG: Could not restore access to file even after folder restoration")
+            }
+            
+            // Remove the song from the playlist since it can't be played
+            Task {
+                if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
+                    await viewModel.removeFromPlaylist(at: IndexSet(integer: index))
+                }
+            }
+            // Show error alert
+            viewModel.showError("Cannot play '\(song.cleanTitle)' - MP4 file is missing")
+            return
+        }
+        
+        // Try to access the file data
+        if (try? Data(contentsOf: URL(fileURLWithPath: song.filePath), options: .alwaysMapped)) == nil {
+            print("❌ DEBUG: MP4 file exists but is not accessible: \(song.filePath)")
+            
+            // Try to restore folder access if this looks like a folder-based file
+            if song.filePath.contains("File Provider Storage") {
+                print("🔄 DEBUG: File not accessible, attempting to restore folder access")
+                
+                let settingsViewModel = SettingsViewModel.shared
+                if settingsViewModel.filePickerService.restoreFolderAccess() {
+                    print("✅ DEBUG: Folder access restored, retrying file access")
+                    
+                    // Retry file access after restoring folder access
+                    if (try? Data(contentsOf: URL(fileURLWithPath: song.filePath), options: .alwaysMapped)) != nil {
+                        print("✅ DEBUG: File now accessible after folder access restoration")
+                        onSongSelected?(song)
+                        return
+                    }
+                }
+                
+                print("❌ DEBUG: Could not restore access to file even after folder restoration")
+            }
+            
+            // Remove the song from the playlist since it can't be played
+            Task {
+                if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
+                    await viewModel.removeFromPlaylist(at: IndexSet(integer: index))
+                }
+            }
+            // Show error alert
+            viewModel.showError("Cannot play '\(song.cleanTitle)' - MP4 file is not accessible")
+            return
+        }
+        
+        print("✅ DEBUG: File verified, starting playback")
         onSongSelected?(song)
     }
     
     private func deleteSong(_ song: Song) {
-        if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
-            viewModel.removeFromPlaylist(at: IndexSet(integer: index))
+        Task {
+            if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
+                await viewModel.removeFromPlaylist(at: IndexSet(integer: index))
+            }
         }
     }
 

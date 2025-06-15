@@ -1143,11 +1143,50 @@ class EnhancedFilePickerService: ObservableObject {
     }
     
     private func cleanupFolderAccess() {
+        // Don't automatically release folder access - we need it for playback
+        // Only release when explicitly requested or when app terminates
+        print("🔒 Keeping folder security-scoped access for playback")
+    }
+    
+    // NEW METHOD: Restore folder access from saved bookmark
+    func restoreFolderAccess() -> Bool {
+        guard let bookmarkData = UserDefaults.standard.data(forKey: "mp4FolderBookmark") else {
+            print("📁 No saved folder bookmark found")
+            return false
+        }
+        
+        do {
+            var isStale = false
+            let folderURL = try URL(
+                resolvingBookmarkData: bookmarkData,
+                options: .withoutUI,
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
+            )
+            
+            guard folderURL.startAccessingSecurityScopedResource() else {
+                print("❌ Failed to restore folder security-scoped access")
+                return false
+            }
+            
+            folderSecurityScope = folderURL
+            processingMode = .directFolderAccess
+            print("✅ Restored folder security-scoped access: \(folderURL.path)")
+            return true
+            
+        } catch {
+            print("❌ Failed to restore folder bookmark: \(error)")
+            return false
+        }
+    }
+    
+    // NEW METHOD: Explicitly release folder access (call when app terminates)
+    func releaseFolderAccess() {
         if let folderURL = folderSecurityScope {
             folderURL.stopAccessingSecurityScopedResource()
             folderSecurityScope = nil
-            processingMode = .filePickerCopy // Reset to default mode
-            print("🔓 Released security-scoped access to folder")
+            processingMode = .filePickerCopy
+            print("🔓 Explicitly released security-scoped access to folder")
         }
     }
     
@@ -1510,6 +1549,7 @@ class SettingsViewModel: ObservableObject {
     private func processMP4FolderAccess(_ folderURL: URL) async {
         guard folderURL.startAccessingSecurityScopedResource() else {
             print("❌ Failed to access security-scoped resource")
+            showError(FilePickerError.processingFailed(reason: "Permission denied to access folder"))
             return
         }
         
@@ -1537,6 +1577,7 @@ class SettingsViewModel: ObservableObject {
                     // Process files directly from their location (no copying needed!)
                     // Mark this as direct folder access so processing knows not to copy files
                     filePickerService.processingMode = .directFolderAccess
+                    filePickerService.folderSecurityScope = folderURL
                     handleFilesSelected(mp4Files)
                 }
             }
@@ -1547,30 +1588,6 @@ class SettingsViewModel: ObservableObject {
                 showError(error)
             }
         }
-        
-        // Keep security access until processing is complete
-        // We'll release it after processing is done
-        filePickerService.folderSecurityScope = folderURL
-    }
-    
-    private func scanForMP4Files(in folderURL: URL) -> [URL] {
-        let fileManager = FileManager.default
-        let resourceKeys: [URLResourceKey] = [.nameKey, .isDirectoryKey, .fileSizeKey]
-        
-        var mp4Files: [URL] = []
-        
-        if let enumerator = fileManager.enumerator(
-            at: folderURL,
-            includingPropertiesForKeys: resourceKeys,
-            options: [.skipsHiddenFiles]
-        ) {
-            // Swift 6 fix: collect URLs synchronously first to avoid makeIterator async issues
-            let allURLs = enumerator.allObjects.compactMap { $0 as? URL }
-            mp4Files = allURLs.filter { $0.pathExtension.lowercased() == "mp4" }
-        }
-        
-        // Sort alphabetically for consistent ordering
-        return mp4Files.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
     
     private func scanForMP4FilesWithBookmarks(in folderURL: URL) async -> [URL] {
@@ -1590,33 +1607,53 @@ class SettingsViewModel: ObservableObject {
             allMP4URLs = allURLs.filter { $0.pathExtension.lowercased() == "mp4" }
         }
         
+        print("🔍 Found \(allMP4URLs.count) MP4 files in folder before processing")
+        
         // Now process the collected URLs (can be done async-safely)
         var mp4Files: [URL] = []
         
         for fileURL in allMP4URLs {
-            // Create individual file bookmark for persistent access
-            do {
-                let fileBookmark = try fileURL.bookmarkData(
-                    options: .suitableForBookmarkFile,
-                    includingResourceValuesForKeys: nil,
-                    relativeTo: nil
-                )
+            // Try to create individual file bookmark for persistent access
+            var hasIndividualBookmark = false
+            
+            // First, try to get individual security-scoped access
+            if fileURL.startAccessingSecurityScopedResource() {
+                do {
+                    let fileBookmark = try fileURL.bookmarkData(
+                        options: .suitableForBookmarkFile,
+                        includingResourceValuesForKeys: nil,
+                        relativeTo: nil
+                    )
+                    
+                    // Store bookmark with filename as key
+                    let bookmarkKey = "fileBookmark_\(fileURL.lastPathComponent)"
+                    UserDefaults.standard.set(fileBookmark, forKey: bookmarkKey)
+                    
+                    hasIndividualBookmark = true
+                    print("📁 Created individual bookmark for: \(fileURL.lastPathComponent)")
+                    
+                } catch {
+                    print("⚠️ Failed to create individual bookmark for \(fileURL.lastPathComponent): \(error)")
+                }
                 
-                // Store bookmark with filename as key
-                let bookmarkKey = "fileBookmark_\(fileURL.lastPathComponent)"
-                UserDefaults.standard.set(fileBookmark, forKey: bookmarkKey)
-                
-                mp4Files.append(fileURL)
-                print("📁 Created bookmark for: \(fileURL.lastPathComponent)")
-                
-            } catch {
-                print("⚠️ Failed to create bookmark for \(fileURL.lastPathComponent): \(error)")
-                // Still add the file, it might work with folder-level access
-                mp4Files.append(fileURL)
+                // Stop accessing individual security scope (we'll rely on folder scope for now)
+                fileURL.stopAccessingSecurityScopedResource()
+            } else {
+                print("⚠️ Failed to get individual security-scoped access for: \(fileURL.lastPathComponent)")
+            }
+            
+            // Always add the file to the list - we have folder-level access
+            // The file should be accessible through the folder's security scope
+            mp4Files.append(fileURL)
+            
+            if hasIndividualBookmark {
+                print("✅ Added file with individual bookmark: \(fileURL.lastPathComponent)")
+            } else {
+                print("📂 Added file with folder-level access: \(fileURL.lastPathComponent)")
             }
         }
         
-        print("✅ Scanned folder: \(mp4Files.count) MP4 files found with bookmarks")
+        print("✅ Scanned folder: \(mp4Files.count) MP4 files found (with folder-level access)")
         
         // Sort alphabetically for consistent ordering
         return mp4Files.sorted { $0.lastPathComponent < $1.lastPathComponent }
@@ -1951,14 +1988,16 @@ struct SettingsView: View {
     }
     
     private func clearAllCoreDataSongs() async {
+        print("\n🗑️ DEBUG: Starting complete cleanup")
+        
         let context = PersistenceController.shared.container.viewContext
         let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
         
         do {
             let songs = try context.fetch(request)
-            print("🗑️ DEBUG: Deleting \(songs.count) songs from Core Data")
+            print("📊 Found \(songs.count) songs to clean up")
             
-            // Get the app's Documents/Media directory path for comparison
+            // Get the app's Documents/Media directory path
             guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
                 print("❌ Could not access documents directory")
                 return
@@ -1966,56 +2005,57 @@ struct SettingsView: View {
             let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
             let mediaPath = mediaDirectory.path
             
-            for song in songs {
-                guard let filePath = song.filePath else {
-                    print("⚠️ Song has no file path, deleting metadata only")
-                    context.delete(song)
-                    continue
+            // Clean up UserDefaults bookmarks
+            print("🧹 Cleaning up all file bookmarks...")
+            let userDefaults = UserDefaults.standard
+            let allKeys = userDefaults.dictionaryRepresentation().keys
+            for key in allKeys {
+                if key.hasPrefix("fileBookmark_") {
+                    userDefaults.removeObject(forKey: key)
+                    print("  ✅ Removed bookmark: \(key)")
                 }
-                
-                let fileName = URL(fileURLWithPath: filePath).lastPathComponent
-                
-                // Check if the file is in our app's Media directory (internal file)
-                if filePath.hasPrefix(mediaPath) {
-                    print("📁 Internal file detected: \(fileName)")
-                    print("🗑️ Deleting both metadata and file from app storage")
-                    
-                    // Delete the MP4 file if it exists
-                    if FileManager.default.fileExists(atPath: filePath) {
-                        do {
-                            try FileManager.default.removeItem(atPath: filePath)
-                            print("✅ Deleted MP4 file: \(fileName)")
-                            
-                            // Also try to delete associated LRC file if it exists
-                            let lrcURL = URL(fileURLWithPath: filePath).deletingPathExtension().appendingPathExtension("lrc")
-                            if FileManager.default.fileExists(atPath: lrcURL.path) {
-                                try FileManager.default.removeItem(atPath: lrcURL.path)
-                                print("✅ Deleted LRC file: \(lrcURL.lastPathComponent)")
-                            }
-                        } catch {
-                            print("⚠️ Failed to delete file \(fileName): \(error)")
-                        }
-                    }
-                } else {
-                    print("🔒 External file detected: \(fileName)")
-                    print("🗑️ Deleting only metadata, preserving external file")
-                    
-                    // For external files, also clean up any associated bookmark
-                    let bookmarkKey = "fileBookmark_\(fileName)"
-                    if UserDefaults.standard.data(forKey: bookmarkKey) != nil {
-                        UserDefaults.standard.removeObject(forKey: bookmarkKey)
-                        print("🧹 Cleaned up bookmark for external file: \(fileName)")
-                    }
-                }
-                
-                // Always delete the Core Data entry
-                context.delete(song)
             }
             
+            // Process each song
+            for song in songs {
+                if let filePath = song.filePath {
+                    let fileName = URL(fileURLWithPath: filePath).lastPathComponent
+                    
+                    // Check if this is an internal file
+                    if filePath.hasPrefix(mediaPath) {
+                        print("\n📱 Processing internal file: \(fileName)")
+                        
+                        // Delete MP4 file
+                        if FileManager.default.fileExists(atPath: filePath) {
+                            try FileManager.default.removeItem(atPath: filePath)
+                            print("  ✅ Deleted MP4 file")
+                        }
+                        
+                        // Delete LRC file if exists
+                        if let lrcPath = song.lrcFilePath,
+                           FileManager.default.fileExists(atPath: lrcPath) {
+                            try FileManager.default.removeItem(atPath: lrcPath)
+                            print("  ✅ Deleted LRC file")
+                        }
+                    } else {
+                        print("\n📁 Processing external file: \(fileName)")
+                    }
+                }
+                
+                // Delete Core Data entity
+                context.delete(song)
+                print("  ✅ Deleted song data from database")
+            }
+            
+            // Save Core Data changes
             try context.save()
-            print("✅ DEBUG: Successfully cleared all songs from Core Data")
+            print("\n✅ Cleanup complete:")
+            print("  - Deleted \(songs.count) songs from database")
+            print("  - Cleaned up all file bookmarks")
+            print("  - Removed all internal files")
+            
         } catch {
-            print("❌ DEBUG: Error clearing Core Data songs: \(error)")
+            print("\n❌ Error during cleanup: \(error.localizedDescription)")
         }
     }
     
@@ -2036,7 +2076,7 @@ struct SettingsView: View {
                         
                         FilePickerRow(
                             title: "📄 Select Individual Files",
-                            subtitle: "⚠️ Select 1 to 30 files max to prevent system crashes",
+                            subtitle: "⚠️ Select up to 30 files to prevent crashes",
                             icon: "folder.badge.plus",
                             isEnabled: viewModel.isFilePickerEnabled,
                             isLoading: false

@@ -9,17 +9,20 @@ import Foundation
 import CoreData
 import Combine
 
+@MainActor
 class SongListViewModel: ObservableObject {
     @Published var songs: [Song] = []
+    @Published private(set) var displaySongs: [Song] = []
     @Published var filteredSongs: [Song] = []
     @Published var searchText = "" {
         didSet {
-            searchSubject.send(searchText)
+            updateDisplaySongs()
         }
     }
     @Published var searchSuggestions: [SearchSuggestion] = []
     @Published var isSearching = false
     @Published var showingSuggestions = false
+    @Published var error: Error?
     
     private let persistenceController = PersistenceController.shared
     private var cancellables = Set<AnyCancellable>()
@@ -27,39 +30,26 @@ class SongListViewModel: ObservableObject {
     private let searchSubject = PassthroughSubject<String, Never>()
     
     // Computed property for display
-    var displaySongs: [Song] {
-        return searchText.isEmpty ? songs : filteredSongs
-    }
-    
     var displayCount: Int {
-        return searchText.isEmpty ? songs.count : filteredSongs.count
+        displaySongs.count
     }
 
     init() {
-        print("🏗️ OLD SongListViewModel.init() - Loading songs from Core Data")
-        loadSongsFromCoreData()
-        setupCoreDataObserver()
-        setupSearchDebouncing()
+        setupObservers()
+        Task {
+            await loadSongs()
+        }
     }
     
-    private func setupCoreDataObserver() {
-        // Observe Core Data changes for SongEntity
+    private func setupObservers() {
+        // Observe Core Data changes
         NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
-            .sink { [weak self] notification in
-                DispatchQueue.main.async {
-                    print("🔔 OLD SongListViewModel - Core Data change notification received")
-                    self?.loadSongsFromCoreData()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                Task { @MainActor in
+                    print("🔄 Received Core Data change notification - Reloading songs")
+                    await self?.loadSongs()
                 }
-            }
-            .store(in: &cancellables)
-    }
-    
-    private func setupSearchDebouncing() {
-        // Debounce search input to avoid excessive filtering
-        searchSubject
-            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-            .sink { [weak self] searchText in
-                self?.performFuzzySearch(searchText)
             }
             .store(in: &cancellables)
     }
@@ -307,70 +297,212 @@ class SongListViewModel: ObservableObject {
     // MARK: - Song Management
     
     func deleteSong(_ song: Song) async {
-        await MainActor.run {
-            let context = persistenceController.container.viewContext
+        print("\n🗑️ Starting song deletion")
+        print("  - Title: '\(song.cleanTitle)'")
+        print("  - Artist: '\(song.cleanArtist)'")
+        
+        let context = persistenceController.container.viewContext
+        
+        do {
+            // Find the song in Core Data
+            let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+            let songUUID = UUID(uuidString: song.id) ?? UUID()
+            request.predicate = NSPredicate(format: "id == %@", songUUID as CVarArg)
             
-            do {
-                // Find the corresponding SongEntity in Core Data
-                let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
-                let songUUID = UUID(uuidString: song.id) ?? UUID()
-                request.predicate = NSPredicate(format: "id == %@", songUUID as CVarArg)
+            guard let songEntity = try context.fetch(request).first else {
+                print("❌ Song not found in database")
+                return
+            }
+            
+            // Get file path before deleting
+            let filePath = songEntity.filePath ?? ""
+            let fileManager = FileManager.default
+            
+            // Check if this is an internal file (in app's sandbox) or external (in folder)
+            let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+            let mediaPath = mediaDirectory.path
+            
+            if filePath.hasPrefix(mediaPath) {
+                // Internal file - delete everything
+                print("📱 Internal file - deleting MP4 and all associated data")
                 
-                guard let songEntity = try context.fetch(request).first else {
-                    print("❌ Could not find SongEntity for song: \(song.title)")
-                    return
+                // Delete MP4 if it exists
+                if fileManager.fileExists(atPath: filePath) {
+                    try fileManager.removeItem(atPath: filePath)
+                    print("  ✅ Deleted MP4 file")
                 }
                 
-                // Get file path before deleting the entity
-                guard let filePath = songEntity.filePath else {
-                    // No file path, just delete the Core Data entity
-                    context.delete(songEntity)
-                    try context.save()
-                    print("✅ Deleted song metadata: \(song.title)")
-                    return
+                // Delete LRC if it exists
+                if let lrcPath = songEntity.lrcFilePath,
+                   fileManager.fileExists(atPath: lrcPath) {
+                    try fileManager.removeItem(atPath: lrcPath)
+                    print("  ✅ Deleted LRC file")
                 }
-                
-                // Determine if this is an internal or external file
-                let fileManager = FileManager.default
-                let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
-                let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
-                let mediaPath = mediaDirectory.path
-                let fileName = URL(fileURLWithPath: filePath).lastPathComponent
-                
-                // Check if the file is in our app's Media directory (internal file)
-                if filePath.hasPrefix(mediaPath) {
-                    print("📁 Deleting internal file: \(fileName)")
-                    
-                    // Delete associated MP4 file if it exists
-                    if fileManager.fileExists(atPath: filePath) {
-                        try fileManager.removeItem(atPath: filePath)
-                        print("✅ Deleted MP4 file: \(fileName)")
-                    }
-                    
-                    // Delete associated LRC file if exists
-                    if let lrcPath = songEntity.lrcFilePath, fileManager.fileExists(atPath: lrcPath) {
-                        try fileManager.removeItem(atPath: lrcPath)
-                        print("✅ Deleted LRC file: \(URL(fileURLWithPath: lrcPath).lastPathComponent)")
-                    }
-                } else {
-                    print("📁 External file detected: \(fileName) - only deleting metadata")
-                    
-                    // Clean up bookmark for external file
-                    let bookmarkKey = "fileBookmark_\(fileName)"
-                    UserDefaults.standard.removeObject(forKey: bookmarkKey)
-                    print("🧹 Cleaned up bookmark: \(bookmarkKey)")
-                }
-                
-                // Delete the Core Data entity
-                context.delete(songEntity)
-                try context.save()
-                
-                print("✅ Successfully deleted song: \(song.title) by \(song.artist)")
-                
-            } catch {
-                print("❌ Error deleting song: \(error)")
+            } else {
+                // External file - only delete app data
+                print("📁 External file - deleting only app data")
+            }
+            
+            // Delete Core Data entity
+            context.delete(songEntity)
+            try context.save()
+            print("✅ Deleted song data from database")
+            
+            // Refresh song list
+            await loadSongs()
+            
+        } catch {
+            print("❌ Error during deletion: \(error.localizedDescription)")
+            self.error = error
+        }
+    }
+    
+    /// Load all songs from Core Data
+    func loadSongs() async {
+        print("🔄 Loading songs from Core Data...")
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+        
+        // Sort by title
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        do {
+            let songEntities = try context.fetch(request)
+            print("📝 Found \(songEntities.count) songs in Core Data")
+            
+            let loadedSongs = songEntities.compactMap { Song(from: $0) }
+            print("✅ Converted to \(loadedSongs.count) Song objects")
+            
+            // Update the UI on the main thread
+            await MainActor.run {
+                self.songs = loadedSongs
+                self.updateDisplaySongs()
+                self.error = nil
+                print("🎵 Updated UI with \(self.displaySongs.count) songs")
+            }
+        } catch {
+            print("❌ Error loading songs: \(error)")
+            await MainActor.run {
+                self.error = error
             }
         }
+    }
+    
+    /// Update display songs based on search text or other filters
+    private func updateDisplaySongs() {
+        if searchText.isEmpty {
+            displaySongs = songs.sorted { $0.cleanTitle < $1.cleanTitle }
+            print("📋 Displaying all \(displaySongs.count) songs")
+        } else {
+            displaySongs = songs.filter { song in
+                song.cleanTitle.localizedCaseInsensitiveContains(searchText) ||
+                song.cleanArtist.localizedCaseInsensitiveContains(searchText)
+            }.sorted { $0.cleanTitle < $1.cleanTitle }
+            print("🔍 Filtered to \(displaySongs.count) songs matching '\(searchText)'")
+        }
+    }
+    
+    /// Check if a song already exists in Core Data
+    private func songExists(title: String, artist: String?, filePath: String) async -> Bool {
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+        
+        // First check by file path
+        request.predicate = NSPredicate(format: "filePath == %@", filePath)
+        if let _ = try? context.fetch(request).first {
+            print("🔍 Found duplicate by file path: \(filePath)")
+            return true
+        }
+        
+        // Then check by title and artist
+        if let artist = artist {
+            request.predicate = NSPredicate(
+                format: "title == %@ AND artist == %@",
+                title, artist
+            )
+        } else {
+            request.predicate = NSPredicate(
+                format: "title == %@ AND artist == nil",
+                title
+            )
+        }
+        
+        if let _ = try? context.fetch(request).first {
+            print("🔍 Found duplicate by title/artist: \(title) by \(artist ?? "Unknown")")
+            return true
+        }
+        
+        return false
+    }
+    
+    /// Import a song from a file path
+    func importSong(title: String, artist: String?, filePath: String) async throws {
+        print("\n📝 DEBUG: Attempting to import song")
+        print("  - Title: \(title)")
+        print("  - Artist: \(artist ?? "Unknown")")
+        print("  - File path: \(filePath)")
+        
+        // First verify the file exists and is accessible
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: filePath) else {
+            print("❌ DEBUG: File does not exist at path: \(filePath)")
+            throw NSError(domain: "SongList", 
+                         code: -1, 
+                         userInfo: [NSLocalizedDescriptionKey: "MP4 file not found at specified location"])
+        }
+        
+        // Try to access the file
+        guard let _ = try? Data(contentsOf: URL(fileURLWithPath: filePath), options: .alwaysMapped) else {
+            print("❌ DEBUG: File exists but is not accessible: \(filePath)")
+            throw NSError(domain: "SongList", 
+                         code: -2, 
+                         userInfo: [NSLocalizedDescriptionKey: "MP4 file exists but cannot be accessed"])
+        }
+        
+        // Check for duplicates
+        if await songExists(title: title, artist: artist, filePath: filePath) {
+            print("⚠️ DEBUG: Song already exists in database")
+            throw NSError(domain: "SongList", 
+                         code: -3, 
+                         userInfo: [NSLocalizedDescriptionKey: "Song already exists in library"])
+        }
+        
+        // Get the app's Documents/Media directory path for comparison
+        let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+        let mediaPath = mediaDirectory.path
+        
+        print("📁 DEBUG: Checking file location")
+        print("  - Media directory: \(mediaPath)")
+        print("  - File path: \(filePath)")
+        
+        let context = persistenceController.container.viewContext
+        let song = SongEntity(context: context)
+        
+        song.id = UUID()
+        song.title = title
+        song.artist = artist
+        song.filePath = filePath
+        song.dateAdded = Date()
+        
+        // If this is an internal file (in app's Media directory), verify it exists
+        if filePath.hasPrefix(mediaPath) {
+            print("📂 DEBUG: Internal file detected")
+            if !fileManager.fileExists(atPath: filePath) {
+                print("❌ DEBUG: Internal file missing at: \(filePath)")
+                context.delete(song)
+                throw NSError(domain: "SongList", 
+                            code: -4, 
+                            userInfo: [NSLocalizedDescriptionKey: "Internal MP4 file is missing"])
+            }
+        }
+        
+        try context.save()
+        print("✅ DEBUG: Successfully imported song: \(title)")
+        
+        // Refresh the song list
+        await loadSongs()
     }
 }
 

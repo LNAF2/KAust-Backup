@@ -15,6 +15,7 @@ struct SongListView: View {
     @State private var swipeState: [String: CGFloat] = [:]
     @State private var songToDelete: Song?
     @State private var showDeleteConfirmation = false
+    @State private var isLoading = false
     private let cornerRadius: CGFloat = 8
     private let panelGap: CGFloat = 8
     private let swipeThreshold: CGFloat = -80
@@ -49,20 +50,52 @@ struct SongListView: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
         )
-        .alert("Delete Song", isPresented: $showDeleteConfirmation) {
+        .alert("Delete Song?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) {
+                print("🚫 DEBUG: Delete cancelled")
+                print("  - Song: \(songToDelete?.cleanTitle ?? "nil")")
                 songToDelete = nil
+                showDeleteConfirmation = false
             }
             Button("Delete", role: .destructive) {
+                print("🗑️ DEBUG: Delete confirmed")
                 if let song = songToDelete {
-                    deleteSong(song)
+                    print("  - Song: '\(song.cleanTitle)' by '\(song.cleanArtist)'")
+                    print("  - ID: \(song.id)")
+                    print("  - File: \(song.filePath)")
+                    Task {
+                        print("📝 DEBUG: Starting deletion task")
+                        isLoading = true
+                        await viewModel.deleteSong(song)
+                        print("🔄 DEBUG: Reloading songs")
+                        await viewModel.loadSongs()
+                        isLoading = false
+                        print("✅ DEBUG: Deletion task complete")
+                    }
+                } else {
+                    print("⚠️ DEBUG: songToDelete is nil when delete was confirmed!")
                 }
                 songToDelete = nil
+                showDeleteConfirmation = false
             }
         } message: {
             if let song = songToDelete {
                 Text(deletionMessage(for: song))
             }
+        }
+        .overlay {
+            if isLoading {
+                Color.black.opacity(0.3)
+                    .ignoresSafeArea()
+                ProgressView()
+                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                    .scaleEffect(1.5)
+            }
+        }
+        .onAppear {
+            print("👁️ DEBUG: SongListView appeared")
+            print("  - Swipe to delete enabled: \(swipeToDeleteEnabled)")
+            print("  - Number of songs: \(viewModel.displaySongs.count)")
         }
     }
 
@@ -241,20 +274,43 @@ struct SongListView: View {
             if swipeToDeleteEnabled {
                 HStack {
                     Spacer()
-                    Button(action: {
-                        showDeleteConfirmation(for: song)
-                        resetSwipe(for: song.id)
-                    }) {
+                    Button {
+                        print("\n🔴 DEBUG: Delete button action triggered")
+                        print("  - Song: '\(song.cleanTitle)' by '\(song.cleanArtist)'")
+                        print("  - ID: \(song.id)")
+                        print("  - File: \(song.filePath)")
+                        print("  - Current swipe state: \(swipeState[song.id] ?? 0)")
+                        
+                        // Reset swipe state first
+                        withAnimation(.spring()) {
+                            swipeState[song.id] = 0
+                        }
+                        print("  - Swipe state reset")
+                        
+                        // Set up deletion
+                        DispatchQueue.main.async {
+                            print("  - Setting songToDelete")
+                            songToDelete = song
+                            print("  - songToDelete set: \(songToDelete?.id == song.id)")
+                            print("  - Showing confirmation dialog")
+                            showDeleteConfirmation = true
+                            print("  - showDeleteConfirmation set to: \(showDeleteConfirmation)")
+                        }
+                    } label: {
                         Image(systemName: "trash.fill")
                             .foregroundColor(.white)
                             .padding()
                             .background(Color.red)
                             .cornerRadius(8)
                     }
+                    .buttonStyle(PlainButtonStyle())
                     .frame(width: 60)
+                    .contentShape(Rectangle())
+                    .allowsHitTesting(abs(swipeState[song.id] ?? 0) > 20)
                 }
                 .padding(.trailing, 8)
                 .opacity(abs(swipeState[song.id] ?? 0) > 20 ? 1 : 0)
+                .zIndex(1) // Ensure delete button is above the song item
             }
             
             // Main song item
@@ -262,19 +318,27 @@ struct SongListView: View {
                 .offset(x: swipeState[song.id] ?? 0)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    print("👆 DEBUG: Song item tapped")
+                    print("  - Song: '\(song.cleanTitle)'")
+                    print("  - Current swipe: \(swipeState[song.id] ?? 0)")
+                    
                     if abs(swipeState[song.id] ?? 0) > 10 {
-                        // Reset swipe if item was swiped
+                        print("  - Resetting swipe")
                         resetSwipe(for: song.id)
                     } else {
-                        // Add to playlist and hide suggestions
+                        print("  - Adding to playlist")
                         playlistViewModel.addToPlaylist(song)
                         viewModel.showingSuggestions = false
                     }
                 }
-                .simultaneousGesture(
+                .gesture(
                     swipeToDeleteEnabled ? 
                     DragGesture()
                         .onChanged { value in
+                            print("👆 DEBUG: Drag gesture changed")
+                            print("  - Song: '\(song.cleanTitle)'")
+                            print("  - Translation: \(value.translation.width)")
+                            
                             // Only allow left swipe (negative translation)
                             let translation = min(0, value.translation.width)
                             swipeState[song.id] = translation
@@ -283,17 +347,24 @@ struct SongListView: View {
                             let translation = value.translation.width
                             let velocity = value.velocity.width
                             
+                            print("👆 DEBUG: Swipe gesture ended")
+                            print("  - Song: '\(song.cleanTitle)'")
+                            print("  - Translation: \(translation)")
+                            print("  - Velocity: \(velocity)")
+                            print("  - Threshold: \(swipeThreshold)")
+                            
                             if translation < swipeThreshold || velocity < -500 {
-                                // Snap to delete position
+                                print("  - Threshold reached, snapping to delete position")
                                 withAnimation(.spring()) {
                                     swipeState[song.id] = swipeThreshold
                                 }
                             } else {
-                                // Snap back to original position
+                                print("  - Threshold not reached, resetting position")
                                 resetSwipe(for: song.id)
                             }
                         } : nil
                 )
+                .zIndex(0) // Ensure song item is below the delete button
         }
         .clipped()
     }
@@ -315,12 +386,6 @@ struct SongListView: View {
     private func showDeleteConfirmation(for song: Song) {
         songToDelete = song
         showDeleteConfirmation = true
-    }
-    
-    private func deleteSong(_ song: Song) {
-        Task {
-            await viewModel.deleteSong(song)
-        }
     }
     
     private func deletionMessage(for song: Song) -> String {
