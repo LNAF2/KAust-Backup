@@ -19,40 +19,38 @@ struct TitlePanelView: View {
     private let kFontSize: CGFloat = 200 // Large on purpose, will be clipped/scaled
 
     var body: some View {
-        HStack(alignment: .center, spacing: 4) {
-            Text("REAL")
-                .font(.custom(logoFontName, size: textFontSize))
-                .foregroundColor(AppTheme.leftPanelAccent)
-
-            // The "K" is huge, but clipped to panel height
-            Text("K")
-                .font(.custom(logoFontName, size: kFontSize))
-                .foregroundColor(AppTheme.rightPanelAccent)
-                .frame(height: panelHeight)
-                .minimumScaleFactor(0.01)
-                .lineLimit(1)
-                .clipped() // Ensures no overflow
-
-            Image(systemName: "star.fill")
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(width: starSize, height: starSize)
-                .foregroundColor(AppTheme.rightPanelAccent)
-
-            Text("ARAOKE")
-                .font(.custom(logoFontName, size: textFontSize))
-                .foregroundColor(AppTheme.leftPanelAccent)
-
-            Spacer()
-        }
-        .padding(.horizontal, panelGap) // Use panelGap to match ControlsPanelView
-        .frame(height: panelHeight)
-        .background(AppTheme.leftPanelBackground)
-        .cornerRadius(cornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(AppTheme.appBackground, lineWidth: borderWidth)
-        )
+        Rectangle()
+            .fill(AppTheme.leftPanelBackground)
+            .frame(height: panelHeight)
+            .frame(maxWidth: .infinity)
+            .overlay(
+                Rectangle()
+                    .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
+            )
+            .overlay(
+                HStack(alignment: .center, spacing: 4) {
+                    Text("REAL")
+                        .font(.custom(logoFontName, size: textFontSize))
+                        .foregroundColor(AppTheme.leftPanelAccent)
+                    Text("K")
+                        .font(.custom(logoFontName, size: kFontSize))
+                        .foregroundColor(AppTheme.rightPanelAccent)
+                        .frame(height: panelHeight)
+                        .minimumScaleFactor(0.01)
+                        .lineLimit(1)
+                        .clipped()
+                    Image(systemName: "star.fill")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: starSize, height: starSize)
+                        .foregroundColor(AppTheme.rightPanelAccent)
+                    Text("ARAOKE")
+                        .font(.custom(logoFontName, size: textFontSize))
+                        .foregroundColor(AppTheme.leftPanelAccent)
+                    Spacer()
+                }
+                .padding(.horizontal, panelGap)
+            )
     }
 }
 

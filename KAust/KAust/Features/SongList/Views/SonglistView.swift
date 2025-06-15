@@ -21,82 +21,81 @@ struct SongListView: View {
     private let swipeThreshold: CGFloat = -80
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            searchSection
-            ZStack {
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .fill(AppTheme.leftPanelListBackground)
-                RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(AppTheme.leftPanelListBackground, lineWidth: 1)
-                
+        Rectangle()
+            .fill(Color.white)
+            .frame(maxWidth: .infinity)
+            .overlay(
+                Rectangle()
+                    .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
+            )
+            .overlay(
                 VStack(spacing: 0) {
-                    // Search suggestions
-                    if viewModel.showingSuggestions {
-                        searchSuggestionsView
+                    header
+                    searchSection
+                    ZStack {
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .fill(AppTheme.leftPanelListBackground)
+                        RoundedRectangle(cornerRadius: cornerRadius)
+                            .stroke(AppTheme.leftPanelListBackground, lineWidth: 1)
+                        VStack(spacing: 0) {
+                            if viewModel.showingSuggestions {
+                                searchSuggestionsView
+                            }
+                            songListView
+                        }
                     }
-                    
-                    // Song list
-                    songListView
+                    .padding(.horizontal, panelGap)
+                    .padding(.bottom, panelGap)
+                    .padding(.top, 0)
                 }
-            }
-            .padding(.horizontal, panelGap)
-            .padding(.bottom, panelGap)
-            .padding(.top, 0)
-        }
-        .background(Color.white)
-        .cornerRadius(cornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
-        )
-        .alert("Delete Song?", isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) {
-                print("🚫 DEBUG: Delete cancelled")
-                print("  - Song: \(songToDelete?.cleanTitle ?? "nil")")
-                songToDelete = nil
-                showDeleteConfirmation = false
-            }
-            Button("Delete", role: .destructive) {
-                print("🗑️ DEBUG: Delete confirmed")
+            )
+            .alert("Delete Song?", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {
+                    print("🚫 DEBUG: Delete cancelled")
+                    print("  - Song: \(songToDelete?.cleanTitle ?? "nil")")
+                    songToDelete = nil
+                    showDeleteConfirmation = false
+                }
+                Button("Delete", role: .destructive) {
+                    print("🗑️ DEBUG: Delete confirmed")
+                    if let song = songToDelete {
+                        print("  - Song: '\(song.cleanTitle)' by '\(song.cleanArtist)'")
+                        print("  - ID: \(song.id)")
+                        print("  - File: \(song.filePath)")
+                        Task {
+                            print("📝 DEBUG: Starting deletion task")
+                            isLoading = true
+                            await viewModel.deleteSong(song)
+                            print("🔄 DEBUG: Reloading songs")
+                            await viewModel.loadSongs()
+                            isLoading = false
+                            print("✅ DEBUG: Deletion task complete")
+                        }
+                    } else {
+                        print("⚠️ DEBUG: songToDelete is nil when delete was confirmed!")
+                    }
+                    songToDelete = nil
+                    showDeleteConfirmation = false
+                }
+            } message: {
                 if let song = songToDelete {
-                    print("  - Song: '\(song.cleanTitle)' by '\(song.cleanArtist)'")
-                    print("  - ID: \(song.id)")
-                    print("  - File: \(song.filePath)")
-                    Task {
-                        print("📝 DEBUG: Starting deletion task")
-                        isLoading = true
-                        await viewModel.deleteSong(song)
-                        print("🔄 DEBUG: Reloading songs")
-                        await viewModel.loadSongs()
-                        isLoading = false
-                        print("✅ DEBUG: Deletion task complete")
-                    }
-                } else {
-                    print("⚠️ DEBUG: songToDelete is nil when delete was confirmed!")
+                    Text(deletionMessage(for: song))
                 }
-                songToDelete = nil
-                showDeleteConfirmation = false
             }
-        } message: {
-            if let song = songToDelete {
-                Text(deletionMessage(for: song))
+            .overlay {
+                if isLoading {
+                    Color.black.opacity(0.3)
+                        .ignoresSafeArea()
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.5)
+                }
             }
-        }
-        .overlay {
-            if isLoading {
-                Color.black.opacity(0.3)
-                    .ignoresSafeArea()
-                ProgressView()
-                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                    .scaleEffect(1.5)
+            .onAppear {
+                print("👁️ DEBUG: SongListView appeared")
+                print("  - Swipe to delete enabled: \(swipeToDeleteEnabled)")
+                print("  - Number of songs: \(viewModel.displaySongs.count)")
             }
-        }
-        .onAppear {
-            print("👁️ DEBUG: SongListView appeared")
-            print("  - Swipe to delete enabled: \(swipeToDeleteEnabled)")
-            print("  - Number of songs: \(viewModel.displaySongs.count)")
-        }
     }
 
     private var header: some View {

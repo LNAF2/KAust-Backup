@@ -20,10 +20,9 @@ struct EmptyPanelView: View {
             .fill(AppTheme.rightPanelBackground)
             .frame(height: panelHeight)
             .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: cornerRadiusAmount))
             .overlay(
-                RoundedRectangle(cornerRadius: cornerRadiusAmount)
-                    .stroke(AppTheme.appBackground, lineWidth: AppConstants.Layout.panelBorderWidth)
+                Rectangle()
+                    .stroke(AppTheme.rightPanelAccent, lineWidth: 1)
             )
     }
 }

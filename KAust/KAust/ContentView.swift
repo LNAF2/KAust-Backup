@@ -17,7 +17,7 @@ struct ContentView: View {
     private let outerPadding: CGFloat = 16
     private let centerGap: CGFloat = 16
     private let topPanelHeight: CGFloat = 60
-    private let middlePanelHeight: CGFloat = 80
+    private let middlePanelHeight: CGFloat = 36
     
     init() {
         let videoPlayerVM = VideoPlayerViewModel()
@@ -31,42 +31,13 @@ struct ContentView: View {
             let columnWidth = (geometry.size.width - (outerPadding * 2 + centerGap)) / 2
             
             ZStack {
-                // Main content
                 HStack(spacing: centerGap) {
-                    // LEFT COLUMN
-                    VStack(spacing: 0) {
-                        TitlePanelView()
-                            .frame(height: topPanelHeight)
-                        ControlsPanelView()
-                            .frame(height: middlePanelHeight)
-                        SongListView(playlistViewModel: playlistViewModel)
-                            .frame(maxHeight: .infinity)
-                    }
-                    .frame(width: columnWidth, height: totalHeight - outerPadding * 2)
-
-                    // RIGHT COLUMN
-                    VStack(spacing: 0) {
-                        EmptyPanelView()
-                            .frame(height: topPanelHeight)
-                        SettingsAccessPanelView {
-                            showSettings = true
-                        }
-                        .frame(height: middlePanelHeight)
-                        PlaylistView(
-                            viewModel: playlistViewModel,
-                            onSongSelected: { song in
-                                print("🎬 ContentView.onSongSelected - Song tapped: '\(song.title)'")
-                                playlistViewModel.playSong(song)
-                            }
-                        )
-                        .frame(maxHeight: .infinity)
-                    }
-                    .frame(width: columnWidth, height: totalHeight - outerPadding * 2)
+                    leftColumn(totalHeight: totalHeight, columnWidth: columnWidth)
+                    rightColumn(totalHeight: totalHeight, columnWidth: columnWidth)
                 }
                 .padding(.horizontal, outerPadding)
                 .padding(.vertical, outerPadding)
-
-                // Video Player Overlay
+                
                 if videoPlayerViewModel.currentVideo != nil {
                     CustomVideoPlayerView(viewModel: videoPlayerViewModel)
                         .ignoresSafeArea()
@@ -79,7 +50,6 @@ struct ContentView: View {
         }
         .environmentObject(videoPlayerViewModel)
         .onAppear {
-            // Set up notification observer for delete song
             NotificationCenter.default.addObserver(
                 forName: .deleteSongFromPlaylist,
                 object: nil,
@@ -93,6 +63,78 @@ struct ContentView: View {
                 }
             }
         }
+    }
+    
+    private func leftColumn(totalHeight: CGFloat, columnWidth: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            // Top Left Panel - TITLE
+            TitlePanelView()
+                .frame(height: topPanelHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.purple, lineWidth: 1)
+                )
+            
+            // Middle Left Panel - CONTROLS  
+            ControlsPanelView()
+                .frame(height: middlePanelHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.purple, lineWidth: 1)
+                )
+            
+            // Bottom Left Panel - SONG LIST
+            SongListView(playlistViewModel: playlistViewModel)
+                .frame(maxHeight: .infinity)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.purple, lineWidth: 1)
+                )
+        }
+        .frame(width: columnWidth, height: totalHeight - outerPadding * 2)
+    }
+    
+    private func rightColumn(totalHeight: CGFloat, columnWidth: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            // Top Right Panel - EMPTY
+            EmptyPanelView()
+                .frame(height: topPanelHeight)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.red, lineWidth: 1)
+                )
+            
+            // Middle Right Panel - SETTINGS ACCESS
+            SettingsAccessPanelView {
+                showSettings = true
+            }
+            .frame(height: middlePanelHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.red, lineWidth: 1)
+            )
+            
+            // Bottom Right Panel - PLAYLIST
+            PlaylistView(
+                viewModel: playlistViewModel,
+                onSongSelected: { song in
+                    print("🎬 ContentView.onSongSelected - Song tapped: '\(song.title)'")
+                    playlistViewModel.playSong(song)
+                }
+            )
+            .frame(maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.red, lineWidth: 1)
+            )
+        }
+        .frame(width: columnWidth, height: totalHeight - outerPadding * 2)
     }
     
     private func startPlayback(_ song: Song) {
@@ -356,69 +398,3 @@ struct VideoControlButtonStyle: ButtonStyle {
             .allowsHitTesting(true)
     }
 }
-
-
-
-/*
-import SwiftUI
-
-struct ContentView: View {
-    @State private var showSettings = false
-
-    var body: some View {
-        ZStack {
-            GeometryReader { geometry in
-                let totalWidth = geometry.size.width
-                let totalHeight = geometry.size.height
-                let outerPadding = AppConstants.Layout.outerUIPadding
-                let centerGap = AppConstants.Layout.defaultSpacing
-                let columnWidth = (totalWidth - outerPadding * 2 - centerGap) / 2
-                let topPanelHeight = AppConstants.Layout.titlePanelHeight
-                let middlePanelHeight = AppConstants.Layout.controlsPanelHeight
-
-                HStack(spacing: centerGap) {
-                    // LEFT COLUMN
-                    VStack(spacing: 0) {
-                        TitlePanelView()
-                            .frame(height: topPanelHeight)
-                        ControlsPanelView()
-                            .frame(height: middlePanelHeight)
-                        SongListView()
-                            .frame(maxHeight: .infinity)
-                    }
-                    .frame(width: columnWidth, height: totalHeight - outerPadding * 2)
-
-                    // RIGHT COLUMN
-                    VStack(spacing: 0) {
-                        EmptyPanelView()
-                            .frame(height: topPanelHeight)
-                        SettingsAccessPanelView {
-                            showSettings = true
-                        }
-                        .frame(height: middlePanelHeight)
-                        PlaylistView() // <--- Use your working PlaylistView here!
-                            .frame(maxHeight: .infinity)
-                    }
-                    .frame(width: columnWidth, height: totalHeight - outerPadding * 2)
-                }
-                .padding(.horizontal, outerPadding)
-                .padding(.vertical, outerPadding)
-            }
-            .background(AppTheme.appBackground.ignoresSafeArea())
-
-            // Video Player Overlay (centered)
-            VideoPlayerOverlayView()
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-        }
-    }
-}
-
-struct ContentView_Previews: PreviewProvider {
-    static var previews: some View {
-        ContentView()
-            .previewInterfaceOrientation(.landscapeLeft)
-    }
-}
-*/

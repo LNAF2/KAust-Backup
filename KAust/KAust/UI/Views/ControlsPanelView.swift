@@ -20,44 +20,10 @@ struct ControlsPanelView: View {
 
     var body: some View {
         HStack(spacing: innerGap) {
-            // Filter Button - COMMENTED OUT
-            /*
-            CustomButton(
-                title: "Filter",
-                icon: "line.3.horizontal.decrease.circle",
-                backgroundColor: AppTheme.leftPanelListBackground,
-                accentColor: AppTheme.leftPanelAccent
-            ) {
-                // Filter action
-            }
-            .frame(width: filterButtonWidth, height: panelHeight * 0.8)
-            */
-
-            // Search Bar - COMMENTED OUT
-            /*
-            CustomTextField(
-                text: $searchText,
-                placeholder: "Search",
-                icon: "magnifyingglass",
-                backgroundColor: AppTheme.leftPanelListBackground,
-                accentColor: AppTheme.leftPanelAccent,
-                isFocused: isSearchFocused
-            )
-            .frame(height: panelHeight * 0.8)
-            .frame(maxWidth: .infinity)
-            .padding(.trailing, panelGap) // <-- This ensures right edge matches left gap
-            */
-            
-            // Empty spacer to maintain panel size and shape
             Spacer()
         }
         .frame(height: panelHeight)
+        .frame(maxWidth: .infinity)
         .background(AppTheme.leftPanelBackground)
-        .cornerRadius(cornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(Color.white, lineWidth: borderWidth)
-        )
-        // No .padding(.horizontal) here!
     }
 }

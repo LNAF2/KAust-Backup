@@ -31,11 +31,6 @@ struct SettingsAccessPanelView: View {
         .frame(height: panelHeight)
         .frame(maxWidth: .infinity)
         .background(AppTheme.rightPanelBackground)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadiusAmount))
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadiusAmount)
-                .stroke(Color.white, lineWidth: AppConstants.Layout.panelBorderWidth)
-        )
     }
 }
 
