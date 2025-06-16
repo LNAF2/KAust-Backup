@@ -23,7 +23,7 @@ struct DownloadProgressWindow: View {
                 }
                 .allowsHitTesting(true)
             
-            // Main progress window
+            // Main progress window - INCREASED HEIGHT from 800 to 850 to accommodate taller current file panel
             VStack(spacing: 20) {
                 // Window title
                 windowTitle
@@ -50,7 +50,7 @@ struct DownloadProgressWindow: View {
                     .stroke(Color.white.opacity(0.3), lineWidth: 2)
                     .shadow(color: Color.black.opacity(0.5), radius: 20, x: 0, y: 10)
             )
-            .frame(maxWidth: 600, maxHeight: 800)
+            .frame(maxWidth: 600, maxHeight: 850)
         }
         .onAppear {
             startAnimations()
@@ -176,11 +176,14 @@ struct DownloadProgressWindow: View {
             
             if !filePickerService.currentFileName.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
+                    // Fixed height text area that always accommodates 2 lines
                     Text(filePickerService.currentFileName)
                         .font(.subheadline)
                         .fontWeight(.medium)
                         .foregroundColor(.white)
                         .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(height: 44, alignment: .top)
                     
                     HStack {
                         Text(currentFileStatusText)
@@ -195,21 +198,32 @@ struct DownloadProgressWindow: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 12)
+                .padding(.vertical, 18)
                 .background(
                     RoundedRectangle(cornerRadius: 16)
                         .stroke(Color.orange.opacity(0.2), lineWidth: 1)
                 )
             } else {
-                Text("No file currently processing")
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.6))
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(Color.white.opacity(0.2), lineWidth: 1)
-                    )
+                VStack(alignment: .leading, spacing: 8) {
+                    // Fixed height for "No file" message to match the filename area
+                    Text("No file currently processing")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.6))
+                        .frame(height: 44, alignment: .top)
+                    
+                    // Empty spacer to match the status row height
+                    HStack {
+                        Text("")
+                            .font(.caption)
+                        Spacer()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 18)
+                .background(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                )
             }
         }
     }
@@ -491,8 +505,6 @@ struct DownloadProgressWindow: View {
             pulseAnimation = 1.2
         }
     }
-    
-
     
     private func formatElapsedTime() -> String {
         let elapsed = filePickerService.elapsedTime

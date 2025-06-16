@@ -17,7 +17,8 @@ struct PlaylistView: View {
     @State private var isEditing = false
     @State private var cancellables = Set<AnyCancellable>()
     @State private var swipeState: [String: CGFloat] = [:]
-    @State private var draggedSongId: String? = nil
+    // COMMENTED OUT: Drag and drop functionality 
+    // @State private var draggedSongId: String? = nil
     var onSongSelected: ((Song) -> Void)? = nil
 
     private let cornerRadius: CGFloat = 8
@@ -105,7 +106,8 @@ struct PlaylistView: View {
             
             // Main playlist item with edit mode overlays
             HStack(spacing: 0) {
-                // Drag handle on the left when editing
+                // COMMENTED OUT: Drag handle on the left when editing
+                /*
                 if isEditing {
                     DragHandleView(
                         song: song, 
@@ -116,22 +118,24 @@ struct PlaylistView: View {
                     }
                     .frame(width: 30)
                 }
+                */
                 
                 // Song content
                 PlaylistItemView(song: song)
                     .opacity(videoPlayerViewModel.currentVideo != nil ? 0.5 : 1.0)
                     .offset(x: swipeState[song.id] ?? 0)
-                    .scaleEffect(draggedSongId == song.id ? 1.05 : 1.0)
-                    .opacity(draggedSongId == song.id ? 0.8 : (videoPlayerViewModel.currentVideo != nil ? 0.5 : 1.0))
-                    .shadow(
-                        color: draggedSongId == song.id ? AppTheme.rightPanelAccent.opacity(0.3) : .clear,
-                        radius: draggedSongId == song.id ? 8 : 0,
-                        x: 0,
-                        y: draggedSongId == song.id ? 4 : 0
-                    )
-                    .animation(.easeInOut(duration: 0.2), value: draggedSongId)
+                    // COMMENTED OUT: Drag-related visual effects
+                    // .scaleEffect(draggedSongId == song.id ? 1.05 : 1.0)
+                    // .opacity(draggedSongId == song.id ? 0.8 : (videoPlayerViewModel.currentVideo != nil ? 0.5 : 1.0))
+                    // .shadow(
+                    //     color: draggedSongId == song.id ? AppTheme.rightPanelAccent.opacity(0.3) : .clear,
+                    //     radius: draggedSongId == song.id ? 8 : 0,
+                    //     x: 0,
+                    //     y: draggedSongId == song.id ? 4 : 0
+                    // )
+                    // .animation(.easeInOut(duration: 0.2), value: draggedSongId)
                     .contentShape(Rectangle()) // Ensure the entire area is tappable
-                                    .onTapGesture {
+                    .onTapGesture {
                     if abs(swipeState[song.id] ?? 0) > 10 {
                         // Reset swipe if item was swiped
                         resetSwipe(for: song.id)
@@ -183,14 +187,17 @@ struct PlaylistView: View {
                 }
             }
             .id(song.id)
+            // COMMENTED OUT: Drop delegate for drag and drop reordering
+            /*
             .if(isEditing) { view in
-                view                        .onDrop(of: [.text], delegate: PlaylistDropDelegate(
+                view.onDrop(of: [.text], delegate: PlaylistDropDelegate(
                             item: song,
                             listData: $viewModel.playlistItems,
                             current: $viewModel.draggedItem,
                             draggedSongId: $draggedSongId
                         ))
             }
+            */
         }
         .clipped()
     }
@@ -388,7 +395,7 @@ struct PlaylistView: View {
                         Text("Song selection disabled in edit mode")
                             .font(.caption)
                             .foregroundColor(.orange)
-                        Text("Drag ≡ to reorder • Tap ⊖ to delete • Swipe left for quick delete")
+                        Text("Tap ⊖ to delete • Swipe left for quick delete")
                             .font(.caption)
                             .foregroundColor(AppTheme.rightPanelAccent.opacity(0.7))
                     }
@@ -400,7 +407,8 @@ struct PlaylistView: View {
                 isEditing.toggle()
                 if !isEditing {
                     resetAllSwipes()
-                    draggedSongId = nil // Clear drag feedback when exiting edit mode
+                    // COMMENTED OUT: Clear drag feedback when exiting edit mode
+                    // draggedSongId = nil
                 }
             }) {
                 Text(isEditing ? "DONE" : "EDIT")
@@ -423,8 +431,8 @@ struct PlaylistView: View {
     }
 }
 
-// MARK: - Drag Handle Component
-
+// MARK: - COMMENTED OUT: Drag Handle Component
+/*
 struct DragHandleView: View {
     let song: Song
     let viewModel: PlaylistViewModel
@@ -444,9 +452,10 @@ struct DragHandleView: View {
             }
     }
 }
+*/
 
-// MARK: - Drag and Drop Support
-
+// MARK: - COMMENTED OUT: Drag and Drop Support
+/*
 struct PlaylistDropDelegate: DropDelegate {
     let item: Song
     @Binding var listData: [Song]
@@ -474,3 +483,4 @@ struct PlaylistDropDelegate: DropDelegate {
         return true
     }
 }
+*/

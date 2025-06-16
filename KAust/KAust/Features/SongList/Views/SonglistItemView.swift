@@ -24,7 +24,7 @@ struct SongListItemView: View {
             // Background color changes based on playlist state
             if isInPlaylist || isCurrentlyPlaying {
                 // Purple background when song is in playlist or playing
-                Color("LeftPanelListBg").opacity(0.1)
+                Color("LeftPanelListBg").opacity(0.5)
             } else {
                 // Normal light purple background
                 Color.purple.opacity(0.1)
@@ -50,7 +50,7 @@ struct SongListItemView: View {
                     Text("SONG ALREADY IN PLAY LIST")
                         .font(.caption)
                         .fontWeight(.medium)
-                        .foregroundColor(AppTheme.leftPanelAccent.opacity(0.8))
+                        .foregroundColor(.red)
                         .padding(.bottom, 2)
                 }
                 
