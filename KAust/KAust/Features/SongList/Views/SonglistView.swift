@@ -13,13 +13,11 @@ struct SongListView: View {
     @EnvironmentObject var videoPlayerViewModel: VideoPlayerViewModel
     @FocusState private var isSearchFocused: Bool
     @AppStorage("swipeToDeleteEnabled") private var swipeToDeleteEnabled = false
-    @State private var swipeState: [String: CGFloat] = [:]
     @State private var songToDelete: Song?
     @State private var showDeleteConfirmation = false
     @State private var isLoading = false
     private let cornerRadius: CGFloat = 8
     private let panelGap: CGFloat = 8
-    private let swipeThreshold: CGFloat = -80
 
     var body: some View {
         Rectangle()
@@ -113,7 +111,7 @@ struct SongListView: View {
             
             // Show swipe-to-delete status
             if swipeToDeleteEnabled {
-                Text("Swipe left to delete songs")
+                Text("Swipe left on songs to delete")
                     .font(.caption)
                     .foregroundColor(AppTheme.leftPanelAccent.opacity(0.7))
             }
@@ -144,8 +142,6 @@ struct SongListView: View {
                         if !viewModel.searchText.isEmpty {
                             viewModel.showingSuggestions = true
                         }
-                        // Reset all swipe states when search changes
-                        resetAllSwipes()
                     }
                 
                 if !viewModel.searchText.isEmpty {
@@ -251,16 +247,26 @@ struct SongListView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.clear)
             } else {
-                // Replace List with ScrollView to fix background issues
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        ForEach(viewModel.displaySongs) { song in
-                            songListItemRow(for: song)
+                // Use List with native swipe actions to maintain scrolling functionality
+                List(viewModel.displaySongs) { song in
+                    songListItemRow(for: song)
+                        .listRowInsets(EdgeInsets())
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .if(swipeToDeleteEnabled) { view in
+                            view.swipeActions(edge: .trailing) {
+                                Button("Delete", role: .destructive) {
+                                    print("\n🔴 DEBUG: Native swipe delete action triggered")
+                                    print("  - Song: '\(song.cleanTitle)' by '\(song.cleanArtist)'")
+                                    songToDelete = song
+                                    showDeleteConfirmation = true
+                                }
+                            }
                         }
-                    }
                 }
+                .listStyle(.plain)
                 .background(Color.clear)
-                .padding(.vertical, 4)
+                .scrollContentBackground(.hidden)
             }
         }
     }
@@ -269,138 +275,35 @@ struct SongListView: View {
     
     @ViewBuilder
     private func songListItemRow(for song: Song) -> some View {
-        ZStack {
-            // Delete button revealed when swiping (only if swipe-to-delete is enabled)
-            if swipeToDeleteEnabled {
-                HStack {
-                    Spacer()
-                    Button {
-                        print("\n🔴 DEBUG: Delete button action triggered")
-                        print("  - Song: '\(song.cleanTitle)' by '\(song.cleanArtist)'")
-                        print("  - ID: \(song.id)")
-                        print("  - File: \(song.filePath)")
-                        print("  - Current swipe state: \(swipeState[song.id] ?? 0)")
-                        
-                        // Reset swipe state first
-                        withAnimation(.spring()) {
-                            swipeState[song.id] = 0
-                        }
-                        print("  - Swipe state reset")
-                        
-                        // Set up deletion
-                        DispatchQueue.main.async {
-                            print("  - Setting songToDelete")
-                            songToDelete = song
-                            print("  - songToDelete set: \(songToDelete?.id == song.id)")
-                            print("  - Showing confirmation dialog")
-                            showDeleteConfirmation = true
-                            print("  - showDeleteConfirmation set to: \(showDeleteConfirmation)")
-                        }
-                    } label: {
-                        Image(systemName: "trash.fill")
-                            .foregroundColor(.white)
-                            .padding()
-                            .background(Color.red)
-                            .cornerRadius(8)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .frame(width: 60)
-                    .contentShape(Rectangle())
-                    .allowsHitTesting(abs(swipeState[song.id] ?? 0) > 20)
-                }
-                .padding(.trailing, 8)
-                .opacity(abs(swipeState[song.id] ?? 0) > 20 ? 1 : 0)
-                .zIndex(1) // Ensure delete button is above the song item
-            }
+        SongListItemView(
+            song: song, 
+            isInPlaylist: playlistViewModel.playlistItems.contains { $0.id == song.id },
+            isCurrentlyPlaying: videoPlayerViewModel.currentVideo?.id == song.id
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            print("👆 DEBUG: Song item tapped")
+            print("  - Song: '\(song.cleanTitle)'")
+            print("  - Is in playlist: \(playlistViewModel.playlistItems.contains { $0.id == song.id })")
+            print("  - Is currently playing: \(videoPlayerViewModel.currentVideo?.id == song.id)")
             
-            // Main song item
-            SongListItemView(
-                song: song, 
-                isInPlaylist: playlistViewModel.playlistItems.contains { $0.id == song.id },
-                isCurrentlyPlaying: videoPlayerViewModel.currentVideo?.id == song.id
-            )
-                .offset(x: swipeState[song.id] ?? 0)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    print("👆 DEBUG: Song item tapped")
-                    print("  - Song: '\(song.cleanTitle)'")
-                    print("  - Current swipe: \(swipeState[song.id] ?? 0)")
-                    print("  - Is in playlist: \(playlistViewModel.playlistItems.contains { $0.id == song.id })")
-                    print("  - Is currently playing: \(videoPlayerViewModel.currentVideo?.id == song.id)")
-                    
-                    if abs(swipeState[song.id] ?? 0) > 10 {
-                        print("  - Resetting swipe")
-                        resetSwipe(for: song.id)
-                    } else if isInPlaylist(song) {
-                        if videoPlayerViewModel.currentVideo?.id == song.id {
-                            print("  - Song is currently playing, providing haptic feedback")
-                        } else {
-                            print("  - Song already in playlist, providing haptic feedback")
-                        }
-                        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                        impactFeedback.impactOccurred()
-                    } else {
-                        print("  - Adding to playlist")
-                        playlistViewModel.addToPlaylist(song)
-                        viewModel.showingSuggestions = false
-                    }
+            if isInPlaylist(song) {
+                if videoPlayerViewModel.currentVideo?.id == song.id {
+                    print("  - Song is currently playing, providing haptic feedback")
+                } else {
+                    print("  - Song already in playlist, providing haptic feedback")
                 }
-                .gesture(
-                    swipeToDeleteEnabled ? 
-                    DragGesture()
-                        .onChanged { value in
-                            print("👆 DEBUG: Drag gesture changed")
-                            print("  - Song: '\(song.cleanTitle)'")
-                            print("  - Translation: \(value.translation.width)")
-                            
-                            // Only allow left swipe (negative translation)
-                            let translation = min(0, value.translation.width)
-                            swipeState[song.id] = translation
-                        }
-                        .onEnded { value in
-                            let translation = value.translation.width
-                            let velocity = value.velocity.width
-                            
-                            print("👆 DEBUG: Swipe gesture ended")
-                            print("  - Song: '\(song.cleanTitle)'")
-                            print("  - Translation: \(translation)")
-                            print("  - Velocity: \(velocity)")
-                            print("  - Threshold: \(swipeThreshold)")
-                            
-                            if translation < swipeThreshold || velocity < -500 {
-                                print("  - Threshold reached, snapping to delete position")
-                                withAnimation(.spring()) {
-                                    swipeState[song.id] = swipeThreshold
-                                }
-                            } else {
-                                print("  - Threshold not reached, resetting position")
-                                resetSwipe(for: song.id)
-                            }
-                        } : nil
-                )
-                .zIndex(0) // Ensure song item is below the delete button
+                let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+                impactFeedback.impactOccurred()
+            } else {
+                print("  - Adding to playlist")
+                playlistViewModel.addToPlaylist(song)
+                viewModel.showingSuggestions = false
+            }
         }
-        .clipped()
     }
     
     // MARK: - Helper Functions
-    
-    private func resetSwipe(for songId: String) {
-        withAnimation(.spring()) {
-            swipeState[songId] = 0
-        }
-    }
-    
-    private func resetAllSwipes() {
-        withAnimation(.spring()) {
-            swipeState.removeAll()
-        }
-    }
-    
-    private func showDeleteConfirmation(for song: Song) {
-        songToDelete = song
-        showDeleteConfirmation = true
-    }
     
     private func deletionMessage(for song: Song) -> String {
         let fileManager = FileManager.default

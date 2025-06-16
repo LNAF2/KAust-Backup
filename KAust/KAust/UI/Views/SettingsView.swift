@@ -398,6 +398,15 @@ class EnhancedFilePickerService: ObservableObject {
     @Published var showLargeSelectionWarning = false
     @Published var pendingLargeSelection: [URL] = []
     
+    // DEDICATED UI STATE FOR PROGRESS VISIBILITY
+    @Published var isProcessingFiles = false
+    @Published var currentProgressPercentage: Double = 0.0
+    @Published var currentFileCount = 0
+    @Published var totalFileCount = 0
+    @Published var currentFileName: String = ""
+    @Published var currentBatch = 0
+    @Published var totalBatches = 0
+    
     // NEW: Direct folder access support
     var processingMode: ProcessingMode = .filePickerCopy
     var folderSecurityScope: URL?
@@ -417,6 +426,7 @@ class EnhancedFilePickerService: ObservableObject {
     // Processing state
     private var allFiles: [URL] = []
     private var currentBatchIndex = 0
+    private var currentFileIndexInBatch = 0  // NEW: Track file position within current batch
     private var shouldPause = false
     private var shouldCancel = false
     private var processingStartTime: Date?
@@ -447,10 +457,12 @@ class EnhancedFilePickerService: ObservableObject {
     
     func handleFileSelection(_ urls: [URL]) {
         let fileCount = urls.count
+        print("🎯 DEBUG: handleFileSelection called with \(fileCount) files")
         print("📁 Received \(fileCount) files for automatic batch processing")
         
         // Simple automatic processing with intelligent batching
         Task {
+            print("🎯 DEBUG: About to call processFilesWithAutomaticBatching")
             await processFilesWithAutomaticBatching(urls)
         }
     }
@@ -547,14 +559,54 @@ class EnhancedFilePickerService: ObservableObject {
             estimatedTimeRemaining: nil
         )
         
-        processingState = .processing
-        canPause = true
-        canResume = false
+        // Set processing state and ensure UI sees the initial batch progress
+        await MainActor.run {
+            print("🎯 DEBUG: Setting processing state and initial progress")
+            self.processingState = .processing
+            self.canPause = true
+            self.canResume = false
+            
+            // Initialize with first file to ensure progress is visible immediately
+            self.batchProgress = BatchProgress(
+                totalFiles: urls.count,
+                completedFiles: 0,
+                currentBatch: 1,
+                totalBatches: totalBatches,
+                currentBatchProgress: 0,
+                successfulFiles: 0,
+                failedFiles: 0,
+                duplicateFiles: 0,
+                estimatedTimeRemaining: nil,
+                currentFileName: urls.first?.lastPathComponent
+            )
+            
+            // INITIALIZE DEDICATED UI STATE FOR PROGRESS VISIBILITY
+            self.isProcessingFiles = true
+            self.totalFileCount = urls.count
+            self.totalBatches = totalBatches
+            self.currentBatch = 1
+            self.currentFileCount = 0
+            self.currentProgressPercentage = 0.0
+            self.currentFileName = urls.first?.lastPathComponent ?? ""
+            
+            print("🎯 PROGRESS UI STATE INITIALIZED: \(self.totalFileCount) files, \(self.totalBatches) batches")
+            print("🎯 isProcessingFiles = \(self.isProcessingFiles)")
+            print("🎯 totalFileCount = \(self.totalFileCount)")
+            print("🎯 currentFileCount = \(self.currentFileCount)")
+            
+            // Force view update
+            self.objectWillChange.send()
+        }
+        
+        // Small delay to ensure UI updates
+        print("🎯 DEBUG: UI should now show progress overlay...")
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
         
         await processBatchesWithPauses(batchSize: safeBatchSize)
     }
     
     func processFiles(_ urls: [URL]) async {
+        print("🎯 DEBUG: OLD processFiles() called - redirecting to enhanced method")
         // Keep the old method for compatibility
         await processFilesWithAutomaticBatching(urls)
     }
@@ -565,16 +617,40 @@ class EnhancedFilePickerService: ObservableObject {
         processingState = .paused
         canPause = false
         canResume = true
+        
+        // KEEP UI STATE TRUE FOR PAUSED STATE SO OVERLAY STAYS VISIBLE
+        Task { @MainActor in
+            self.isProcessingFiles = true  // Keep overlay visible when paused
+            print("⏸️ Processing paused - keeping UI overlay visible")
+        }
     }
     
     func resumeProcessing() async {
-        guard processingState == .paused else { return }
+        guard processingState == .paused else { 
+            print("❌ RESUME ERROR: Cannot resume, current state is \(processingState)")
+            return 
+        }
+        
+        print("▶️ Resuming processing from pause state...")
+        print("📊 Resume context: \(results.count)/\(allFiles.count) files processed, currentBatchIndex=\(currentBatchIndex), currentFileIndexInBatch=\(currentFileIndexInBatch)")
+        
+        // RESET FLAGS AND STATE
         shouldPause = false
         processingState = .processing
         canPause = true
         canResume = false
         
-        await processBatches()
+        // RESUME WITH DEDICATED UI STATE
+        await MainActor.run {
+            self.isProcessingFiles = true
+            print("🎯 RESUME: isProcessingFiles = true, UI state updated")
+        }
+        
+        print("▶️ RESTARTING processing loop from currentBatchIndex=\(currentBatchIndex)")
+        
+        // RESTART THE PROCESSING LOOP - this is the key fix!
+        // The paused function already exited, so we need to restart it
+        await processBatchesWithPauses(batchSize: 30)
     }
     
     func cancelProcessing() {
@@ -583,6 +659,13 @@ class EnhancedFilePickerService: ObservableObject {
         processingState = .cancelled
         canPause = false
         canResume = false
+        
+        // UPDATE DEDICATED UI STATE FOR CANCELLATION
+        Task { @MainActor in
+            self.isProcessingFiles = false
+            print("🛑 Processing cancelled by user - UI state updated")
+        }
+        
         print("🛑 Processing cancelled by user")
     }
     
@@ -626,31 +709,40 @@ class EnhancedFilePickerService: ObservableObject {
         
         print("📊 Processing \(totalFiles) files in \(totalBatches) batches of \(batchSize) files each")
         
-        for batchIndex in 0..<totalBatches {
-            // Check for cancellation
-            guard !shouldCancel else {
+        // USE WHILE LOOP INSTEAD OF FOR LOOP TO PROPERLY HANDLE PAUSING
+        while currentBatchIndex < totalBatches && !shouldCancel {
+            // Check for pause at start of each batch iteration
+            while shouldPause && !shouldCancel {
+                print("⏸️ Processing paused (batch \(currentBatchIndex + 1)/\(totalBatches)) - waiting for resume...")
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            }
+            
+            // Check if we resumed or if we should cancel
+            if shouldCancel {
                 print("🛑 Processing cancelled")
                 processingState = .cancelled
                 return
             }
             
-            // Check for pause
-            while shouldPause && !shouldCancel {
-                print("⏸️ Processing paused")
-                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            if !shouldPause {
+                print("▶️ Processing resumed for batch \(currentBatchIndex + 1)/\(totalBatches)")
             }
             
-            let startIndex = batchIndex * batchSize
+            let startIndex = currentBatchIndex * batchSize
             let endIndex = min(startIndex + batchSize, totalFiles)
             let batch = Array(allFiles[startIndex..<endIndex])
             
-            print("📂 Processing batch \(batchIndex + 1)/\(totalBatches): \(batch.count) files")
+            if currentFileIndexInBatch > 0 {
+                print("📂 Resuming batch \(currentBatchIndex + 1)/\(totalBatches): \(batch.count) files (starting from file \(currentFileIndexInBatch + 1))")
+            } else {
+                print("📂 Processing batch \(currentBatchIndex + 1)/\(totalBatches): \(batch.count) files")
+            }
             
             // Update progress
             await updateBatchProgress(
                 totalFiles: totalFiles,
                 completedFiles: startIndex,
-                currentBatch: batchIndex + 1,
+                currentBatch: currentBatchIndex + 1,
                 totalBatches: totalBatches,
                 currentBatchProgress: 0,
                 successfulFiles: results.filter(\.isSuccess).count,
@@ -662,15 +754,35 @@ class EnhancedFilePickerService: ObservableObject {
                 )
             )
             
+            // UPDATE UI BATCH STATE
+            await MainActor.run {
+                self.currentBatch = currentBatchIndex + 1
+                print("🎯 UI BATCH UPDATED: \(currentBatchIndex + 1)/\(totalBatches)")
+            }
+            
             // Process the batch
-            await processSingleBatch(batch, batchIndex: batchIndex + 1, totalBatches: totalBatches)
+            await processSingleBatch(batch, batchIndex: currentBatchIndex + 1, totalBatches: totalBatches)
+            
+            // CHECK IF BATCH WAS PAUSED DURING PROCESSING
+            if shouldPause {
+                print("🎯 BATCH PROCESSING PAUSED: currentBatchIndex remains \(currentBatchIndex) (will resume from here)")
+                return  // Exit function, batch index stays the same for resume
+            }
+            
+            // Only advance batch index if batch completed successfully
+            currentBatchIndex += 1
+            currentFileIndexInBatch = 0  // RESET file index for new batch
+            print("🎯 BATCH COMPLETED: Advanced to batch \(currentBatchIndex)/\(totalBatches)")
             
             // 5-second pause between batches (except for the last batch)
-            if batchIndex < totalBatches - 1 && !shouldCancel && !shouldPause {
+            if currentBatchIndex < totalBatches && !shouldCancel && !shouldPause {
                 print("⏳ 5-second pause before next batch...")
                 for second in 1...5 {
                     // Check for cancellation or pause during the wait
-                    if shouldCancel || shouldPause { break }
+                    if shouldCancel || shouldPause { 
+                        print("🎯 Inter-batch pause interrupted by user action")
+                        break 
+                    }
                     
                     try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
                     print("⏳ \(6 - second) seconds remaining...")
@@ -683,6 +795,13 @@ class EnhancedFilePickerService: ObservableObject {
             processingState = .completed
             canPause = false
             canResume = false
+            
+            // COMPLETE DEDICATED UI STATE
+            await MainActor.run {
+                self.isProcessingFiles = false
+                self.currentProgressPercentage = 100.0
+                print("🎯 UI PROCESSING COMPLETED!")
+            }
             
             // Clean up folder access if we were in direct folder access mode
             if processingMode == .directFolderAccess {
@@ -701,16 +820,24 @@ class EnhancedFilePickerService: ObservableObject {
         let batchStartTime = Date()
         print("🔄 Processing batch \(batchIndex) with \(batchFiles.count) files")
         
-        // Process each file in the batch
-        for (index, url) in batchFiles.enumerated() {
+        // START FROM WHERE WE LEFT OFF (if resuming)
+        let startIndex = currentFileIndexInBatch
+        print("🎯 RESUME: Starting from file \(startIndex + 1)/\(batchFiles.count) in batch \(batchIndex)")
+        
+        // Process each file in the batch, starting from where we left off
+        for index in startIndex..<batchFiles.count {
+            let url = batchFiles[index]
+            
             // Check for cancellation or pause
             if shouldCancel { 
                 print("🛑 Processing cancelled during batch \(batchIndex)")
                 break 
             }
             if shouldPause { 
-                print("⏸️ Processing paused during batch \(batchIndex)")
-                return 
+                print("⏸️ Processing paused during batch \(batchIndex) at file \(index + 1)/\(batchFiles.count)")
+                print("🎯 BATCH PAUSED: Saving position \(index) for resume")
+                currentFileIndexInBatch = index  // SAVE CURRENT POSITION
+                return  // EXIT WITHOUT MARKING BATCH AS COMPLETE
             }
             
             // Update batch progress
@@ -724,9 +851,12 @@ class EnhancedFilePickerService: ObservableObject {
             try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
         }
         
-        // Mark batch as complete
-        await updateCurrentBatchProgress(1.0, currentFileName: nil)
-        print("✅ Completed batch \(batchIndex) in \(String(format: "%.1f", Date().timeIntervalSince(batchStartTime)))s")
+        // ONLY mark batch as complete if we processed ALL files without pause
+        if !shouldPause {
+            await updateCurrentBatchProgress(1.0, currentFileName: nil)
+            print("✅ Completed batch \(batchIndex) in \(String(format: "%.1f", Date().timeIntervalSince(batchStartTime)))s")
+            currentFileIndexInBatch = 0  // RESET for next batch
+        }
     }
     
     private func calculateEstimatedTimeRemaining(completedFiles: Int, totalFiles: Int) -> TimeInterval? {
@@ -746,6 +876,7 @@ class EnhancedFilePickerService: ObservableObject {
     // MARK: - Batch Processing Logic
     
     private func processBatches() async {
+        print("🎯 DEBUG: processBatches() called - this might be the wrong method!")
         while currentBatchIndex * batchSize < allFiles.count && !shouldCancel {
             // Check for pause
             if shouldPause {
@@ -776,6 +907,17 @@ class EnhancedFilePickerService: ObservableObject {
         
         // Processing completed
         if !shouldCancel {
+            // Ensure minimum processing time for UI visibility
+            let processingTime = Date().timeIntervalSince(processingStartTime ?? Date())
+            let minimumDisplayTime: TimeInterval = 2.0 // 2 seconds minimum
+            
+            if processingTime < minimumDisplayTime {
+                let remainingTime = minimumDisplayTime - processingTime
+                print("🎯 DEBUG: Extending processing display time by \(remainingTime) seconds for UI visibility")
+                try? await Task.sleep(nanoseconds: UInt64(remainingTime * 1_000_000_000))
+            }
+            
+            print("🎯 DEBUG: Setting processing state to .completed")
             processingState = .completed
             canPause = false
             canResume = false
@@ -988,6 +1130,14 @@ class EnhancedFilePickerService: ObservableObject {
             estimatedTimeRemaining: calculateEstimatedTimeRemaining(),
             currentFileName: currentFileName
         )
+        
+        // UPDATE DEDICATED UI STATE
+        await MainActor.run {
+            if let fileName = currentFileName {
+                self.currentFileName = fileName
+                print("🎯 UI FILE NAME UPDATED: \(fileName)")
+            }
+        }
     }
     
     private func addResult(_ result: FileProcessingResult) async {
@@ -1009,6 +1159,12 @@ class EnhancedFilePickerService: ObservableObject {
                 estimatedTimeRemaining: self.calculateEstimatedTimeRemaining(),
                 currentFileName: nil  // Clear filename when file is completed
             )
+            
+            // UPDATE DEDICATED UI STATE
+            self.currentFileCount = completedFiles
+            self.currentProgressPercentage = (Double(completedFiles) / Double(self.totalFileCount)) * 100.0
+            
+            print("🎯 UI PROGRESS UPDATED: \(completedFiles)/\(self.totalFileCount) (\(Int(self.currentProgressPercentage))%)")
         }
     }
     
@@ -1022,18 +1178,30 @@ class EnhancedFilePickerService: ObservableObject {
     }
     
     private func resetProcessing() async {
+        print("🎯 DEBUG: resetProcessing() called")
         currentBatchIndex = 0
+        currentFileIndexInBatch = 0  // RESET file position
         shouldPause = false
         shouldCancel = false
         processingStartTime = nil
         avgProcessingTimePerFile = 0
         
         await MainActor.run {
+            print("🎯 DEBUG: Setting state to idle in resetProcessing")
             self.results = []
             self.currentError = nil
             self.processingState = .idle
             self.canPause = false
             self.canResume = false
+            
+            // RESET DEDICATED UI STATE FOR PROGRESS
+            self.isProcessingFiles = false
+            self.currentProgressPercentage = 0.0
+            self.currentFileCount = 0
+            self.totalFileCount = 0
+            self.currentFileName = ""
+            self.currentBatch = 0
+            self.totalBatches = 0
         }
     }
     
@@ -1467,6 +1635,16 @@ class SettingsViewModel: ObservableObject {
     // File picker service
     @Published var filePickerService: EnhancedFilePickerService
     
+    // DIRECT UI STATE MIRRORS FOR SWIFTUI REACTIVITY
+    @Published var isProcessingFiles = false
+    @Published var processingProgress: Double = 0.0
+    @Published var processingFileName = ""
+    @Published var processingBatch = ""
+    @Published var processingFileCount = ""
+    
+    // Combine subscribers
+    private var cancellables = Set<AnyCancellable>()
+    
     var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
@@ -1502,12 +1680,82 @@ class SettingsViewModel: ObservableObject {
         // Initialize services with default configuration
         // The service will be reconfigured dynamically based on file count
         self.filePickerService = EnhancedFilePickerService()
+        
+        // SETUP REACTIVE MONITORING FOR UI STATE
+        setupProgressMonitoring()
+    }
+    
+    private func setupProgressMonitoring() {
+        // Monitor isProcessingFiles changes
+        filePickerService.$isProcessingFiles
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isProcessing in
+                print("🎯 REACTIVE SYNC: isProcessingFiles = \(isProcessing)")
+                self?.isProcessingFiles = isProcessing
+            }
+            .store(in: &cancellables)
+        
+        // Monitor processing state changes for pause/resume handling
+        filePickerService.$processingState
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                print("🎯 REACTIVE SYNC: processingState = \(state)")
+                // Keep isProcessingFiles true for paused state so UI stays visible
+                if state == .paused {
+                    self?.isProcessingFiles = true
+                } else if state == .cancelled || state == .completed {
+                    // For cancelled/completed, rely on the service's isProcessingFiles flag
+                    // which should be set to false by the service
+                }
+            }
+            .store(in: &cancellables)
+        
+        // Monitor currentProgressPercentage changes
+        filePickerService.$currentProgressPercentage
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] percentage in
+                self?.processingProgress = percentage
+            }
+            .store(in: &cancellables)
+        
+        // Monitor currentFileName changes
+        filePickerService.$currentFileName
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] fileName in
+                self?.processingFileName = fileName
+            }
+            .store(in: &cancellables)
+        
+        // Monitor file count changes
+        filePickerService.$currentFileCount
+            .combineLatest(filePickerService.$totalFileCount)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] current, total in
+                self?.processingFileCount = "\(current)/\(total)"
+            }
+            .store(in: &cancellables)
+        
+        // Monitor batch changes
+        filePickerService.$currentBatch
+            .combineLatest(filePickerService.$totalBatches)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] current, total in
+                self?.processingBatch = "Batch \(current) of \(total)"
+            }
+            .store(in: &cancellables)
+        
+        print("🎯 REACTIVE MONITORING SETUP COMPLETE")
     }
     
     // Reinitialize file picker service with optimal settings for large batches
     private func optimizeForFileCount(_ fileCount: Int) {
         print("🔧 Optimizing file picker service for \(fileCount) files")
+        // Clear existing subscribers
+        cancellables.removeAll()
+        // Create new optimized service
         self.filePickerService = EnhancedFilePickerService(optimizedFor: fileCount)
+        // Re-setup reactive monitoring for the new service
+        setupProgressMonitoring()
     }
     
     // MARK: - Actions
@@ -1758,12 +2006,8 @@ class SettingsViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
             }
             
-            // Show results when processing is complete
-            if filePickerService.processingState == .completed && !filePickerService.results.isEmpty {
-                await MainActor.run {
-                    isShowingResults = true
-                }
-            }
+            // NOTE: No longer automatically showing results sheet
+            // User must manually request results via "Show Report" button
             
             // Show error if there was one
             if let error = filePickerService.currentError {
@@ -1782,6 +2026,10 @@ class SettingsViewModel: ObservableObject {
 struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
     @StateObject private var viewModel = SettingsViewModel()
+    @State private var showingClearSongsAlert = false
+    @State private var showingCompletionOverlay = false
+    @State private var hasCompletionResults = false  // Track when results are ready to show
+    @State private var wasProcessingCancelled = false  // Track if processing was cancelled
 
     var body: some View {
         ZStack {
@@ -1798,6 +2046,281 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 32)
+            }
+            
+            // TOP-LEVEL REACTIVE PROGRESS OVERLAY
+            // Show during processing OR when completion results are available
+            if viewModel.isProcessingFiles || (hasCompletionResults && !viewModel.filePickerService.results.isEmpty) {
+                
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 16) {
+                            // Show different content based on processing state  
+                            if hasCompletionResults && !viewModel.isProcessingFiles {
+                                // Completion/Cancellation Status
+                                VStack(spacing: 16) {
+                                    if !wasProcessingCancelled {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.system(size: 60))
+                                            .foregroundColor(.green)
+                                        
+                                        VStack(spacing: 8) {
+                                            Text("Processing Complete!")
+                                                .font(.title2)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.white)
+                                            
+                                            let stats = viewModel.filePickerService.processingStats
+                                            Text("\(stats.successful) successful, \(stats.failed) failed")
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.8))
+                                        }
+                                    } else {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 60))
+                                            .foregroundColor(.orange)
+                                        
+                                        VStack(spacing: 8) {
+                                            Text("Processing Cancelled")
+                                                .font(.title2)
+                                                .fontWeight(.bold)
+                                                .foregroundColor(.white)
+                                            
+                                            let stats = viewModel.filePickerService.processingStats
+                                            Text("\(stats.successful) processed before cancellation")
+                                                .font(.subheadline)
+                                                .foregroundColor(.white.opacity(0.8))
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Active Processing - Circular progress with percentage
+                                ZStack {
+                                    Circle()
+                                        .stroke(Color.white.opacity(0.3), lineWidth: 8)
+                                        .frame(width: 120, height: 120)
+                                    
+                                    Circle()
+                                        .trim(from: 0, to: max(0, min(1, viewModel.processingProgress / 100.0)))
+                                        .stroke(AppTheme.settingsResetIconBlue, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                                        .frame(width: 120, height: 120)
+                                        .rotationEffect(.degrees(-90))
+                                        .animation(.easeInOut(duration: 0.5), value: viewModel.processingProgress)
+                                    
+                                    VStack(spacing: 4) {
+                                        Text("\(Int(viewModel.processingProgress))%")
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.white)
+                                        
+                                        Text(viewModel.processingFileCount)
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.8))
+                                    }
+                                }
+                            }
+                            
+                            VStack(spacing: 8) {
+                                if viewModel.filePickerService.processingState == .completed || viewModel.filePickerService.processingState == .cancelled {
+                                    // Completion/Cancellation State
+                                    VStack(spacing: 12) {
+                                        Text(!wasProcessingCancelled ? 
+                                             "All files processed successfully!" : 
+                                             "Processing was cancelled")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                            .multilineTextAlignment(.center)
+                                        
+                                        // Completion Action Buttons
+                                        HStack(spacing: 16) {
+                                            Button(action: {
+                                                // Show detailed completion results overlay
+                                                showingCompletionOverlay = true
+                                                print("📊 Showing detailed completion results overlay")
+                                            }) {
+                                                HStack(spacing: 8) {
+                                                    Image(systemName: "doc.text.magnifyingglass")
+                                                    Text("Show Report")
+                                                }
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 20)
+                                                .padding(.vertical, 12)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 8)
+                                                        .fill(AppTheme.settingsResetIconBlue)
+                                                )
+                                            }
+                                            
+                                            Button(action: {
+                                                // GENTLE DISMISS: Hide overlay but preserve results for "Show Report"
+                                                hasCompletionResults = false
+                                                wasProcessingCancelled = false
+                                                print("✅ Dismissed completion overlay, results preserved for Show Report")
+                                            }) {
+                                                HStack(spacing: 8) {
+                                                    Image(systemName: "xmark")
+                                                    Text("Dismiss")
+                                                }
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 20)
+                                                .padding(.vertical, 12)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 8)
+                                                        .fill(Color.gray.opacity(0.6))
+                                                )
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    // Active Processing State
+                                    Text("Processing MP4 Files")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    
+                                    if !viewModel.processingFileName.isEmpty {
+                                        Text(viewModel.processingFileName)
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.9))
+                                            .lineLimit(1)
+                                            .frame(maxWidth: 250)
+                                    }
+                                    
+                                    if !viewModel.processingBatch.isEmpty && viewModel.processingBatch != "Batch 0 of 0" {
+                                        Text(viewModel.processingBatch)
+                                            .font(.caption)
+                                            .foregroundColor(.white.opacity(0.7))
+                                    }
+                                    
+                                    // Processing Control Buttons
+                                    HStack(spacing: 16) {
+                                        if viewModel.filePickerService.processingState == .processing {
+                                            Button(action: {
+                                                viewModel.pauseFileProcessing()
+                                            }) {
+                                                HStack(spacing: 8) {
+                                                    Image(systemName: "pause.fill")
+                                                    Text("Pause")
+                                                }
+                                                .font(.caption)
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 8)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 8)
+                                                        .fill(Color.orange.opacity(0.8))
+                                                )
+                                            }
+                                        } else if viewModel.filePickerService.processingState == .paused {
+                                            Button(action: {
+                                                Task {
+                                                    await viewModel.resumeFileProcessing()
+                                                }
+                                            }) {
+                                                HStack(spacing: 8) {
+                                                    Image(systemName: "play.fill")
+                                                    Text("Continue")
+                                                }
+                                                .font(.caption)
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 16)
+                                                .padding(.vertical, 8)
+                                                .background(
+                                                    RoundedRectangle(cornerRadius: 8)
+                                                        .fill(Color.green.opacity(0.8))
+                                                )
+                                            }
+                                        }
+                                        
+                                        // Cancel Button
+                                        Button(action: {
+                                            viewModel.cancelFileProcessing()
+                                        }) {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "xmark.circle.fill")
+                                                Text("Cancel")
+                                            }
+                                            .font(.caption)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 8)
+                                                    .fill(Color.red.opacity(0.8))
+                                            )
+                                        }
+                                    }
+                                    .padding(.top, 8)
+                                }
+                            }
+                        }
+                        .padding(32)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(Color.black.opacity(0.8))
+                                .shadow(radius: 20)
+                        )
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .background(Color.black.opacity(0.4))
+                .ignoresSafeArea()
+                .transition(.opacity.combined(with: .scale).animation(.easeInOut(duration: 0.3)))
+                .onAppear {
+                    print("🎯 TOP-LEVEL PROGRESS OVERLAY APPEARED!")
+                }
+                .onDisappear {
+                    print("🎯 TOP-LEVEL PROGRESS OVERLAY DISAPPEARED!")
+                }
+            }
+            
+            // SECONDARY DEBUG OVERLAY - Always shows when processing
+            if viewModel.isProcessingFiles {
+                VStack {
+                    HStack {
+                        Spacer()
+                        VStack {
+                            Text("🔄 PROCESSING \(viewModel.processingFileCount)")
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Color.green.opacity(0.8))
+                                .cornerRadius(8)
+                        }
+                        .padding()
+                    }
+                    Spacer()
+                }
+                .onAppear {
+                    print("🔴 SECONDARY DEBUG OVERLAY APPEARED!")
+                }
+            }
+            
+
+            
+            // Completion Results Overlay - persistent until dismissed
+            if showingCompletionOverlay && !viewModel.filePickerService.results.isEmpty {
+                Color.black.opacity(0.6)
+                    .ignoresSafeArea()
+                    .transition(.opacity.animation(.easeInOut(duration: 0.3)))
+                
+                CompletionResultsOverlay(
+                    results: viewModel.filePickerService.results,
+                    filePickerService: viewModel.filePickerService,
+                    onDismiss: {
+                        showingCompletionOverlay = false
+                    },
+                    onShowDetails: {
+                        showingCompletionOverlay = false
+                        viewModel.isShowingResults = true
+                    }
+                )
+                .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.6, dampingFraction: 0.8, blendDuration: 0)))
             }
         }
         .sheet(isPresented: $viewModel.isShowingFilePicker) {
@@ -1821,15 +2344,28 @@ struct SettingsView: View {
                 onDismiss: {
                     viewModel.isShowingResults = false
                     viewModel.filePickerService.clearResults()
+                    // Clear completion results flag when results are fully cleared
+                    hasCompletionResults = false
+                    wasProcessingCancelled = false
                 }
             )
         }
         .alert(
             "Error",
-            isPresented: $viewModel.isShowingErrorAlert
+            isPresented: Binding(
+                get: { 
+                    viewModel.isShowingErrorAlert && 
+                    viewModel.filePickerService.processingState != .processing && 
+                    viewModel.filePickerService.processingState != .completed 
+                },
+                set: { viewModel.isShowingErrorAlert = $0 }
+            )
         ) {
             Button("OK") {
                 viewModel.isShowingErrorAlert = false
+                viewModel.errorAlert = nil
+                // Clear the service error as well
+                viewModel.filePickerService.currentError = nil
             }
 
         } message: {
@@ -1846,8 +2382,32 @@ struct SettingsView: View {
                 Text(errorAlert.message)
             }
         }
-
-
+        .alert(
+            "Warning!",
+            isPresented: $showingClearSongsAlert
+        ) {
+            Button("Cancel", role: .cancel) {
+                showingClearSongsAlert = false
+            }
+            Button("Continue", role: .destructive) {
+                Task {
+                    await clearAllCoreDataSongs()
+                }
+                showingClearSongsAlert = false
+            }
+        } message: {
+            Text("This will delete all the songs in the SONG LIST")
+        }
+        .onChange(of: viewModel.filePickerService.processingState) { oldState, newState in
+            print("🎯 Processing state: \(oldState) → \(newState)")
+            
+            // Set completion results flag when processing finishes
+            if (oldState == .processing || oldState == .paused) && (newState == .completed || newState == .cancelled) {
+                hasCompletionResults = true
+                wasProcessingCancelled = (newState == .cancelled)
+                print("✅ Completion results now available for display (cancelled: \(wasProcessingCancelled))")
+            }
+        }
 
     }
     
@@ -1892,6 +2452,9 @@ struct SettingsView: View {
             // Download MP4 files section
             downloadSection
             
+            // Song List Management section
+            songListManagementSection
+            
             // App Settings section
             appSettingsSection
             
@@ -1903,23 +2466,6 @@ struct SettingsView: View {
             
             // App Info section
             appInfoSection
-            
-            // Debug Section (temporary for troubleshooting)
-            Section("Debug") {
-                Button("Show All Core Data Songs") {
-                    Task {
-                        await printAllCoreDataSongs()
-                    }
-                }
-                .foregroundColor(.blue)
-                
-                Button("Clear All Core Data Songs") {
-                    Task {
-                        await clearAllCoreDataSongs()
-                    }
-                }
-                .foregroundColor(.red)
-            }
             
             // Storage Management
             Section("Storage") {
@@ -1968,23 +2514,35 @@ struct SettingsView: View {
     // MARK: - Debug Methods (temporary for troubleshooting)
     
     private func printAllCoreDataSongs() async {
+        print("🚀 DEBUG: printAllCoreDataSongs() function called!")
+        
         let context = PersistenceController.shared.container.viewContext
         let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(key: "dateAdded", ascending: false)]
         
+        print("📋 DEBUG: About to fetch songs from Core Data...")
+        
         do {
             let songs = try context.fetch(request)
             print("🔍 DEBUG: Found \(songs.count) songs in Core Data:")
-            for (index, song) in songs.enumerated() {
-                print("  \(index + 1). '\(song.title ?? "Unknown")' by '\(song.artist ?? "Unknown")'")
-                print("     - Added: \(song.dateAdded ?? Date())")
-                print("     - Duration: \(song.duration)s")
-                print("     - File: \(song.filePath ?? "Unknown")")
-                print("     - ID: \(song.id?.uuidString ?? "Unknown")")
+            
+            if songs.isEmpty {
+                print("⚠️ DEBUG: No songs found in Core Data - the song list might be empty or stored differently")
+            } else {
+                for (index, song) in songs.enumerated() {
+                    print("  \(index + 1). '\(song.title ?? "Unknown")' by '\(song.artist ?? "Unknown")'")
+                    print("     - Added: \(song.dateAdded ?? Date())")
+                    print("     - Duration: \(song.duration)s")
+                    print("     - File: \(song.filePath ?? "Unknown")")
+                    print("     - ID: \(song.id?.uuidString ?? "Unknown")")
+                }
             }
         } catch {
             print("❌ DEBUG: Error fetching Core Data songs: \(error)")
+            print("❌ DEBUG: Error details: \(error.localizedDescription)")
         }
+        
+        print("✅ DEBUG: printAllCoreDataSongs() function completed!")
     }
     
     private func clearAllCoreDataSongs() async {
@@ -2085,13 +2643,23 @@ struct SettingsView: View {
                         }
                     }
                 } else {
-                    FilePickerRow(
-                        title: "Processing Files...",
-                        subtitle: viewModel.statusMessage,
-                        isEnabled: false,
-                        isLoading: true,
-                        action: {}
-                    )
+                    VStack(spacing: 12) {
+                        FilePickerRow(
+                            title: "Processing Files...",
+                            subtitle: viewModel.statusMessage,
+                            isEnabled: false,
+                            isLoading: true,
+                            action: {}
+                        )
+                        
+                        // Compact Progress Summary - show during processing
+                        if viewModel.filePickerService.processingState == .processing || viewModel.filePickerService.processingState == .paused {
+                            CompactProgressView(
+                                progress: viewModel.filePickerService.batchProgress,
+                                filePickerService: viewModel.filePickerService
+                            )
+                        }
+                    }
                 }
                 
                 // Control buttons based on processing state
@@ -2118,6 +2686,9 @@ struct SettingsView: View {
                         Button("Clear All") {
                             Task {
                                 await viewModel.clearAllFiles()
+                                // Clear completion results flag when results are cleared
+                                hasCompletionResults = false
+                                wasProcessingCancelled = false
                             }
                         }
                         .font(.subheadline)
@@ -2133,6 +2704,71 @@ struct SettingsView: View {
                         progress: viewModel.filePickerService.batchProgress,
                         filePickerService: viewModel.filePickerService
                     )
+                } else if viewModel.filePickerService.processingState == .completed && !viewModel.filePickerService.results.isEmpty {
+                    // Show completion summary in download section too
+                    VStack(spacing: 8) {
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                                .font(.system(size: 16))
+                            
+                            Text("Processing Complete!")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(AppTheme.settingsText)
+                            
+                            Spacer()
+                        }
+                        
+                        HStack {
+                            Text("Tap above for detailed results")
+                                .font(.caption)
+                                .foregroundColor(AppTheme.settingsText.opacity(0.7))
+                            
+                            Spacer()
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
+                            .fill(.green.opacity(0.1))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
+                                    .stroke(.green.opacity(0.3), lineWidth: 1)
+                            )
+                    )
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+    }
+    
+    // MARK: - Song List Management Section
+    
+    private var songListManagementSection: some View {
+        SettingsSection(title: "SONG LIST Management", icon: "music.note.list") {
+            VStack(spacing: 8) {
+                SettingRow(
+                    title: "Show All Core Data Songs",
+                    subtitle: "Display all songs in the console for debugging",
+                    icon: "list.bullet",
+                    iconColor: .blue,
+                    accessoryType: .disclosure
+                ) {
+                    Task {
+                        await printAllCoreDataSongs()
+                    }
+                }
+                
+                SettingRow(
+                    title: "Clear All Core Data Songs",
+                    subtitle: "Remove all songs and associated files permanently",
+                    icon: "trash.fill",
+                    iconColor: .red,
+                    accessoryType: .disclosure
+                ) {
+                    showingClearSongsAlert = true
                 }
             }
             .padding(.horizontal, 16)
@@ -2270,7 +2906,7 @@ struct ProcessingProgressView: View {
                 }
                 
                 // Overall progress bar
-                ProgressView(value: progress.overallProgress)
+                ProgressView(value: max(0, min(1, progress.overallProgress)))
                     .progressViewStyle(LinearProgressViewStyle(tint: AppTheme.settingsResetIconBlue))
                     .scaleEffect(y: 1.5)
                 
@@ -2304,7 +2940,7 @@ struct ProcessingProgressView: View {
                             .foregroundColor(AppTheme.settingsText.opacity(0.6))
                     }
                     
-                    ProgressView(value: progress.currentBatchProgress)
+                    ProgressView(value: max(0, min(1, progress.currentBatchProgress)))
                         .progressViewStyle(LinearProgressViewStyle(tint: .green))
                         .scaleEffect(y: 1.0)
                 }
@@ -2702,6 +3338,432 @@ struct FilePickerRow: View {
         }
         .buttonStyle(PlainButtonStyle())
         .disabled(!isEnabled)
+    }
+}
+
+// MARK: - Compact Progress View
+
+struct CompactProgressView: View {
+    let progress: BatchProgress
+    @ObservedObject var filePickerService: EnhancedFilePickerService
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            // Progress bar with percentage
+            HStack {
+                ProgressView(value: max(0, min(1, progress.overallProgress)))
+                    .progressViewStyle(LinearProgressViewStyle(tint: AppTheme.settingsResetIconBlue))
+                    .scaleEffect(y: 1.5)
+                
+                Text("\(Int(progress.overallProgress * 100))%")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(AppTheme.settingsText)
+                    .frame(minWidth: 40)
+            }
+            
+            // Current file and stats
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    if let currentFileName = progress.currentFileName {
+                        Text("Processing: \(currentFileName)")
+                            .font(.caption)
+                            .foregroundColor(AppTheme.settingsText.opacity(0.8))
+                            .lineLimit(1)
+                    }
+                    
+                    HStack(spacing: 12) {
+                        Text("\(progress.completedFiles)/\(progress.totalFiles) files")
+                            .font(.caption2)
+                            .foregroundColor(AppTheme.settingsText.opacity(0.7))
+                        
+                        if let timeRemaining = progress.estimatedTimeRemaining {
+                            Text("~\(formatCompactTime(timeRemaining)) left")
+                                .font(.caption2)
+                                .foregroundColor(AppTheme.settingsResetIconBlue)
+                        }
+                    }
+                }
+                
+                Spacer()
+                
+                // Mini stats
+                HStack(spacing: 8) {
+                    CompactStatBadge(
+                        value: progress.successfulFiles,
+                        color: .green,
+                        icon: "checkmark"
+                    )
+                    
+                    if progress.failedFiles > 0 {
+                        CompactStatBadge(
+                            value: progress.failedFiles,
+                            color: .red,
+                            icon: "xmark"
+                        )
+                    }
+                    
+                    if progress.duplicateFiles > 0 {
+                        CompactStatBadge(
+                            value: progress.duplicateFiles,
+                            color: .orange,
+                            icon: "repeat"
+                        )
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
+                .fill(AppTheme.settingsResetIconBlue.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
+                        .stroke(AppTheme.settingsResetIconBlue.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+    
+    private func formatCompactTime(_ time: TimeInterval) -> String {
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        
+        if minutes > 0 {
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+}
+
+struct CompactStatBadge: View {
+    let value: Int
+    let color: Color
+    let icon: String
+    
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+                .foregroundColor(color)
+            
+            Text("\(value)")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(AppTheme.settingsText)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(
+            RoundedRectangle(cornerRadius: 4)
+                .fill(color.opacity(0.2))
+        )
+    }
+}
+
+// MARK: - Enhanced Progress Overlay
+
+struct EnhancedProgressOverlay: View {
+    let progress: BatchProgress
+    @ObservedObject var filePickerService: EnhancedFilePickerService
+    
+    var body: some View {
+        VStack(spacing: 32) {
+            // Title
+            VStack(spacing: 8) {
+                Image(systemName: "arrow.down.circle.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(AppTheme.settingsResetIconBlue)
+                
+                Text("Processing MP4 Files")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(AppTheme.settingsText)
+            }
+            
+            // Main Progress Circle
+            ZStack {
+                Circle()
+                    .stroke(AppTheme.settingsText.opacity(0.2), lineWidth: 8)
+                    .frame(width: 200, height: 200)
+                
+                Circle()
+                    .trim(from: 0, to: max(0, min(1, progress.overallProgress)))
+                    .stroke(
+                        AppTheme.settingsResetIconBlue,
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                    )
+                    .frame(width: 200, height: 200)
+                    .rotationEffect(.degrees(-90))
+                    .animation(.easeInOut(duration: 0.5), value: progress.overallProgress)
+                
+                VStack(spacing: 4) {
+                    Text("\(Int(progress.overallProgress * 100))%")
+                        .font(.system(size: 36, weight: .bold, design: .rounded))
+                        .foregroundColor(AppTheme.settingsText)
+                    
+                    Text("\(progress.completedFiles) of \(progress.totalFiles)")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(AppTheme.settingsText.opacity(0.8))
+                    
+                    if let timeRemaining = progress.estimatedTimeRemaining {
+                        Text("~\(formatTime(timeRemaining)) left")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppTheme.settingsResetIconBlue)
+                    }
+                }
+            }
+            
+            // Current File Info
+            VStack(spacing: 8) {
+                if let currentFileName = progress.currentFileName {
+                    VStack(spacing: 4) {
+                        Text("Currently Processing:")
+                            .font(.caption)
+                            .foregroundColor(AppTheme.settingsText.opacity(0.7))
+                        
+                        Text(currentFileName)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(AppTheme.settingsText)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 16)
+                    }
+                }
+                
+                // Batch info if multiple batches
+                if progress.totalBatches > 1 {
+                    HStack(spacing: 12) {
+                        Text("Batch \(progress.currentBatch)/\(progress.totalBatches)")
+                            .font(.caption)
+                            .foregroundColor(AppTheme.settingsText.opacity(0.8))
+                        
+                        ProgressView(value: max(0, min(1, progress.currentBatchProgress)))
+                            .progressViewStyle(LinearProgressViewStyle(tint: AppTheme.settingsResetIconBlue))
+                            .frame(width: 100)
+                    }
+                }
+            }
+            
+            // Statistics Row
+            HStack(spacing: 24) {
+                OverlayStatView(
+                    icon: "checkmark.circle.fill",
+                    color: .green,
+                    value: progress.successfulFiles,
+                    label: "Success"
+                )
+                
+                OverlayStatView(
+                    icon: "xmark.circle.fill",
+                    color: .red,
+                    value: progress.failedFiles,
+                    label: "Failed"
+                )
+                
+                OverlayStatView(
+                    icon: "repeat.circle.fill",
+                    color: .orange,
+                    value: progress.duplicateFiles,
+                    label: "Duplicates"
+                )
+            }
+            
+            // Control Buttons
+            HStack(spacing: 16) {
+                if filePickerService.canPause {
+                    Button("⏸ Pause") {
+                        filePickerService.pauseProcessing()
+                    }
+                    .buttonStyle(OverlayButtonStyle(color: .orange))
+                }
+                
+                Button("✕ Cancel") {
+                    filePickerService.cancelProcessing()
+                }
+                .buttonStyle(OverlayButtonStyle(color: .red))
+            }
+        }
+        .padding(40)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(AppTheme.settingsBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(AppTheme.settingsResetIconBlue.opacity(0.3), lineWidth: 2)
+                )
+                .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+        )
+        .frame(maxWidth: 500)
+    }
+    
+    private func formatTime(_ time: TimeInterval) -> String {
+        let hours = Int(time) / 3600
+        let minutes = Int(time) % 3600 / 60
+        let seconds = Int(time) % 60
+        
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        } else if minutes > 0 {
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+}
+
+struct OverlayStatView: View {
+    let icon: String
+    let color: Color
+    let value: Int
+    let label: String
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .foregroundColor(color)
+                .font(.system(size: 20))
+            
+            Text("\(value)")
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(AppTheme.settingsText)
+            
+            Text(label)
+                .font(.caption)
+                .foregroundColor(AppTheme.settingsText.opacity(0.7))
+        }
+        .frame(minWidth: 60)
+    }
+}
+
+struct OverlayButtonStyle: ButtonStyle {
+    let color: Color
+    
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(.white)
+            .padding(.horizontal, 24)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(color)
+                    .opacity(configuration.isPressed ? 0.8 : 1.0)
+            )
+            .scaleEffect(configuration.isPressed ? 0.95 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+// MARK: - Completion Results Overlay
+
+struct CompletionResultsOverlay: View {
+    let results: [FileProcessingResult]
+    @ObservedObject var filePickerService: EnhancedFilePickerService
+    let onDismiss: () -> Void
+    let onShowDetails: () -> Void
+    
+    private var stats: (successful: Int, failed: Int, duplicates: Int) {
+        let successful = results.filter { $0.status == .success }.count
+        let failed = results.filter { $0.status == .failed }.count
+        let duplicates = results.filter { $0.status == .duplicate }.count
+        return (successful, failed, duplicates)
+    }
+    
+    var body: some View {
+        VStack(spacing: 32) {
+            // Header
+            VStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 48))
+                    .foregroundColor(.green)
+                
+                Text("Download Complete!")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(AppTheme.settingsText)
+            }
+            
+            // Summary Stats
+            HStack(spacing: 32) {
+                CompletionStatView(
+                    icon: "checkmark.circle.fill",
+                    color: .green,
+                    value: stats.successful,
+                    label: "Successful"
+                )
+                
+                if stats.failed > 0 {
+                    CompletionStatView(
+                        icon: "xmark.circle.fill",
+                        color: .red,
+                        value: stats.failed,
+                        label: "Failed"
+                    )
+                }
+                
+                if stats.duplicates > 0 {
+                    CompletionStatView(
+                        icon: "repeat.circle.fill",
+                        color: .orange,
+                        value: stats.duplicates,
+                        label: "Duplicates"
+                    )
+                }
+            }
+            
+            // Total processed
+            Text("Processed \(results.count) files")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundColor(AppTheme.settingsText.opacity(0.8))
+            
+            // Action Buttons
+            HStack(spacing: 16) {
+                Button("Show Details") {
+                    onShowDetails()
+                }
+                .buttonStyle(OverlayButtonStyle(color: AppTheme.settingsResetIconBlue))
+                
+                Button("Done") {
+                    onDismiss()
+                }
+                .buttonStyle(OverlayButtonStyle(color: .green))
+            }
+        }
+        .padding(40)
+        .background(
+            RoundedRectangle(cornerRadius: 20)
+                .fill(AppTheme.settingsBackground)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 20)
+                        .stroke(.green.opacity(0.3), lineWidth: 2)
+                )
+                .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+        )
+        .frame(maxWidth: 500)
+    }
+}
+
+struct CompletionStatView: View {
+    let icon: String
+    let color: Color
+    let value: Int
+    let label: String
+    
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .foregroundColor(color)
+                .font(.system(size: 24))
+            
+            Text("\(value)")
+                .font(.system(size: 28, weight: .bold))
+                .foregroundColor(AppTheme.settingsText)
+            
+            Text(label)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppTheme.settingsText.opacity(0.7))
+        }
+        .frame(minWidth: 80)
     }
 }
 

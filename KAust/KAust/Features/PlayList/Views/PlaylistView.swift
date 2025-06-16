@@ -9,6 +9,7 @@
 
 import SwiftUI
 import Combine
+import CoreData
 
 struct PlaylistView: View {
     @ObservedObject var viewModel: PlaylistViewModel
@@ -220,82 +221,48 @@ struct PlaylistView: View {
             return
         }
         
-        // First, try to verify file exists
-        let fileManager = FileManager.default
-        if !fileManager.fileExists(atPath: song.filePath) {
-            print("❌ DEBUG: MP4 file not found at: \(song.filePath)")
+        // Use advanced file resolution like VideoPlayerViewModel
+        Task {
+            let resolvedURL = await findVideoURL(for: song)
             
-            // Try to restore folder access if this looks like a folder-based file
-            if song.filePath.contains("File Provider Storage") {
-                print("🔄 DEBUG: Attempting to restore folder access for File Provider Storage file")
+            guard let url = resolvedURL else {
+                print("❌ DEBUG: Could not resolve file location for: \(song.cleanTitle)")
                 
-                // Try to restore folder access using the settings view model
-                let settingsViewModel = SettingsViewModel.shared
-                if settingsViewModel.filePickerService.restoreFolderAccess() {
-                    print("✅ DEBUG: Folder access restored, retrying file access")
-                    
-                    // Retry file access after restoring folder access
-                    if fileManager.fileExists(atPath: song.filePath) {
-                        print("✅ DEBUG: File now accessible after folder access restoration")
-                        // Try to access the file data
-                        if (try? Data(contentsOf: URL(fileURLWithPath: song.filePath), options: .alwaysMapped)) != nil {
-                            print("✅ DEBUG: File verified after folder restoration, starting playback")
-                            onSongSelected?(song)
-                            return
-                        }
-                    }
-                }
-                
-                print("❌ DEBUG: Could not restore access to file even after folder restoration")
-            }
-            
-            // Remove the song from the playlist since it can't be played
-            Task {
+                // Remove the song from the playlist since it can't be played
                 if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
                     await viewModel.removeFromPlaylist(at: IndexSet(integer: index))
                 }
-            }
-            // Show error alert
-            viewModel.showError("Cannot play '\(song.cleanTitle)' - MP4 file is missing")
-            return
-        }
-        
-        // Try to access the file data
-        if (try? Data(contentsOf: URL(fileURLWithPath: song.filePath), options: .alwaysMapped)) == nil {
-            print("❌ DEBUG: MP4 file exists but is not accessible: \(song.filePath)")
-            
-            // Try to restore folder access if this looks like a folder-based file
-            if song.filePath.contains("File Provider Storage") {
-                print("🔄 DEBUG: File not accessible, attempting to restore folder access")
                 
-                let settingsViewModel = SettingsViewModel.shared
-                if settingsViewModel.filePickerService.restoreFolderAccess() {
-                    print("✅ DEBUG: Folder access restored, retrying file access")
-                    
-                    // Retry file access after restoring folder access
-                    if (try? Data(contentsOf: URL(fileURLWithPath: song.filePath), options: .alwaysMapped)) != nil {
-                        print("✅ DEBUG: File now accessible after folder access restoration")
-                        onSongSelected?(song)
-                        return
-                    }
+                // Show error alert
+                await MainActor.run {
+                    viewModel.showError("Cannot play '\(song.cleanTitle)' - MP4 file is missing")
                 }
-                
-                print("❌ DEBUG: Could not restore access to file even after folder restoration")
+                return
             }
             
-            // Remove the song from the playlist since it can't be played
-            Task {
-                if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
-                    await viewModel.removeFromPlaylist(at: IndexSet(integer: index))
-                }
+            print("✅ DEBUG: File resolved at: \(url.path)")
+            
+            // If we found the file at a different location, update the song object for this session
+            var updatedSong = song
+            if url.path != song.filePath {
+                print("📝 DEBUG: File path changed from \(song.filePath) to \(url.path)")
+                updatedSong = Song(
+                    id: song.id,
+                    title: song.title,
+                    artist: song.artist,
+                    duration: song.duration,
+                    filePath: url.path
+                )
+                
+                // Update the database with the new path
+                await updateSongFilePath(songId: song.id, newPath: url.path)
             }
-            // Show error alert
-            viewModel.showError("Cannot play '\(song.cleanTitle)' - MP4 file is not accessible")
-            return
+            
+            await MainActor.run {
+                print("✅ DEBUG: Starting playback with resolved file")
+                onSongSelected?(updatedSong)
+            }
         }
-        
-        print("✅ DEBUG: File verified, starting playback")
-        onSongSelected?(song)
     }
     
     private func deleteSong(_ song: Song) {
@@ -303,6 +270,104 @@ struct PlaylistView: View {
             if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
                 await viewModel.removeFromPlaylist(at: IndexSet(integer: index))
             }
+        }
+    }
+    
+    // MARK: - File Resolution Methods
+    
+    private func findVideoURL(for song: Song) async -> URL? {
+        if let url = song.videoURL, FileManager.default.fileExists(atPath: url.path) {
+            print("📁 PlaylistView.find - Found video at original path: \(url.path)")
+            return url
+        } else {
+            print("⚠️ PlaylistView.find - Video not at original path. Attempting migration/search...")
+            return await attemptFileMigration(for: song)
+        }
+    }
+    
+    private func attemptFileMigration(for song: Song) async -> URL? {
+        let fileName = URL(fileURLWithPath: song.filePath).lastPathComponent
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return nil }
+        let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+        
+        // Primary search locations - check Media directory first
+        let searchDirectories = [
+            mediaDirectory, // Check our permanent storage first
+            documentsDirectory,
+            documentsDirectory.appendingPathComponent("Inbox"),
+            documentsDirectory.appendingPathComponent("tmp"),
+            FileManager.default.temporaryDirectory,
+            FileManager.default.temporaryDirectory.appendingPathComponent("com.erlingbreaden.KAust-Inbox")
+        ]
+        
+        print("🔍 PlaylistView: Searching for file: \(fileName)")
+        
+        for dir in searchDirectories {
+            let potentialPath = dir.appendingPathComponent(fileName)
+            print("🔍 Checking: \(potentialPath.path)")
+            
+            if FileManager.default.fileExists(atPath: potentialPath.path) {
+                print("🎯 Found match at: \(potentialPath.path)")
+                
+                // If file is already in Media directory, use it directly
+                if potentialPath.path.contains("/Media/") {
+                    print("✅ File already in permanent storage: \(potentialPath.path)")
+                    return potentialPath
+                }
+                
+                // Otherwise, move it to Media directory
+                let destinationURL = mediaDirectory.appendingPathComponent(fileName)
+                
+                do {
+                    try FileManager.default.createDirectory(at: mediaDirectory, withIntermediateDirectories: true)
+                    
+                    // If a file already exists at the destination, it might be the correct one
+                    if FileManager.default.fileExists(atPath: destinationURL.path) {
+                       print("✅ File already exists at destination, using it. No move needed.")
+                       return destinationURL
+                    }
+                    
+                    // Move file to permanent storage
+                    try FileManager.default.moveItem(at: potentialPath, to: destinationURL)
+                    print("✅ Successfully moved file to permanent storage: \(destinationURL.path)")
+                    return destinationURL
+                } catch {
+                    print("❌ Failed to move file from \(potentialPath.path) to \(destinationURL.path): \(error)")
+                    // If move fails, maybe we can still play from the found location
+                    return potentialPath
+                }
+            }
+        }
+        
+        print("❌ File '\(fileName)' not found in any standard location.")
+        return nil
+    }
+    
+    private func updateSongFilePath(songId: String, newPath: String) async {
+        print("🗄️ PlaylistView - Updating database file path for song: \(songId)")
+        let context = PersistenceController.shared.container.viewContext
+        
+        guard let uuid = UUID(uuidString: songId) else {
+             print("❌ Invalid UUID string: \(songId)")
+             return
+        }
+        
+        let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+        request.predicate = NSPredicate(format: "id == %@", uuid as CVarArg)
+        
+        do {
+            let songs = try context.fetch(request)
+            if let songEntity = songs.first {
+                songEntity.filePath = newPath
+                if context.hasChanges {
+                    try context.save()
+                    print("✅ Updated song file path in database: \(newPath)")
+                }
+            } else {
+                print("❌ Song not found in database for UUID: \(songId)")
+            }
+        } catch {
+            print("❌ Failed to update song file path: \(error)")
         }
     }
 
