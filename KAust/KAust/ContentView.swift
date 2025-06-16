@@ -11,7 +11,9 @@ import AVKit
 struct ContentView: View {
     @StateObject private var videoPlayerViewModel = VideoPlayerViewModel()
     @StateObject private var playlistViewModel: PlaylistViewModel
+    @StateObject private var settingsViewModel = SettingsViewModel()  // Global settings view model
     @State private var showSettings = false
+    @State private var showingDownloadProgressWindow = false  // Global download progress state
     
     // Layout constants
     private let outerPadding: CGFloat = 16
@@ -37,16 +39,44 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, outerPadding)
                 .padding(.vertical, outerPadding)
+                .allowsHitTesting(!showingDownloadProgressWindow)  // Block ALL touches during download
+                .opacity(showingDownloadProgressWindow ? 0.3 : 1.0)  // Gray out during download
                 
                 if videoPlayerViewModel.currentVideo != nil {
                     CustomVideoPlayerView(viewModel: videoPlayerViewModel)
                         .ignoresSafeArea()
+                        .allowsHitTesting(!showingDownloadProgressWindow)  // Block video player touches too
                 }
             }
             .background(AppTheme.appBackground.ignoresSafeArea())
         }
+
+        .onChange(of: settingsViewModel.filePickerService.processingState) { _, newState in
+            switch newState {
+            case .processing, .paused:
+                // Immediately show progress window and dismiss settings
+                showingDownloadProgressWindow = true
+                showSettings = false  // Close settings window
+            case .completed, .cancelled:
+                showingDownloadProgressWindow = true  // Keep showing until manually closed
+            case .idle:
+                showingDownloadProgressWindow = false
+            }
+        }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+                .environmentObject(settingsViewModel)  // Pass shared settings view model
+        }
+        .fullScreenCover(isPresented: $showingDownloadProgressWindow) {
+            // GLOBAL DOWNLOAD PROGRESS WINDOW - Appears above EVERYTHING including sheets
+            DownloadProgressWindow(
+                progress: settingsViewModel.filePickerService.batchProgress,
+                filePickerService: settingsViewModel.filePickerService,
+                onDismiss: {
+                    showingDownloadProgressWindow = false
+                }
+            )
+            .background(Color.clear) // Transparent background since the window has its own
         }
         .environmentObject(videoPlayerViewModel)
         .onAppear {

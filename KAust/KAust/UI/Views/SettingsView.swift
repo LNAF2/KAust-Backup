@@ -407,6 +407,10 @@ class EnhancedFilePickerService: ObservableObject {
     @Published var currentBatch = 0
     @Published var totalBatches = 0
     
+    // TIME TRACKING
+    @Published var elapsedTime: TimeInterval = 0
+    @Published var estimatedTimeRemaining: TimeInterval?
+    
     // NEW: Direct folder access support
     var processingMode: ProcessingMode = .filePickerCopy
     var folderSecurityScope: URL?
@@ -438,6 +442,9 @@ class EnhancedFilePickerService: ObservableObject {
     // Background processing queue
     private let processingQueue = DispatchQueue(label: "com.kaust.fileprocessing", qos: .utility)
     
+    // Timer for time tracking
+    nonisolated(unsafe) private var timeTrackingTimer: Timer?
+    
     init(batchSize: Int = BatchProcessingConfig.defaultBatchSize,
          maxConcurrentOperations: Int = BatchProcessingConfig.maxConcurrentOperations) {
         self.batchSize = batchSize
@@ -451,6 +458,10 @@ class EnhancedFilePickerService: ObservableObject {
             maxConcurrentOperations: BatchProcessingConfig.optimalConcurrency(for: fileCount)
         )
         print("🔧 Initialized optimized file processor: batchSize=\(batchSize), concurrency=\(maxConcurrentOperations) for \(fileCount) files")
+    }
+    
+    deinit {
+        stopTimeTracking()
     }
     
     // MARK: - Public Interface
@@ -543,6 +554,11 @@ class EnhancedFilePickerService: ObservableObject {
         allFiles = urls
         processingStartTime = Date()
         
+        // Start time tracking
+        await MainActor.run {
+            startTimeTracking()
+        }
+        
         // Use 30-file batches for stability
         let safeBatchSize = 30
         let totalBatches = Int(ceil(Double(urls.count) / Double(safeBatchSize)))
@@ -618,6 +634,9 @@ class EnhancedFilePickerService: ObservableObject {
         canPause = false
         canResume = true
         
+        // Stop time tracking when paused
+        stopTimeTracking()
+        
         // KEEP UI STATE TRUE FOR PAUSED STATE SO OVERLAY STAYS VISIBLE
         Task { @MainActor in
             self.isProcessingFiles = true  // Keep overlay visible when paused
@@ -643,6 +662,8 @@ class EnhancedFilePickerService: ObservableObject {
         // RESUME WITH DEDICATED UI STATE
         await MainActor.run {
             self.isProcessingFiles = true
+            // Restart time tracking
+            startTimeTracking()
             print("🎯 RESUME: isProcessingFiles = true, UI state updated")
         }
         
@@ -659,6 +680,9 @@ class EnhancedFilePickerService: ObservableObject {
         processingState = .cancelled
         canPause = false
         canResume = false
+        
+        // Stop time tracking when cancelled
+        stopTimeTracking()
         
         // UPDATE DEDICATED UI STATE FOR CANCELLATION
         Task { @MainActor in
@@ -796,6 +820,9 @@ class EnhancedFilePickerService: ObservableObject {
             canPause = false
             canResume = false
             
+            // Stop time tracking when completed
+            stopTimeTracking()
+            
             // COMPLETE DEDICATED UI STATE
             await MainActor.run {
                 self.isProcessingFiles = false
@@ -867,6 +894,43 @@ class EnhancedFilePickerService: ObservableObject {
         let avgTimePerFile = elapsedTime / Double(completedFiles)
         let remainingFiles = totalFiles - completedFiles
         return avgTimePerFile * Double(remainingFiles)
+    }
+    
+    // MARK: - Time Tracking
+    
+    @MainActor
+    private func startTimeTracking() {
+        stopTimeTracking() // Stop any existing timer
+        
+        // Create timer on main thread and assign to nonisolated property
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateTimeTracking()
+            }
+        }
+        timeTrackingTimer = timer
+    }
+    
+    nonisolated private func stopTimeTracking() {
+        timeTrackingTimer?.invalidate()
+        timeTrackingTimer = nil
+    }
+    
+    @MainActor
+    private func updateTimeTracking() {
+        guard let startTime = processingStartTime else { return }
+        
+        elapsedTime = Date().timeIntervalSince(startTime)
+        
+        // Calculate estimated time remaining
+        let completedFiles = results.count
+        if completedFiles > 0 && completedFiles < allFiles.count {
+            let avgTimePerFile = elapsedTime / Double(completedFiles)
+            let remainingFiles = allFiles.count - completedFiles
+            estimatedTimeRemaining = avgTimePerFile * Double(remainingFiles)
+        } else {
+            estimatedTimeRemaining = nil
+        }
     }
     
     var canRestart: Bool {
@@ -1774,6 +1838,9 @@ class SettingsViewModel: ObservableObject {
         let fileCount = urls.count
         print("📋 Handling selection of \(fileCount) files")
         
+        // IMMEDIATELY set processing state to trigger progress window
+        filePickerService.processingState = .processing
+        
         // Optimize the service configuration for the file count
         if fileCount > 100 {
             optimizeForFileCount(fileCount)
@@ -1788,6 +1855,9 @@ class SettingsViewModel: ObservableObject {
     
     func handleFolderSelected(_ folderURL: URL) {
         print("📁 Folder selected: \(folderURL.path)")
+        
+        // IMMEDIATELY set processing state to trigger progress window
+        filePickerService.processingState = .processing
         
         Task {
             await processMP4FolderAccess(folderURL)
@@ -2025,7 +2095,7 @@ class SettingsViewModel: ObservableObject {
 
 struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
-    @StateObject private var viewModel = SettingsViewModel()
+    @EnvironmentObject var viewModel: SettingsViewModel  // Use injected view model
     @State private var showingClearSongsAlert = false
     @State private var showingCompletionOverlay = false
     @State private var hasCompletionResults = false  // Track when results are ready to show
@@ -2046,281 +2116,6 @@ struct SettingsView: View {
                 }
                 .padding(.horizontal, 32)
                 .padding(.bottom, 32)
-            }
-            
-            // TOP-LEVEL REACTIVE PROGRESS OVERLAY
-            // Show during processing OR when completion results are available
-            if viewModel.isProcessingFiles || (hasCompletionResults && !viewModel.filePickerService.results.isEmpty) {
-                
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 16) {
-                            // Show different content based on processing state  
-                            if hasCompletionResults && !viewModel.isProcessingFiles {
-                                // Completion/Cancellation Status
-                                VStack(spacing: 16) {
-                                    if !wasProcessingCancelled {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .font(.system(size: 60))
-                                            .foregroundColor(.green)
-                                        
-                                        VStack(spacing: 8) {
-                                            Text("Processing Complete!")
-                                                .font(.title2)
-                                                .fontWeight(.bold)
-                                                .foregroundColor(.white)
-                                            
-                                            let stats = viewModel.filePickerService.processingStats
-                                            Text("\(stats.successful) successful, \(stats.failed) failed")
-                                                .font(.subheadline)
-                                                .foregroundColor(.white.opacity(0.8))
-                                        }
-                                    } else {
-                                        Image(systemName: "xmark.circle.fill")
-                                            .font(.system(size: 60))
-                                            .foregroundColor(.orange)
-                                        
-                                        VStack(spacing: 8) {
-                                            Text("Processing Cancelled")
-                                                .font(.title2)
-                                                .fontWeight(.bold)
-                                                .foregroundColor(.white)
-                                            
-                                            let stats = viewModel.filePickerService.processingStats
-                                            Text("\(stats.successful) processed before cancellation")
-                                                .font(.subheadline)
-                                                .foregroundColor(.white.opacity(0.8))
-                                        }
-                                    }
-                                }
-                            } else {
-                                // Active Processing - Circular progress with percentage
-                                ZStack {
-                                    Circle()
-                                        .stroke(Color.white.opacity(0.3), lineWidth: 8)
-                                        .frame(width: 120, height: 120)
-                                    
-                                    Circle()
-                                        .trim(from: 0, to: max(0, min(1, viewModel.processingProgress / 100.0)))
-                                        .stroke(AppTheme.settingsResetIconBlue, style: StrokeStyle(lineWidth: 8, lineCap: .round))
-                                        .frame(width: 120, height: 120)
-                                        .rotationEffect(.degrees(-90))
-                                        .animation(.easeInOut(duration: 0.5), value: viewModel.processingProgress)
-                                    
-                                    VStack(spacing: 4) {
-                                        Text("\(Int(viewModel.processingProgress))%")
-                                            .font(.title2)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.white)
-                                        
-                                        Text(viewModel.processingFileCount)
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.8))
-                                    }
-                                }
-                            }
-                            
-                            VStack(spacing: 8) {
-                                if viewModel.filePickerService.processingState == .completed || viewModel.filePickerService.processingState == .cancelled {
-                                    // Completion/Cancellation State
-                                    VStack(spacing: 12) {
-                                        Text(!wasProcessingCancelled ? 
-                                             "All files processed successfully!" : 
-                                             "Processing was cancelled")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
-                                            .multilineTextAlignment(.center)
-                                        
-                                        // Completion Action Buttons
-                                        HStack(spacing: 16) {
-                                            Button(action: {
-                                                // Show detailed completion results overlay
-                                                showingCompletionOverlay = true
-                                                print("📊 Showing detailed completion results overlay")
-                                            }) {
-                                                HStack(spacing: 8) {
-                                                    Image(systemName: "doc.text.magnifyingglass")
-                                                    Text("Show Report")
-                                                }
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(.white)
-                                                .padding(.horizontal, 20)
-                                                .padding(.vertical, 12)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .fill(AppTheme.settingsResetIconBlue)
-                                                )
-                                            }
-                                            
-                                            Button(action: {
-                                                // GENTLE DISMISS: Hide overlay but preserve results for "Show Report"
-                                                hasCompletionResults = false
-                                                wasProcessingCancelled = false
-                                                print("✅ Dismissed completion overlay, results preserved for Show Report")
-                                            }) {
-                                                HStack(spacing: 8) {
-                                                    Image(systemName: "xmark")
-                                                    Text("Dismiss")
-                                                }
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                                .foregroundColor(.white)
-                                                .padding(.horizontal, 20)
-                                                .padding(.vertical, 12)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .fill(Color.gray.opacity(0.6))
-                                                )
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    // Active Processing State
-                                    Text("Processing MP4 Files")
-                                        .font(.headline)
-                                        .foregroundColor(.white)
-                                    
-                                    if !viewModel.processingFileName.isEmpty {
-                                        Text(viewModel.processingFileName)
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.9))
-                                            .lineLimit(1)
-                                            .frame(maxWidth: 250)
-                                    }
-                                    
-                                    if !viewModel.processingBatch.isEmpty && viewModel.processingBatch != "Batch 0 of 0" {
-                                        Text(viewModel.processingBatch)
-                                            .font(.caption)
-                                            .foregroundColor(.white.opacity(0.7))
-                                    }
-                                    
-                                    // Processing Control Buttons
-                                    HStack(spacing: 16) {
-                                        if viewModel.filePickerService.processingState == .processing {
-                                            Button(action: {
-                                                viewModel.pauseFileProcessing()
-                                            }) {
-                                                HStack(spacing: 8) {
-                                                    Image(systemName: "pause.fill")
-                                                    Text("Pause")
-                                                }
-                                                .font(.caption)
-                                                .foregroundColor(.white)
-                                                .padding(.horizontal, 16)
-                                                .padding(.vertical, 8)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .fill(Color.orange.opacity(0.8))
-                                                )
-                                            }
-                                        } else if viewModel.filePickerService.processingState == .paused {
-                                            Button(action: {
-                                                Task {
-                                                    await viewModel.resumeFileProcessing()
-                                                }
-                                            }) {
-                                                HStack(spacing: 8) {
-                                                    Image(systemName: "play.fill")
-                                                    Text("Continue")
-                                                }
-                                                .font(.caption)
-                                                .foregroundColor(.white)
-                                                .padding(.horizontal, 16)
-                                                .padding(.vertical, 8)
-                                                .background(
-                                                    RoundedRectangle(cornerRadius: 8)
-                                                        .fill(Color.green.opacity(0.8))
-                                                )
-                                            }
-                                        }
-                                        
-                                        // Cancel Button
-                                        Button(action: {
-                                            viewModel.cancelFileProcessing()
-                                        }) {
-                                            HStack(spacing: 8) {
-                                                Image(systemName: "xmark.circle.fill")
-                                                Text("Cancel")
-                                            }
-                                            .font(.caption)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 16)
-                                            .padding(.vertical, 8)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 8)
-                                                    .fill(Color.red.opacity(0.8))
-                                            )
-                                        }
-                                    }
-                                    .padding(.top, 8)
-                                }
-                            }
-                        }
-                        .padding(32)
-                        .background(
-                            RoundedRectangle(cornerRadius: 20)
-                                .fill(Color.black.opacity(0.8))
-                                .shadow(radius: 20)
-                        )
-                        Spacer()
-                    }
-                    Spacer()
-                }
-                .background(Color.black.opacity(0.4))
-                .ignoresSafeArea()
-                .transition(.opacity.combined(with: .scale).animation(.easeInOut(duration: 0.3)))
-                .onAppear {
-                    print("🎯 TOP-LEVEL PROGRESS OVERLAY APPEARED!")
-                }
-                .onDisappear {
-                    print("🎯 TOP-LEVEL PROGRESS OVERLAY DISAPPEARED!")
-                }
-            }
-            
-            // SECONDARY DEBUG OVERLAY - Always shows when processing
-            if viewModel.isProcessingFiles {
-                VStack {
-                    HStack {
-                        Spacer()
-                        VStack {
-                            Text("🔄 PROCESSING \(viewModel.processingFileCount)")
-                                .foregroundColor(.white)
-                                .padding(8)
-                                .background(Color.green.opacity(0.8))
-                                .cornerRadius(8)
-                        }
-                        .padding()
-                    }
-                    Spacer()
-                }
-                .onAppear {
-                    print("🔴 SECONDARY DEBUG OVERLAY APPEARED!")
-                }
-            }
-            
-
-            
-            // Completion Results Overlay - persistent until dismissed
-            if showingCompletionOverlay && !viewModel.filePickerService.results.isEmpty {
-                Color.black.opacity(0.6)
-                    .ignoresSafeArea()
-                    .transition(.opacity.animation(.easeInOut(duration: 0.3)))
-                
-                CompletionResultsOverlay(
-                    results: viewModel.filePickerService.results,
-                    filePickerService: viewModel.filePickerService,
-                    onDismiss: {
-                        showingCompletionOverlay = false
-                    },
-                    onShowDetails: {
-                        showingCompletionOverlay = false
-                        viewModel.isShowingResults = true
-                    }
-                )
-                .transition(.scale(scale: 0.8).combined(with: .opacity).animation(.spring(response: 0.6, dampingFraction: 0.8, blendDuration: 0)))
             }
         }
         .sheet(isPresented: $viewModel.isShowingFilePicker) {
@@ -2473,6 +2268,152 @@ struct SettingsView: View {
         }
     }
     
+    // MARK: - Completion Overlay
+    
+    private var completionOverlayView: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                VStack(spacing: 16) {
+                    completionStatusContent
+                    completionActionButtons
+                }
+                .padding(32)
+                .background(
+                    RoundedRectangle(cornerRadius: 20)
+                        .fill(Color.black.opacity(0.95))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.white.opacity(0.3), lineWidth: 2)
+                        )
+                        .shadow(color: .black.opacity(0.5), radius: 30, x: 0, y: 10)
+                )
+                Spacer()
+            }
+            Spacer()
+        }
+        .background(Color.black.opacity(0.6))
+        .ignoresSafeArea()
+        .transition(.opacity.combined(with: .scale))
+        .onAppear {
+            print("🎯 TOP-LEVEL PROGRESS OVERLAY APPEARED!")
+        }
+        .onDisappear {
+            print("🎯 TOP-LEVEL PROGRESS OVERLAY DISAPPEARED!")
+        }
+    }
+    
+    private var completionStatusContent: some View {
+        VStack(spacing: 16) {
+            if !wasProcessingCancelled {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.green)
+                    .shadow(color: .green.opacity(0.5), radius: 10, x: 0, y: 0)
+                
+                VStack(spacing: 8) {
+                    Text("Download Complete!")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                    
+                    let stats = viewModel.filePickerService.processingStats
+                    Text("\(stats.successful) successful, \(stats.failed) failed")
+                        .font(.headline)
+                        .foregroundColor(.white.opacity(0.9))
+                        .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                }
+            } else {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: 50))
+                    .foregroundColor(.orange)
+                    .shadow(color: .orange.opacity(0.5), radius: 10, x: 0, y: 0)
+                
+                VStack(spacing: 8) {
+                    Text("Processing Cancelled")
+                        .font(.title)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                    
+                    let stats = viewModel.filePickerService.processingStats
+                    Text("\(stats.successful) processed before cancellation")
+                        .font(.headline)
+                        .foregroundColor(.white.opacity(0.9))
+                        .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+                }
+            }
+        }
+    }
+    
+    private var completionActionButtons: some View {
+        VStack(spacing: 16) {
+            Text(!wasProcessingCancelled ? 
+                 "All files processed successfully!" : 
+                 "Processing was cancelled")
+                .font(.title2)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .shadow(color: .black.opacity(0.5), radius: 1, x: 0, y: 1)
+            
+            HStack(spacing: 16) {
+                Button(action: {
+                    showingCompletionOverlay = true
+                    print("📊 Showing detailed completion results overlay")
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.system(size: 16, weight: .medium))
+                        Text("Show Report")
+                    }
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(AppTheme.settingsResetIconBlue)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
+                    )
+                }
+                
+                Button(action: {
+                    hasCompletionResults = false
+                    wasProcessingCancelled = false
+                    print("✅ Dismissed completion overlay, results preserved for Show Report")
+                }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .medium))
+                        Text("Dismiss")
+                    }
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color.gray.opacity(0.8))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            )
+                            .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
+                    )
+                }
+            }
+        }
+    }
+    
     // MARK: - AirPlay Section
     
     private var airPlaySection: some View {
@@ -2620,124 +2561,31 @@ struct SettingsView: View {
     private var downloadSection: some View {
         SettingsSection(title: "Download MP4 files", icon: "arrow.down.circle") {
             VStack(spacing: 12) {
-                if viewModel.filePickerService.processingState == .idle {
-                    VStack(spacing: 16) {
-                        FilePickerRow(
-                            title: "📁 Access MP4 Folder",
-                            subtitle: "✅ RECOMMENDED: Select folder with MP4s",
-                            icon: "folder.badge.gearshape",
-                            isEnabled: true,
-                            isLoading: false
-                        ) {
-                            viewModel.selectMP4Folder()
-                        }
-                        
-                        FilePickerRow(
-                            title: "📄 Select Individual Files",
-                            subtitle: "⚠️ Select up to 30 files to prevent crashes",
-                            icon: "folder.badge.plus",
-                            isEnabled: viewModel.isFilePickerEnabled,
-                            isLoading: false
-                        ) {
-                            viewModel.openFilePicker()
-                        }
+                VStack(spacing: 16) {
+                    FilePickerRow(
+                        title: "📁 Access MP4 Folder",
+                        subtitle: "✅ RECOMMENDED: Select folder with MP4s",
+                        icon: "folder.badge.gearshape",
+                        isEnabled: true,
+                        isLoading: false
+                    ) {
+                        viewModel.selectMP4Folder()
                     }
-                } else {
-                    VStack(spacing: 12) {
-                        FilePickerRow(
-                            title: "Processing Files...",
-                            subtitle: viewModel.statusMessage,
-                            isEnabled: false,
-                            isLoading: true,
-                            action: {}
-                        )
-                        
-                        // Compact Progress Summary - show during processing
-                        if viewModel.filePickerService.processingState == .processing || viewModel.filePickerService.processingState == .paused {
-                            CompactProgressView(
-                                progress: viewModel.filePickerService.batchProgress,
-                                filePickerService: viewModel.filePickerService
-                            )
-                        }
+                    
+                    FilePickerRow(
+                        title: "📄 Select Individual Files",
+                        subtitle: "⚠️ Select up to 30 files to prevent crashes",
+                        icon: "folder.badge.plus",
+                        isEnabled: viewModel.isFilePickerEnabled,
+                        isLoading: false
+                    ) {
+                        viewModel.openFilePicker()
                     }
                 }
                 
-                // Control buttons based on processing state
-                HStack(spacing: 12) {
-                    if !viewModel.filePickerService.results.isEmpty && viewModel.filePickerService.processingState == .idle {
-                        Button("Show Last Results") {
-                            viewModel.isShowingResults = true
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(AppTheme.settingsResetIconBlue)
-                    }
-                    
-                    if viewModel.filePickerService.canRestart {
-                        Button("Restart Download") {
-                            Task {
-                                await viewModel.restartFileProcessing()
-                            }
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(.green)
-                    }
-                    
-                    if viewModel.filePickerService.processingState != .processing && !viewModel.filePickerService.results.isEmpty {
-                        Button("Clear All") {
-                            Task {
-                                await viewModel.clearAllFiles()
-                                // Clear completion results flag when results are cleared
-                                hasCompletionResults = false
-                                wasProcessingCancelled = false
-                            }
-                        }
-                        .font(.subheadline)
-                        .foregroundColor(.red)
-                    }
-                    
-                    Spacer()
-                }
-                .padding(.horizontal, 16)
+
                 
-                if viewModel.filePickerService.processingState == .processing || viewModel.filePickerService.processingState == .paused {
-                    ProcessingProgressView(
-                        progress: viewModel.filePickerService.batchProgress,
-                        filePickerService: viewModel.filePickerService
-                    )
-                } else if viewModel.filePickerService.processingState == .completed && !viewModel.filePickerService.results.isEmpty {
-                    // Show completion summary in download section too
-                    VStack(spacing: 8) {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.system(size: 16))
-                            
-                            Text("Processing Complete!")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(AppTheme.settingsText)
-                            
-                            Spacer()
-                        }
-                        
-                        HStack {
-                            Text("Tap above for detailed results")
-                                .font(.caption)
-                                .foregroundColor(AppTheme.settingsText.opacity(0.7))
-                            
-                            Spacer()
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
-                    .background(
-                        RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
-                            .fill(.green.opacity(0.1))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
-                                    .stroke(.green.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-                }
+                // No completion summary in settings - all info in dedicated window
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -3853,5 +3701,6 @@ struct AirPlayPickerViewWrapper: UIViewRepresentable {
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
         SettingsView()
+            .environmentObject(SettingsViewModel())
     }
 }

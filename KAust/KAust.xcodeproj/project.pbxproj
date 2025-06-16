@@ -78,6 +78,7 @@
 				UI/Views/CustomButton.swift,
 				UI/Views/CustomTestField.swift,
 				UI/Views/DoneButton.swift,
+				UI/Views/DownloadProgressWindow.swift,
 				UI/Views/EmptyPanelView.swift,
 				UI/Views/PanelView.swift,
 				UI/Views/SettingsAccessPanelView.swift,
@@ -93,6 +94,7 @@
 				ContentView.swift,
 				Features/VideoPlayer/VideoPlayerViewModel.swift,
 				KAustApp.swift,
+				UI/Views/DownloadProgressWindow.swift,
 			);
 			target = C0A8FEE32DE9C7AC00459205 /* KAustUITests */;
 		};
