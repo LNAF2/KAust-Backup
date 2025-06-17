@@ -2056,6 +2056,19 @@ class SettingsViewModel: ObservableObject {
         // Placeholder
     }
     
+    func showSongsPlayedTable() {
+        print("📊 Songs Played Table - Placeholder function called")
+        // TODO: Implement songs played table functionality
+        // This will show/manage the songs played history table
+    }
+    
+    func deleteSongsPlayedTable() {
+        print("🗑️ Delete Songs Played Table - Placeholder function called")
+        // TODO: Implement delete songs played table functionality
+        // This will clear all entries from the songs played history
+        // Should include confirmation dialog before deletion
+    }
+    
     func monitorProcessingCompletion() {
         Task {
             // Wait for processing to start
@@ -2246,9 +2259,6 @@ struct SettingsView: View {
         VStack(alignment: .leading, spacing: 24) {
             // AirPlay section - at the top
             airPlaySection
-            
-            // Download MP4 files section
-            downloadSection
             
             // Administrator Settings section
             appSettingsSection
@@ -2561,39 +2571,7 @@ struct SettingsView: View {
         }
     }
     
-    private var downloadSection: some View {
-        SettingsSection(title: "Download MP4 files", icon: "arrow.down.circle") {
-            VStack(spacing: 12) {
-                VStack(spacing: 16) {
-                    FilePickerRow(
-                        title: "📁 Access MP4 Folder",
-                        subtitle: "✅ RECOMMENDED: Select folder with MP4s",
-                        icon: "folder.badge.gearshape",
-                        isEnabled: true,
-                        isLoading: false
-                    ) {
-                        viewModel.selectMP4Folder()
-                    }
-                    
-                    FilePickerRow(
-                        title: "📄 Select Individual Files",
-                        subtitle: "⚠️ Select up to 30 files to prevent crashes",
-                        icon: "folder.badge.plus",
-                        isEnabled: viewModel.isFilePickerEnabled,
-                        isLoading: false
-                    ) {
-                        viewModel.openFilePicker()
-                    }
-                }
-                
 
-                
-                // No completion summary in settings - all info in dedicated window
-            }
-            .padding(.horizontal, 16)
-            .padding(.bottom, 12)
-        }
-    }
     
     // MARK: - Programmer Management Section
     
@@ -2626,6 +2604,24 @@ struct SettingsView: View {
                     icon: "trash",
                     accessoryType: .toggle($viewModel.swipeToDeleteEnabled)
                 )
+                
+                SettingRow(
+                    title: "Songs Played Table",
+                    subtitle: "Manage the songs played history table",
+                    icon: "table",
+                    iconColor: .blue,
+                    accessoryType: .disclosure,
+                    action: viewModel.showSongsPlayedTable
+                )
+                
+                SettingRow(
+                    title: "Delete Songs Played Table",
+                    subtitle: "Remove all entries from the songs played history",
+                    icon: "trash.fill",
+                    iconColor: .red,
+                    accessoryType: .disclosure,
+                    action: viewModel.deleteSongsPlayedTable
+                )
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -2634,7 +2630,29 @@ struct SettingsView: View {
     
     private var ownerSettingsSection: some View {
         SettingsSection(title: "Owner Settings", icon: "slider.horizontal.3") {
-            VStack(spacing: 8) {
+            VStack(spacing: 12) {
+                VStack(spacing: 16) {
+                    FilePickerRow(
+                        title: "📁 Download MP4 Folder",
+                        subtitle: "✅ RECOMMENDED: Select folder with MP4s",
+                        icon: "folder.badge.gearshape",
+                        isEnabled: true,
+                        isLoading: false
+                    ) {
+                        viewModel.selectMP4Folder()
+                    }
+                    
+                    FilePickerRow(
+                        title: "📄 Select Individual MP4 Files",
+                        subtitle: "⚠️ Select up to 30 files to prevent crashes",
+                        icon: "folder.badge.plus",
+                        isEnabled: viewModel.isFilePickerEnabled,
+                        isLoading: false
+                    ) {
+                        viewModel.openFilePicker()
+                    }
+                }
+                
                 SettingRow(
                     title: "Clear All Core Data Songs",
                     subtitle: "Remove all songs and associated files permanently",
