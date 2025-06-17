@@ -94,6 +94,9 @@ struct SongListView: View {
                 print("👁️ DEBUG: SongListView appeared")
                 print("  - Swipe to delete enabled: \(swipeToDeleteEnabled)")
                 print("  - Number of songs: \(viewModel.displaySongs.count)")
+                
+                // Always set focus to search bar when view appears
+                isSearchFocused = true
             }
     }
 
@@ -147,7 +150,7 @@ struct SongListView: View {
                 if !viewModel.searchText.isEmpty {
                     Button(action: {
                         viewModel.clearSearch()
-                        isSearchFocused = false
+                        isSearchFocused = true
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(AppTheme.leftPanelAccent.opacity(0.6))
@@ -241,6 +244,8 @@ struct SongListView: View {
                     
                     Button("Clear Search") {
                         viewModel.clearSearch()
+                        // Maintain focus on search bar after clearing
+                        isSearchFocused = true
                     }
                     .foregroundColor(AppTheme.leftPanelAccent)
                 }

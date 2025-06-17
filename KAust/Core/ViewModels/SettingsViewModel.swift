@@ -13,11 +13,6 @@ class SettingsViewModel: ObservableObject {
     @Published var processedFileCount = 0
     @Published var totalFileCount = 0
     
-    // Settings states
-    @Published var notificationsEnabled = true
-    @Published var autoProcessingEnabled = true
-    @Published var storageOptimizationEnabled = false
-    
     // Error handling
     @Published var errorAlert: ErrorAlertConfiguration?
     @Published var isShowingErrorAlert = false
@@ -78,30 +73,16 @@ class SettingsViewModel: ObservableObject {
     // MARK: - Setup
     
     private func setupBindings() {
-        // Auto-save settings when they change
-        Publishers.CombineLatest3(
-            $notificationsEnabled,
-            $autoProcessingEnabled,
-            $storageOptimizationEnabled
-        )
-        .dropFirst() // Skip initial values
-        .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-        .sink { [weak self] _, _, _ in
-            self?.saveSettings()
-        }
-        .store(in: &cancellables)
+        // Storage optimization setting removed as it was redundant
+        // No settings currently need auto-save binding
     }
     
     private func loadSettings() {
-        notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
-        autoProcessingEnabled = UserDefaults.standard.bool(forKey: "autoProcessingEnabled")
-        storageOptimizationEnabled = UserDefaults.standard.bool(forKey: "storageOptimizationEnabled")
+        // Storage optimization setting removed as it was redundant
     }
     
     private func saveSettings() {
-        UserDefaults.standard.set(notificationsEnabled, forKey: "notificationsEnabled")
-        UserDefaults.standard.set(autoProcessingEnabled, forKey: "autoProcessingEnabled")
-        UserDefaults.standard.set(storageOptimizationEnabled, forKey: "storageOptimizationEnabled")
+        // Storage optimization setting removed as it was redundant
     }
     
     // MARK: - Actions
@@ -144,10 +125,7 @@ class SettingsViewModel: ObservableObject {
                 successCount += 1
                 processedFileCount += 1
                 
-                // Show success toast for individual files if enabled
-                if notificationsEnabled {
-                    showToast(.success("Processed \(fileURL.lastPathComponent)"))
-                }
+                // Individual file processing notifications removed - now handled by Download Progress Window
                 
             } catch {
                 errorCount += 1
@@ -164,14 +142,7 @@ class SettingsViewModel: ObservableObject {
         processingProgress = 1.0
         isProcessingFiles = false
         
-        // Show completion toast
-        if successCount > 0 {
-            showToast(.success("Successfully processed \(successCount) files"))
-        }
-        
-        if errorCount > 0 {
-            showToast(.error("Failed to process \(errorCount) files"))
-        }
+        // Completion status now shown in Download Progress Window - toast notifications removed
     }
     
     private func handleFileProcessingError(_ error: Error, for fileURL: URL) {
@@ -207,19 +178,12 @@ class SettingsViewModel: ObservableObject {
     
     func resetSettings() {
         // Reset to defaults
-        notificationsEnabled = true
-        autoProcessingEnabled = true
-        storageOptimizationEnabled = false
+        // Storage optimization setting removed as it was redundant
         
         // Save defaults
         saveSettings()
         
         showToast(.info("Settings reset to defaults"))
-    }
-    
-    func manageDownloads() {
-        // This will be implemented in a future step
-        showToast(.info("Download management coming soon"))
     }
     
     func showAudioSettings() {

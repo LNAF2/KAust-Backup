@@ -1688,10 +1688,8 @@ class SettingsViewModel: ObservableObject {
     @Published var errorAlert: ErrorAlertConfiguration?
     @Published var isShowingErrorAlert = false
     
-    @Published var notificationsEnabled = true
-    @Published var autoProcessingEnabled = true
-    @Published var storageOptimizationEnabled = true
     @AppStorage("swipeToDeleteEnabled") var swipeToDeleteEnabled = false  // Use @AppStorage for automatic persistence
+    
     
     // Shared access to swipe-to-delete setting
     static var shared: SettingsViewModel = SettingsViewModel()
@@ -2017,9 +2015,6 @@ class SettingsViewModel: ObservableObject {
     }
     
     func resetSettings() {
-        notificationsEnabled = true
-        autoProcessingEnabled = true
-        storageOptimizationEnabled = true
         swipeToDeleteEnabled = false  // Reset to default OFF state
         
         // Clear file processing results
@@ -2048,9 +2043,6 @@ class SettingsViewModel: ObservableObject {
         await filePickerService.resetAndClearFiles()
     }
     
-    func manageDownloads() {
-        // Placeholder
-    }
     
     func showAudioSettings() {
         // Placeholder
@@ -2110,6 +2102,17 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 24) {
                     // Header with RESET and DONE
                     headerView
+
+                    // SETTINGS title heading
+                    HStack {
+                        Spacer()
+                        Text("SETTINGS")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                        Spacer()
+                    }
+                    .padding(.vertical, 8)
 
                     // Main settings content
                     settingsContent
@@ -2247,20 +2250,20 @@ struct SettingsView: View {
             // Download MP4 files section
             downloadSection
             
-            // Song List Management section
-            songListManagementSection
-            
-            // App Settings section
+            // Administrator Settings section
             appSettingsSection
             
-            // Other Settings section
-            otherSettingsSection
+            // Owner Settings section
+            ownerSettingsSection
             
             // Account section
             accountSection
             
             // App Info section
             appInfoSection
+            
+            // Programmer Management section - moved to last
+            programmerListManagementSection
             
             // Storage Management
             Section("Storage") {
@@ -2592,10 +2595,10 @@ struct SettingsView: View {
         }
     }
     
-    // MARK: - Song List Management Section
+    // MARK: - Programmer Management Section
     
-    private var songListManagementSection: some View {
-        SettingsSection(title: "SONG LIST Management", icon: "music.note.list") {
+    private var programmerListManagementSection: some View {
+        SettingsSection(title: "Programmer Management", icon: "music.note.list") {
             VStack(spacing: 8) {
                 SettingRow(
                     title: "Show All Core Data Songs",
@@ -2608,16 +2611,6 @@ struct SettingsView: View {
                         await printAllCoreDataSongs()
                     }
                 }
-                
-                SettingRow(
-                    title: "Clear All Core Data Songs",
-                    subtitle: "Remove all songs and associated files permanently",
-                    icon: "trash.fill",
-                    iconColor: .red,
-                    accessoryType: .disclosure
-                ) {
-                    showingClearSongsAlert = true
-                }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -2625,32 +2618,11 @@ struct SettingsView: View {
     }
     
     private var appSettingsSection: some View {
-        SettingsSection(title: "App Settings", icon: "gearshape") {
+        SettingsSection(title: "Administrator Settings", icon: "gearshape") {
             VStack(spacing: 8) {
                 SettingRow(
-                    title: "Enable Notifications",
-                    subtitle: "Get notified when downloads complete",
-                    icon: "bell",
-                    accessoryType: .toggle($viewModel.notificationsEnabled)
-                )
-                
-                SettingRow(
-                    title: "Auto-Process Files",
-                    subtitle: "Automatically process files after selection",
-                    icon: "wand.and.rays",
-                    accessoryType: .toggle($viewModel.autoProcessingEnabled)
-                )
-                
-                SettingRow(
-                    title: "Storage Optimization",
-                    subtitle: "Optimize storage for processed files",
-                    icon: "internaldrive",
-                    accessoryType: .toggle($viewModel.storageOptimizationEnabled)
-                )
-                
-                SettingRow(
                     title: "Enable Swipe to Delete",
-                    subtitle: "Allow swiping left on songs to delete them",
+                    subtitle: "Swipe left to delete songs in the SONG LIST",
                     icon: "trash",
                     accessoryType: .toggle($viewModel.swipeToDeleteEnabled)
                 )
@@ -2660,29 +2632,18 @@ struct SettingsView: View {
         }
     }
     
-    private var otherSettingsSection: some View {
-        SettingsSection(title: "Other Settings", icon: "slider.horizontal.3") {
+    private var ownerSettingsSection: some View {
+        SettingsSection(title: "Owner Settings", icon: "slider.horizontal.3") {
             VStack(spacing: 8) {
                 SettingRow(
-                    title: "Manage Downloads",
-                    subtitle: "View and manage downloaded files",
-                    icon: "folder",
-                    action: viewModel.manageDownloads
-                )
-                
-                SettingRow(
-                    title: "Audio Settings",
-                    subtitle: "Configure audio preferences",
-                    icon: "speaker.wave.2",
-                    action: viewModel.showAudioSettings
-                )
-                
-                SettingRow(
-                    title: "Volume Settings",
-                    subtitle: "Adjust volume controls",
-                    icon: "speaker.3",
-                    action: viewModel.showVolumeSettings
-                )
+                    title: "Clear All Core Data Songs",
+                    subtitle: "Remove all songs and associated files permanently",
+                    icon: "trash.fill",
+                    iconColor: .red,
+                    accessoryType: .disclosure
+                ) {
+                    showingClearSongsAlert = true
+                }
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -3670,7 +3631,7 @@ struct FolderPickerView: UIViewControllerRepresentable {
             parent.isPresented = false
             print("📁 Folder selection cancelled")
         }
-    }
+                                                     }
 }
 
 // MARK: - Preview

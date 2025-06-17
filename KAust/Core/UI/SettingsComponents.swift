@@ -270,15 +270,6 @@ struct SettingsComponents_Previews: PreviewProvider {
                         ) {
                             // Action
                         }
-                        
-                        SettingRow(
-                            title: "Manage Downloads",
-                            subtitle: "View and manage downloaded files",
-                            icon: "doc.text.magnifyingglass",
-                            accessoryType: .disclosure
-                        ) {
-                            // Action
-                        }
                     }
                 }
                 

@@ -14,9 +14,6 @@ class SettingsViewModel: ObservableObject {
     @Published var totalFileCount = 0
     
     // Settings states
-    @Published var notificationsEnabled = true
-    @Published var autoProcessingEnabled = true
-    @Published var storageOptimizationEnabled = true
     @Published var swipeToDeleteEnabled = false
     
     // Error handling
@@ -59,37 +56,21 @@ class SettingsViewModel: ObservableObject {
     
     private func setupBindings() {
         // Auto-save settings when they change
-        Publishers.CombineLatest3(
-            $notificationsEnabled,
-            $autoProcessingEnabled,
-            $storageOptimizationEnabled
-        )
-        .dropFirst() // Skip initial values
-        .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
-        .sink { [weak self] _, _, _ in
-            self?.saveSettings()
-        }
-        .store(in: &cancellables)
+        // Storage optimization setting removed as it was redundant
+        // No settings currently need auto-save binding
     }
     
     private func loadSettings() {
-        notificationsEnabled = UserDefaults.standard.bool(forKey: "notificationsEnabled")
-        autoProcessingEnabled = UserDefaults.standard.bool(forKey: "autoProcessingEnabled")
-        storageOptimizationEnabled = UserDefaults.standard.bool(forKey: "storageOptimizationEnabled")
+        // Storage optimization setting removed as it was redundant
     }
     
     private func saveSettings() {
-        UserDefaults.standard.set(notificationsEnabled, forKey: "notificationsEnabled")
-        UserDefaults.standard.set(autoProcessingEnabled, forKey: "autoProcessingEnabled")
-        UserDefaults.standard.set(storageOptimizationEnabled, forKey: "storageOptimizationEnabled")
+        // Storage optimization setting removed as it was redundant
     }
     
     // MARK: - Actions
     
     func resetSettings() {
-        notificationsEnabled = true
-        autoProcessingEnabled = true
-        storageOptimizationEnabled = true
         swipeToDeleteEnabled = false  // Reset to default OFF state
         
         // Clear file processing results
