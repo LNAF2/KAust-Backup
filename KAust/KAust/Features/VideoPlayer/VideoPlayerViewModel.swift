@@ -86,6 +86,9 @@ final class VideoPlayerViewModel: ObservableObject {
         setupAirPlayMonitoring()
         showControls()
         
+        // 7. Record song play in database for Songs Played Table
+        await recordSongPlay(song: song)
+        
         print("✅ VideoPlayerViewModel.play - Playback started for: '\(song.title)'")
     }
 
@@ -409,5 +412,44 @@ final class VideoPlayerViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+    }
+    
+    /// Record a song play in the Songs Played Table
+    private func recordSongPlay(song: Song) async {
+        print("📊 Recording song play for Songs Played Table: '\(song.title)' by '\(song.artist)'")
+        
+        let context = PersistenceController.shared.container.viewContext
+        
+        do {
+            try await context.perform {
+                // Create a new PlayedSongEntity record
+                let playedSong = PlayedSongEntity(context: context)
+                playedSong.id = UUID()
+                playedSong.playedDate = Date()
+                playedSong.songTitleSnapshot = song.title
+                playedSong.artistNameSnapshot = song.artist
+                
+                // Try to link to the actual SongEntity if it exists
+                if let songUUID = UUID(uuidString: song.id) {
+                    let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+                    request.predicate = NSPredicate(format: "id == %@", songUUID as CVarArg)
+                    
+                    if let songEntity = try? context.fetch(request).first {
+                        playedSong.song = songEntity
+                        print("✅ Linked played song to SongEntity: \(songEntity.title ?? "Unknown")")
+                    } else {
+                        print("⚠️ Could not find SongEntity for ID: \(song.id)")
+                    }
+                }
+                
+                // Note: We're not setting the user relationship since user management 
+                // is not fully implemented in the current app structure
+                
+                try context.save()
+                print("✅ Successfully recorded song play in database")
+            }
+        } catch {
+            print("❌ Failed to record song play: \(error)")
+        }
     }
 } 

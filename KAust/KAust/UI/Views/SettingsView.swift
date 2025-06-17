@@ -1687,6 +1687,8 @@ class SettingsViewModel: ObservableObject {
     @Published var isShowingResults = false
     @Published var errorAlert: ErrorAlertConfiguration?
     @Published var isShowingErrorAlert = false
+    @Published var isShowingSongsPlayedTable = false
+    @Published var showingDeleteSongsPlayedAlert = false
     
     @AppStorage("swipeToDeleteEnabled") var swipeToDeleteEnabled = false  // Use @AppStorage for automatic persistence
     
@@ -2057,16 +2059,35 @@ class SettingsViewModel: ObservableObject {
     }
     
     func showSongsPlayedTable() {
-        print("📊 Songs Played Table - Placeholder function called")
-        // TODO: Implement songs played table functionality
-        // This will show/manage the songs played history table
+        print("📊 Showing Songs Played Table")
+        isShowingSongsPlayedTable = true
     }
     
     func deleteSongsPlayedTable() {
-        print("🗑️ Delete Songs Played Table - Placeholder function called")
-        // TODO: Implement delete songs played table functionality
-        // This will clear all entries from the songs played history
-        // Should include confirmation dialog before deletion
+        print("🗑️ Delete Songs Played Table requested")
+        showingDeleteSongsPlayedAlert = true
+    }
+    
+    func confirmDeleteSongsPlayedTable() async {
+        print("🗑️ Executing delete of all songs played history")
+        
+        let context = PersistenceController.shared.container.viewContext
+        let request: NSFetchRequest<PlayedSongEntity> = PlayedSongEntity.fetchRequest()
+        
+        do {
+            let playedSongs = try context.fetch(request)
+            print("📊 Found \(playedSongs.count) played songs to delete")
+            
+            for playedSong in playedSongs {
+                context.delete(playedSong)
+            }
+            
+            try context.save()
+            print("✅ Successfully deleted all \(playedSongs.count) played songs from history")
+        } catch {
+            print("❌ Error deleting songs played history: \(error)")
+            showError(FilePickerError.processingFailed(reason: "Failed to delete songs played history: \(error.localizedDescription)"))
+        }
     }
     
     func monitorProcessingCompletion() {
@@ -2161,6 +2182,11 @@ struct SettingsView: View {
                 }
             )
         }
+        .sheet(isPresented: $viewModel.isShowingSongsPlayedTable) {
+            SongsPlayedTableView {
+                viewModel.isShowingSongsPlayedTable = false
+            }
+        }
         .alert(
             "Error",
             isPresented: Binding(
@@ -2208,6 +2234,22 @@ struct SettingsView: View {
             }
         } message: {
             Text("This will delete all the songs in the SONG LIST")
+        }
+        .alert(
+            "Delete Songs Played History?",
+            isPresented: $viewModel.showingDeleteSongsPlayedAlert
+        ) {
+            Button("Cancel", role: .cancel) {
+                viewModel.showingDeleteSongsPlayedAlert = false
+            }
+            Button("Delete All", role: .destructive) {
+                Task {
+                    await viewModel.confirmDeleteSongsPlayedTable()
+                }
+                viewModel.showingDeleteSongsPlayedAlert = false
+            }
+        } message: {
+            Text("This will permanently delete all songs played history records. This action cannot be undone.")
         }
         .onChange(of: viewModel.filePickerService.processingState) { oldState, newState in
             print("🎯 Processing state: \(oldState) → \(newState)")
