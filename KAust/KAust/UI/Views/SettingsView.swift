@@ -2007,8 +2007,23 @@ class SettingsViewModel: ObservableObject {
         // Clear any previous state
         filePickerService.clearResults()
         
-        // Open the folder picker
-        isShowingFolderPicker = true
+        // CRITICAL FIX: Dismiss Settings first to prevent presentation conflict
+        // Then present folder picker from ContentView level
+        DispatchQueue.main.async { [weak self] in
+            // Use environment dismiss if available, otherwise fallback to presentationMode
+            self?.dismissSettingsAndShowFolderPicker()
+        }
+    }
+    
+    private func dismissSettingsAndShowFolderPicker() {
+        // Dismiss Settings view first
+        isShowingFolderPicker = false  // Reset in case it was stuck
+        
+        // Post notification to ContentView to handle folder picker presentation
+        NotificationCenter.default.post(
+            name: .requestFolderPicker,
+            object: nil
+        )
     }
     
 
@@ -2319,13 +2334,7 @@ struct SettingsView: View {
                 filePickerService: viewModel.filePickerService
             )
         }
-        .sheet(isPresented: $viewModel.isShowingFolderPicker) {
-            FolderPickerView(
-                isPresented: $viewModel.isShowingFolderPicker,
-                onFolderSelected: viewModel.handleFolderSelected,
-                onError: viewModel.handleFilePickerError
-            )
-        }
+        // Folder picker now handled by ContentView to prevent presentation conflicts
         .sheet(isPresented: $viewModel.isShowingResults) {
             FileProcessingResultsView(
                 results: viewModel.filePickerService.results,
@@ -2963,19 +2972,6 @@ struct SettingsView: View {
                     accessoryType: .disclosure,
                     action: viewModel.deleteSongsPlayedTable
                 )
-                
-                SettingRow(
-                    title: "Delete the Song List",
-                    subtitle: "Deletes permanently metadata and MP4 files",
-                    icon: "trash.fill",
-                    iconColor: .red,
-                    accessoryType: .disclosure,
-                    action: {
-                        print("🗑️ DEBUG: Delete the Song List button tapped (from Admin Settings)!")
-                        showingClearSongsAlert = true
-                        print("🗑️ DEBUG: showingClearSongsAlert set to: \(showingClearSongsAlert)")
-                    }
-                )
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -3007,6 +3003,19 @@ struct SettingsView: View {
                     }
                 }
                 
+                // Delete Song List option
+                SettingRow(
+                    title: "Delete the Song List",
+                    subtitle: "Deletes permanently metadata and MP4 files",
+                    icon: "trash.fill",
+                    iconColor: .red,
+                    accessoryType: .disclosure,
+                    action: {
+                        print("🗑️ DEBUG: Delete the Song List button tapped (from Owner Settings)!")
+                        showingClearSongsAlert = true
+                        print("🗑️ DEBUG: showingClearSongsAlert set to: \(showingClearSongsAlert)")
+                    }
+                )
 
             }
             .padding(.horizontal, 16)

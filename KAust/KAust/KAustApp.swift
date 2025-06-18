@@ -11,6 +11,7 @@ import SwiftUI
 struct KAustApp: App {
     @State private var isSignedIn = false
     @State private var currentUserRole: UserRole = .client
+    @StateObject private var focusManager = FocusManager()
     let persistenceController = PersistenceController.shared
 
     var body: some Scene {
@@ -20,9 +21,17 @@ struct KAustApp: App {
                     ContentView()
                         .environment(\.managedObjectContext, persistenceController.container.viewContext)
                         .environmentObject(UserRoleManager(role: currentUserRole))
+                        .environmentObject(focusManager)
                 } else {
                     LoginView(isSignedIn: $isSignedIn, currentUserRole: $currentUserRole)
+                        .environmentObject(focusManager)
                 }
+        }
+        .backgroundTask(.appRefresh("keyboard-cleanup")) {
+            // Force dismiss keyboards when app goes to background
+            await MainActor.run {
+                focusManager.forceKeyboardDismiss()
+            }
         }
     }
 }
@@ -117,13 +126,17 @@ struct LoginView: View {
     @State private var showError = false
     @State private var errorMessage = ""
     
-    // Focus management for automatic cursor movement
-    @FocusState private var focusedField: FocusField?
+    // Sequential login state
+    @State private var loginStep: LoginStep = .username
     
-    enum FocusField {
+    enum LoginStep {
         case username
         case password
     }
+    
+    // Focus management for automatic cursor movement
+    @EnvironmentObject var focusManager: FocusManager
+    @FocusState private var isFieldFocused: Bool
     
     // Valid credentials
     private let validCredentials = [
@@ -151,61 +164,121 @@ struct LoginView: View {
                     .foregroundColor(.secondary)
             }
             
-            // Login Form
+            // Sequential Login Form
             VStack(spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Username")
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                // Progress indicator
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(loginStep == .username ? Color.blue : Color.blue.opacity(0.3))
+                        .frame(width: 8, height: 8)
                     
-                    TextField("Enter username", text: $username)
-                        .textFieldStyle(.roundedBorder)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled()
-                        .focused($focusedField, equals: .username)
-                        .onSubmit {
-                            // Move to password field when Enter is pressed
-                            focusedField = .password
-                        }
+                    Circle()
+                        .fill(loginStep == .password ? Color.blue : Color.gray.opacity(0.3))
+                        .frame(width: 8, height: 8)
+                    
+                    Spacer()
+                    
+                    Text("Step \(loginStep == .username ? 1 : 2) of 2")
+                        .font(.caption)
+                        .foregroundColor(.gray)
                 }
+                .padding(.horizontal, 40)
                 
+                // Current field
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Password")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    SecureField("Enter password", text: $password)
-                        .textFieldStyle(.roundedBorder)
-                        .focused($focusedField, equals: .password)
-                        .onSubmit {
-                            // Submit form when Enter is pressed in password field
-                            if !username.isEmpty && !password.isEmpty {
+                    if loginStep == .username {
+                        Text("Username")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        TextField("Enter username", text: $username)
+                            .textFieldStyle(.roundedBorder)
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled()
+                            .disableAutocorrection(true)
+                            .textInputAutocapitalization(.never)
+                            .keyboardType(.default)
+                            .submitLabel(.next)
+                            .focused($isFieldFocused)
+                            .onSubmit {
+                                proceedToNextStep()
+                            }
+                            .transition(.move(edge: .leading).combined(with: .opacity))
+                    } else {
+                        Text("Password")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        SecureField("Enter password", text: $password)
+                            .textFieldStyle(.roundedBorder)
+                            .textInputAutocapitalization(.never)
+                            .submitLabel(.go)
+                            .focused($isFieldFocused)
+                            .onSubmit {
                                 signIn()
                             }
-                        }
-                }
-                
-                Button(action: signIn) {
-                    HStack {
-                        Image(systemName: "key.fill")
-                        Text("Sign In")
+                            .transition(.move(edge: .trailing).combined(with: .opacity))
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.blue)
-                    .foregroundColor(.white)
-                    .cornerRadius(8)
                 }
-                .disabled(username.isEmpty || password.isEmpty)
+                .padding(.horizontal, 40)
+                .animation(.easeInOut(duration: 0.3), value: loginStep)
+                
+                // Action buttons
+                VStack(spacing: 12) {
+                    if loginStep == .username {
+                        Button(action: proceedToNextStep) {
+                            HStack {
+                                Text("Next")
+                                Image(systemName: "arrow.right")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(username.isEmpty ? Color.gray : Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .disabled(username.isEmpty)
+                    } else {
+                        Button(action: signIn) {
+                            HStack {
+                                Image(systemName: "key.fill")
+                                Text("Sign In")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(password.isEmpty ? Color.gray : Color.blue)
+                            .foregroundColor(.white)
+                            .cornerRadius(8)
+                        }
+                        .disabled(password.isEmpty)
+                        
+                        Button(action: goBackToUsername) {
+                            HStack {
+                                Image(systemName: "arrow.left")
+                                Text("Back")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.clear)
+                            .foregroundColor(.blue)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .stroke(Color.blue, lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+                .padding(.horizontal, 40)
+                .animation(.easeInOut(duration: 0.3), value: loginStep)
                 
                 if showError {
                     Text(errorMessage)
                         .foregroundColor(.red)
                         .font(.caption)
                         .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
                 }
             }
-            .padding(.horizontal, 40)
             
             // Credentials Helper
             VStack(spacing: 8) {
@@ -232,16 +305,51 @@ struct LoginView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemGroupedBackground))
         .onAppear {
-            // Automatically focus on username field when login view appears
+            // Automatically focus on the current field when login view appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedField = .username
+                isFieldFocused = true
+            }
+        }
+        .onDisappear {
+            // Force dismiss keyboard to prevent constraint conflicts
+            isFieldFocused = false
+            focusManager.forceKeyboardDismiss()
+        }
+        .onChange(of: loginStep) { _, _ in
+            // Auto-focus when changing steps
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                isFieldFocused = true
             }
         }
     }
     
+    private func proceedToNextStep() {
+        guard !username.isEmpty else { return }
+        
+        isFieldFocused = false
+        focusManager.clearFocus()
+        
+        withAnimation(.easeInOut(duration: 0.3)) {
+            loginStep = .password
+        }
+    }
+    
+    private func goBackToUsername() {
+        isFieldFocused = false
+        focusManager.clearFocus()
+        
+        withAnimation(.easeInOut(duration: 0.3)) {
+            loginStep = .username
+        }
+        
+        // Clear error when going back
+        showError = false
+    }
+    
     private func signIn() {
         // Clear focus when signing in
-        focusedField = nil
+        isFieldFocused = false
+        focusManager.clearFocus()
         
         print("🔐 Sign in attempt: \(username) / \(password)")
         
@@ -251,9 +359,9 @@ struct LoginView: View {
             errorMessage = "Invalid username or password"
             print("❌ Invalid credentials")
             
-            // Re-focus on username field for retry
+            // Go back to username step for retry
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                focusedField = .username
+                goBackToUsername()
             }
             return
         }

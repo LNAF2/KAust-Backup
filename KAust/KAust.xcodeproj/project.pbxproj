@@ -56,7 +56,6 @@
 				ContentView.swift,
 				Core/Data/KAustModel.xcdatamodeld,
 				Core/Data/PersistenceController.swift,
-				Core/Managers/FocusManager.swift,
 				Core/Models/AppSong.swift,
 				Core/Models/Song.swift,
 				Core/Services/AuthenticationServiceProtocol.swift,

@@ -35,7 +35,6 @@ struct SonglistEmptyState: View {
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.top, -50441
-        ) // Compensate for search bar pushing content down
+        .padding(.top, -50) // Compensate for search bar pushing content down
     }
 }

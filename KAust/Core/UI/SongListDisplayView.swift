@@ -133,6 +133,7 @@ struct SongListDisplayView: View {
 
 struct SearchBarView: View {
     @Binding var text: String
+    @EnvironmentObject var focusManager: FocusManager
     @FocusState private var isSearchFocused: Bool
     
     var body: some View {
@@ -143,8 +144,19 @@ struct SearchBarView: View {
             TextField("Search songs...", text: $text)
                 .textFieldStyle(.plain)
                 .focused($isSearchFocused)
+                .autocorrectionDisabled()
+                .disableAutocorrection(true)
+                .textInputAutocapitalization(.never)
+                .keyboardType(.default)
+                .submitLabel(.search)
                 .onSubmit {
                     isSearchFocused = false
+                    focusManager.clearFocus()
+                }
+                .onChange(of: isSearchFocused) { _, focused in
+                    if !focused {
+                        focusManager.clearFocus()
+                    }
                 }
             
             if !text.isEmpty {

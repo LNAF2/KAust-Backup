@@ -6,6 +6,7 @@ struct DownloadProgressWindow: View {
     let progress: BatchProgress
     @ObservedObject var filePickerService: EnhancedFilePickerService
     let onDismiss: (() -> Void)?
+    let onShowResults: (() -> Void)?
     
     // Animation states
     @State private var progressRotation: Double = 0
@@ -61,11 +62,11 @@ struct DownloadProgressWindow: View {
     
     private var windowTitle: some View {
         HStack {
-            Text("Download Progress Window")
+            Spacer()
+            Text("DOWNLOAD PROGRESS WINDOW")
                 .font(.title)
                 .fontWeight(.bold)
                 .foregroundColor(.white)
-            
             Spacer()
         }
         .padding(.bottom, 8)
@@ -75,22 +76,7 @@ struct DownloadProgressWindow: View {
     
     private var headerSection: some View {
         HStack(spacing: 16) {
-            Image(systemName: "arrow.down.circle.fill")
-                .font(.system(size: 32))
-                .foregroundColor(.blue)
-                .scaleEffect(pulseAnimation)
-            
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Download Progress")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                Text(processingStateText)
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.8))
-            }
-            
+            // Removed blue circle icon and "Download Progress" text and state text
             Spacer()
         }
     }
@@ -339,6 +325,25 @@ struct DownloadProgressWindow: View {
                     }
                 }
                 
+                // RESULT button - show when there are results to display
+                if !filePickerService.results.isEmpty {
+                    Button(action: {
+                        onShowResults?()
+                    }) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "doc.text.magnifyingglass")
+                            Text("Result")
+                        }
+                        .foregroundColor(.blue)
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 20)
+                                .stroke(Color.blue, lineWidth: 1)
+                        )
+                    }
+                }
+                
                 Spacer()
                 
                 // Close button (only for completed states)
@@ -365,14 +370,14 @@ struct DownloadProgressWindow: View {
             // Time information
             HStack {
                 Text("Elapsed: \(formatElapsedTime())")
-                    .font(.caption)
+                    .font(.body)
                     .foregroundColor(.white.opacity(0.7))
                 
                 Spacer()
                 
                 if filePickerService.processingState == .processing {
                     Text("Estimated remaining: \(formatEstimatedTime())")
-                        .font(.caption)
+                        .font(.body)
                         .foregroundColor(.white.opacity(0.7))
                 }
             }
@@ -553,6 +558,7 @@ struct DownloadProgressWindow: View {
             currentFileName: "Sample Song.mp4"
         ),
         filePickerService: EnhancedFilePickerService(),
-        onDismiss: nil
+        onDismiss: nil,
+        onShowResults: nil
     )
 } 

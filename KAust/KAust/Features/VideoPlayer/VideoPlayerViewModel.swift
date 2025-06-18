@@ -8,6 +8,7 @@ import SwiftUI
 extension Notification.Name {
     static let deleteSongFromPlaylist = Notification.Name("deleteSongFromPlaylist")
     static let playbackFailed = Notification.Name("playbackFailed")
+    static let requestFolderPicker = Notification.Name("requestFolderPicker")
 }
 
 @MainActor
