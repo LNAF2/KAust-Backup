@@ -6,11 +6,45 @@ struct KAustApp: App {
     
     var body: some Scene {
         WindowGroup {
+            VStack {
+                Text("🔍 DEBUG: KAustApp.swift is running")
+                    .foregroundColor(.red)
+                    .padding()
+                Text("🔍 DEBUG: isSignedIn = \(isSignedIn)")
+                    .foregroundColor(.red)
+                    .padding()
+            }
+            .background(Color.yellow)
+            .onAppear {
+                print("🔍 DEBUG: KAustApp appeared - isSignedIn = \(isSignedIn)")
+            }
+            
             if isSignedIn {
-                MainView()
+                ContentView()
+                    .onAppear {
+                        print("🔍 DEBUG: ContentView appeared because isSignedIn = true")
+                    }
             } else {
-                SignInView()
-                    .environment(\.isSignedIn, $isSignedIn)
+                // Temporary simple login screen for debugging
+                VStack(spacing: 20) {
+                    Text("KAUST LOGIN REQUIRED")
+                        .font(.title)
+                        .fontWeight(.bold)
+                    
+                    Text("Debugging: isSignedIn = \(isSignedIn)")
+                        .font(.caption)
+                        .foregroundColor(.gray)
+                    
+                    Button("Sign In") {
+                        isSignedIn = true
+                    }
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.gray.opacity(0.1))
             }
         }
     }

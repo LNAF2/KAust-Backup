@@ -7,10 +7,11 @@
 
 import SwiftUI
 import AVKit
+import Foundation
 
 struct ContentView: View {
-    @StateObject private var videoPlayerViewModel = VideoPlayerViewModel()
     @StateObject private var playlistViewModel: PlaylistViewModel
+    @StateObject private var videoPlayerViewModel = VideoPlayerViewModel()
     @StateObject private var settingsViewModel = SettingsViewModel()  // Global settings view model
     @State private var showSettings = false
     @State private var showingDownloadProgressWindow = false  // Global download progress state

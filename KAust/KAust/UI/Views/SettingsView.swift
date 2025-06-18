@@ -2271,6 +2271,7 @@ class SettingsViewModel: ObservableObject {
 struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var viewModel: SettingsViewModel  // Use injected view model
+    @EnvironmentObject var roleManager: UserRoleManager  // Add role manager for access control
     @State private var showingClearSongsAlert = false
     @State private var showingCompletionOverlay = false
     @State private var hasCompletionResults = false  // Track when results are ready to show
@@ -2448,27 +2449,64 @@ struct SettingsView: View {
     
     private var settingsContent: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // AirPlay section - at the top
-            airPlaySection
-            
-            // Administrator Settings section
-            appSettingsSection
-            
-            // Owner Settings section
-            ownerSettingsSection
-            
-            // Account section
-            accountSection
-            
-            // App Info section
-            appInfoSection
-            
-            // Programmer Management section - moved to last
-            programmerListManagementSection
-            
-            // Storage Management
-            Section("Storage") {
+            // AirPlay section - Everyone can see this
+            if roleManager.canAccessAirplaySettings {
+                airPlaySection
             }
+            
+            // Administrator Settings section - Admin, Dev, Owner only
+            if roleManager.canAccessAdministratorSettings {
+                appSettingsSection
+            }
+            
+            // Owner Settings section - Dev and Owner only
+            if roleManager.canAccessAllSettings {
+                ownerSettingsSection
+            }
+            
+            // Account section - Admin, Dev, Owner only  
+            if roleManager.canAccessAdministratorSettings {
+                accountSection
+            }
+            
+            // App Info section - Admin, Dev, Owner only
+            if roleManager.canAccessAdministratorSettings {
+                appInfoSection
+            }
+            
+            // Programmer Management section - Dev and Owner only
+            if roleManager.canAccessAllSettings {
+                programmerListManagementSection
+            }
+            
+            // Storage Management - Admin, Dev, Owner only
+            if roleManager.canAccessAdministratorSettings {
+                Section("Storage") {
+                }
+            }
+            
+            // Debug: Show current role for testing
+            VStack(alignment: .leading, spacing: 8) {
+                Text("🔐 Current Role: \(roleManager.roleDisplayName)")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text("🎯 Access Level:")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text("  • Airplay: \(roleManager.canAccessAirplaySettings ? "✅" : "❌")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text("  • Admin Settings: \(roleManager.canAccessAdministratorSettings ? "✅" : "❌")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text("  • All Settings: \(roleManager.canAccessAllSettings ? "✅" : "❌")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+            }
+            .padding(.top, 20)
+            .padding(.horizontal, 16)
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(8)
         }
     }
     
