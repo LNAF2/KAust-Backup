@@ -14,7 +14,7 @@ struct TitlePanelView: View {
     private let panelGap: CGFloat = 8 // Match ControlsPanelView's panelGap
     private let starSize: CGFloat = 12.0
     private let logoFontName: String = "Helvetica" // Replace with your font if needed
-
+    
     var textFontSize: CGFloat { panelHeight * 0.60 }
     private let kFontSize: CGFloat = 200 // Large on purpose, will be clipped/scaled
 

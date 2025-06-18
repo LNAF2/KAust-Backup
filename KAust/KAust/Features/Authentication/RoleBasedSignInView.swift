@@ -36,37 +36,48 @@ struct RoleBasedSignInView: View {
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Background
-                AppTheme.appBackground
+                // Beautiful purple background using the dark purple from assets
+                AppTheme.leftPanelBackground
                     .ignoresSafeArea()
                 
-                // Main content
-                VStack(spacing: 32) {
-                    Spacer()
-                    
-                    // App title
-                    titleSection
-                    
-                    // Login methods
-                    VStack(spacing: 24) {
-                        passwordLoginSection
-                        
-                        dividerSection
-                        
-                        appleSignInSection
+                VStack(spacing: 60) {
+                    // Large beautiful title above login
+                    VStack(spacing: 8) {
+                        HStack(spacing: 8) {
+                            // "REAL" in white (no bold)
+                            Text("REAL")
+                                .font(.system(size: 72, weight: .regular))
+                                .foregroundColor(.white)
+                            
+                            // Large "K" in red (no bold)
+                            Text("K")
+                                .font(.system(size: 120, weight: .regular))
+                                .foregroundColor(.red)
+                            
+                            // Red star
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 32))
+                                .foregroundColor(.red)
+                            
+                            // "ARAOKE" in white (no bold)
+                            Text("ARAOKE")
+                                .font(.system(size: 72, weight: .regular))
+                                .foregroundColor(.white)
+                        }
+                        .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
                     }
-                    .padding(.horizontal, 40)
+                    .padding(.top, 40)
+                    
+                    // Compact login card
+                    compactLoginCard
+                        .frame(maxWidth: 400)
+                    
+                    Spacer()
                     
                     // Role info button
                     roleInfoButton
-                    
-                    Spacer()
-                    
-                    // Current user info (if any)
-                    if let user = authService.currentUser {
-                        currentUserInfo(user)
-                    }
                 }
+                .padding(.horizontal, 32)
                 
                 // Loading overlay
                 if isLoading {
@@ -124,77 +135,62 @@ struct RoleBasedSignInView: View {
     
     // MARK: - View Components
     
-    private var titleSection: some View {
-        VStack(spacing: 8) {
-            Text("REAL K*ARAOKE")
-                .font(.system(size: 40, weight: .bold))
-                .foregroundColor(AppTheme.leftPanelAccent)
-            
-            Text("Role-Based Access System")
-                .font(.title3)
-                .foregroundColor(AppTheme.leftPanelAccent.opacity(0.7))
-        }
-    }
-    
-    private var passwordLoginSection: some View {
-        VStack(spacing: 16) {
-            Text("Sign In with Role Credentials")
-                .font(.headline)
-                .foregroundColor(AppTheme.leftPanelAccent)
-            
-            // Progress indicator
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(loginStep == .username ? AppTheme.leftPanelAccent : AppTheme.leftPanelAccent.opacity(0.3))
-                    .frame(width: 8, height: 8)
+    private var compactLoginCard: some View {
+        VStack(spacing: 20) {
+            // Card header
+            VStack(spacing: 8) {
+                Text("Sign In")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
                 
-                Circle()
-                    .fill(loginStep == .password ? AppTheme.leftPanelAccent : Color.gray.opacity(0.3))
-                    .frame(width: 8, height: 8)
+                Text("Role-Based Access")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
                 
-                Spacer()
-                
-                Text("Step \(loginStep == .username ? 1 : 2) of 2")
-                    .font(.caption)
-                    .foregroundColor(AppTheme.leftPanelAccent.opacity(0.7))
+                // Progress dots
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(loginStep == .username ? Color.blue : Color.gray.opacity(0.3))
+                        .frame(width: 8, height: 8)
+                    
+                    Circle()
+                        .fill(loginStep == .password ? Color.blue : Color.gray.opacity(0.3))
+                        .frame(width: 8, height: 8)
+                }
             }
-            .padding(.horizontal, 16)
             
+            // Sequential input field
             VStack(spacing: 12) {
-                // Current field
                 if loginStep == .username {
+                    // Username field
                     HStack {
-                        Image(systemName: "person.circle")
-                            .foregroundColor(AppTheme.leftPanelAccent.opacity(0.6))
+                        Image(systemName: "person.circle.fill")
+                            .foregroundColor(.blue)
                             .frame(width: 20)
                         
-                        TextField("Username (owner, admin, dev, client)", text: $username)
+                        TextField("Username", text: $username)
                             .textFieldStyle(.plain)
                             .focused($isFieldFocused)
                             .autocorrectionDisabled()
-                            .disableAutocorrection(true)
                             .textInputAutocapitalization(.never)
-                            .keyboardType(.default)
                             .submitLabel(.next)
-                            .onSubmit {
-                                proceedToNextStep()
-                            }
+                            .onSubmit(proceedToNextStep)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding()
                     .background(
                         RoundedRectangle(cornerRadius: cornerRadius)
-                            .fill(Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: cornerRadius)
-                                    .stroke(AppTheme.leftPanelAccent.opacity(0.3), lineWidth: 1)
-                            )
+                            .fill(Color(.systemGray6))
                     )
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .leading).combined(with: .opacity),
+                        removal: .move(edge: .trailing).combined(with: .opacity)
+                    ))
                 } else {
+                    // Password field
                     HStack {
-                        Image(systemName: "lock.circle")
-                            .foregroundColor(AppTheme.leftPanelAccent.opacity(0.6))
+                        Image(systemName: "lock.circle.fill")
+                            .foregroundColor(.blue)
                             .frame(width: 20)
                         
                         SecureField("Password", text: $password)
@@ -203,142 +199,144 @@ struct RoleBasedSignInView: View {
                             .textInputAutocapitalization(.never)
                             .submitLabel(.go)
                             .onSubmit {
-                                Task {
-                                    await performPasswordLogin()
-                                }
+                                Task { await performPasswordLogin() }
                             }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding()
                     .background(
                         RoundedRectangle(cornerRadius: cornerRadius)
-                            .fill(Color.white)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: cornerRadius)
-                                    .stroke(AppTheme.leftPanelAccent.opacity(0.3), lineWidth: 1)
-                            )
+                            .fill(Color(.systemGray6))
                     )
-                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    ))
                 }
                 
                 // Action buttons
-                VStack(spacing: 8) {
-                    if loginStep == .username {
-                        Button(action: proceedToNextStep) {
-                            HStack {
-                                Text("Next")
-                                Image(systemName: "arrow.right")
-                            }
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: cornerRadius)
-                                    .fill(username.isEmpty ? Color.gray : AppTheme.leftPanelAccent)
-                            )
-                        }
-                        .disabled(username.isEmpty)
-                    } else {
-                        Button(action: {
-                            Task {
-                                await performPasswordLogin()
-                            }
-                        }) {
-                            HStack {
-                                if isLoading {
-                                    ProgressView()
-                                        .scaleEffect(0.8)
-                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                }
-                                
-                                Text(isLoading ? "Signing In..." : "Sign In")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: cornerRadius)
-                                    .fill(password.isEmpty ? Color.gray : AppTheme.leftPanelAccent)
-                            )
-                        }
-                        .disabled(isLoading || password.isEmpty)
-                        
+                HStack(spacing: 12) {
+                    if loginStep == .password {
+                        // Back button
                         Button(action: goBackToUsername) {
-                            HStack {
-                                Image(systemName: "arrow.left")
-                                Text("Back")
-                            }
-                            .font(.headline)
-                            .foregroundColor(AppTheme.leftPanelAccent)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(
-                                RoundedRectangle(cornerRadius: cornerRadius)
-                                    .stroke(AppTheme.leftPanelAccent, lineWidth: 1)
-                            )
+                            Image(systemName: "arrow.left")
+                                .font(.headline)
+                                .foregroundColor(.blue)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    Circle()
+                                        .stroke(Color.blue, lineWidth: 1.5)
+                                )
                         }
                     }
+                    
+                    // Main action button
+                    Button(action: {
+                        if loginStep == .username {
+                            proceedToNextStep()
+                        } else {
+                            Task { await performPasswordLogin() }
+                        }
+                    }) {
+                        HStack {
+                            if isLoading {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            }
+                            
+                            Text(buttonText)
+                                .fontWeight(.semibold)
+                            
+                            if loginStep == .username && !isLoading {
+                                Image(systemName: "arrow.right")
+                            }
+                        }
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 44)
+                        .background(
+                            RoundedRectangle(cornerRadius: cornerRadius)
+                                .fill(buttonColor)
+                        )
+                    }
+                    .disabled(isButtonDisabled)
                 }
             }
             .animation(.easeInOut(duration: 0.3), value: loginStep)
-        }
-    }
-    
-    private var dividerSection: some View {
-        HStack {
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(AppTheme.leftPanelAccent.opacity(0.3))
             
-            Text("OR")
-                .font(.caption)
-                .foregroundColor(AppTheme.leftPanelAccent.opacity(0.6))
-                .padding(.horizontal, 16)
+            // Divider
+            HStack {
+                Rectangle()
+                    .frame(height: 1)
+                    .foregroundColor(.gray.opacity(0.3))
+                
+                Text("OR")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                    .padding(.horizontal, 12)
+                
+                Rectangle()
+                    .frame(height: 1)
+                    .foregroundColor(.gray.opacity(0.3))
+            }
             
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(AppTheme.leftPanelAccent.opacity(0.3))
-        }
-    }
-    
-    private var appleSignInSection: some View {
-        VStack(spacing: 12) {
-            Text("Sign In with Apple ID")
-                .font(.headline)
-                .foregroundColor(AppTheme.leftPanelAccent)
-            
-            Text("(Default: Client Role)")
-                .font(.caption)
-                .foregroundColor(AppTheme.leftPanelAccent.opacity(0.6))
-            
+            // Apple Sign In (compact)
             SignInWithAppleButton(
                 onRequest: { request in
                     request.requestedScopes = [.fullName, .email]
                 },
                 onCompletion: { result in
-                    Task {
-                        await handleAppleSignIn(result)
-                    }
+                    Task { await handleAppleSignIn(result) }
                 }
             )
             .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-            .frame(height: 50)
+            .frame(height: 44)
             .cornerRadius(cornerRadius)
+        }
+        .padding(24)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+        )
+    }
+    
+    private var buttonText: String {
+        if isLoading {
+            return "Signing In..."
+        } else if loginStep == .username {
+            return "Next"
+        } else {
+            return "Sign In"
+        }
+    }
+    
+    private var buttonColor: Color {
+        if isButtonDisabled {
+            return .gray
+        } else {
+            return .blue
+        }
+    }
+    
+    private var isButtonDisabled: Bool {
+        if isLoading {
+            return true
+        } else if loginStep == .username {
+            return username.isEmpty
+        } else {
+            return password.isEmpty
         }
     }
     
     private var roleInfoButton: some View {
-        Button(action: {
-            showingRoleInfo = true
-        }) {
+        Button(action: { showingRoleInfo = true }) {
             HStack {
                 Image(systemName: "info.circle")
-                Text("View Role Information")
+                Text("Role Information")
             }
             .font(.caption)
-            .foregroundColor(AppTheme.leftPanelAccent.opacity(0.7))
+            .foregroundColor(.white.opacity(0.8))
         }
     }
     
@@ -356,32 +354,6 @@ struct RoleBasedSignInView: View {
                         .padding(.top, 8)
                 }
             )
-    }
-    
-    private func currentUserInfo(_ user: UserSession) -> some View {
-        VStack(spacing: 4) {
-            Text("Current User")
-                .font(.caption)
-                .foregroundColor(AppTheme.leftPanelAccent.opacity(0.6))
-            
-            Text("\(user.displayName) (\(user.role.displayName))")
-                .font(.subheadline)
-                .foregroundColor(AppTheme.leftPanelAccent)
-            
-            Button("Sign Out") {
-                Task {
-                    await authService.signOut()
-                }
-            }
-            .font(.caption)
-            .foregroundColor(.red)
-        }
-        .padding()
-        .background(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(AppTheme.leftPanelAccent.opacity(0.1))
-        )
-        .padding(.horizontal, 40)
     }
     
     private var roleInfoSheet: some View {

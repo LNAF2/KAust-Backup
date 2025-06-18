@@ -456,16 +456,7 @@ struct ContentView: View {
                         .stroke(AppTheme.leftPanelBorderColor, lineWidth: 1)
                 )
             
-            // Middle Left Panel - CONTROLS  
-            ControlsPanelView()
-                .frame(height: middlePanelHeight)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(AppTheme.leftPanelBorderColor, lineWidth: 1)
-                )
-            
-            // Bottom Left Panel - SONG LIST (Keep original purple border)
+            // Bottom Left Panel - SONG LIST (now takes remaining space)
             SongListView(playlistViewModel: playlistViewModel)
                 .frame(maxHeight: CGFloat.infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -479,8 +470,8 @@ struct ContentView: View {
     
     private func rightColumn(totalHeight: CGFloat, columnWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
-            // Top Right Panel - EMPTY
-            EmptyPanelView()
+            // Top Right Panel - EMPTY with COG icon
+            EmptyPanelView(onSettingsTapped: { showSettings = true })
                 .frame(height: topPanelHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
@@ -488,18 +479,7 @@ struct ContentView: View {
                         .stroke(AppTheme.rightPanelBorderColor, lineWidth: 1)
                 )
             
-            // Middle Right Panel - SETTINGS ACCESS
-            SettingsAccessPanelView {
-                showSettings = true
-            }
-            .frame(height: middlePanelHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(AppTheme.rightPanelBorderColor, lineWidth: 1)
-            )
-            
-            // Bottom Right Panel - PLAYLIST (Keep original red border)
+            // Bottom Right Panel - PLAYLIST (now takes remaining space)
             PlaylistView(
                 viewModel: playlistViewModel,
                 onSongSelected: { song in

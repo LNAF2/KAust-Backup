@@ -16,16 +16,17 @@ struct KAustApp: App {
 
     var body: some Scene {
         WindowGroup {
-                        // Role-based access control is now implemented!
-                if isSignedIn {
-                    ContentView()
-                        .environment(\.managedObjectContext, persistenceController.container.viewContext)
-                        .environmentObject(UserRoleManager(role: currentUserRole))
-                        .environmentObject(focusManager)
-                } else {
-                    LoginView(isSignedIn: $isSignedIn, currentUserRole: $currentUserRole)
-                        .environmentObject(focusManager)
-                }
+            // Role-based access control is now implemented!
+            if isSignedIn {
+                ContentView()
+                    .environment(\.managedObjectContext, persistenceController.container.viewContext)
+                    .environmentObject(UserRoleManager(role: currentUserRole))
+                    .environmentObject(focusManager)
+            } else {
+                // Beautiful new purple login screen with large title!
+                BeautifulLoginView(isSignedIn: $isSignedIn, currentUserRole: $currentUserRole)
+                    .environmentObject(focusManager)
+            }
         }
         .backgroundTask(.appRefresh("keyboard-cleanup")) {
             // Force dismiss keyboards when app goes to background
@@ -118,13 +119,16 @@ class UserRoleManager: ObservableObject {
     }
 }
 
-struct LoginView: View {
+// MARK: - Beautiful Purple Login Screen
+
+struct BeautifulLoginView: View {
     @Binding var isSignedIn: Bool
     @Binding var currentUserRole: UserRole
     @State private var username = ""
     @State private var password = ""
     @State private var showError = false
     @State private var errorMessage = ""
+    @State private var isLoading = false
     
     // Sequential login state
     @State private var loginStep: LoginStep = .username
@@ -146,180 +150,233 @@ struct LoginView: View {
         "client": "client"
     ]
     
+    private let cornerRadius: CGFloat = 8
+    
     var body: some View {
-        VStack(spacing: 30) {
-            // Header
-            VStack(spacing: 10) {
-                Text("🏛️ KAUST")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .foregroundColor(.blue)
+        GeometryReader { geometry in
+            ZStack {
+                // Beautiful darker purple background - rich and dramatic
+                Color(red: 0.35, green: 0.08, blue: 0.40)  // Deep purple
+                    .ignoresSafeArea()
                 
-                Text("Karaoke Australia")
-                    .font(.title2)
-                    .foregroundColor(.gray)
-                
-                Text("Please sign in to continue")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
-            // Sequential Login Form
-            VStack(spacing: 20) {
-                // Progress indicator
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(loginStep == .username ? Color.blue : Color.blue.opacity(0.3))
-                        .frame(width: 8, height: 8)
-                    
-                    Circle()
-                        .fill(loginStep == .password ? Color.blue : Color.gray.opacity(0.3))
-                        .frame(width: 8, height: 8)
-                    
+                // Main content
+                VStack(spacing: 40) {
                     Spacer()
                     
-                    Text("Step \(loginStep == .username ? 1 : 2) of 2")
-                        .font(.caption)
-                        .foregroundColor(.gray)
-                }
-                .padding(.horizontal, 40)
-                
-                // Current field
-                VStack(alignment: .leading, spacing: 8) {
-                    if loginStep == .username {
-                        Text("Username")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        TextField("Enter username", text: $username)
-                            .textFieldStyle(.roundedBorder)
-                            .autocapitalization(.none)
-                            .autocorrectionDisabled()
-                            .disableAutocorrection(true)
-                            .textInputAutocapitalization(.never)
-                            .keyboardType(.default)
-                            .submitLabel(.next)
-                            .focused($isFieldFocused)
-                            .onSubmit {
-                                proceedToNextStep()
-                            }
-                            .transition(.move(edge: .leading).combined(with: .opacity))
-                    } else {
-                        Text("Password")
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                        
-                        SecureField("Enter password", text: $password)
-                            .textFieldStyle(.roundedBorder)
-                            .textInputAutocapitalization(.never)
-                            .submitLabel(.go)
-                            .focused($isFieldFocused)
-                            .onSubmit {
-                                signIn()
-                            }
-                            .transition(.move(edge: .trailing).combined(with: .opacity))
-                    }
-                }
-                .padding(.horizontal, 40)
-                .animation(.easeInOut(duration: 0.3), value: loginStep)
-                
-                // Action buttons
-                VStack(spacing: 12) {
-                    if loginStep == .username {
-                        Button(action: proceedToNextStep) {
-                            HStack {
-                                Text("Next")
-                                Image(systemName: "arrow.right")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(username.isEmpty ? Color.gray : Color.blue)
+                    // Large stylized title - exactly as requested!
+                    HStack(alignment: .center, spacing: 8) {
+                        // "REAL" in white (no bold)
+                        Text("REAL")
+                            .font(.system(size: 72, weight: .regular, design: .rounded))
                             .foregroundColor(.white)
-                            .cornerRadius(8)
-                        }
-                        .disabled(username.isEmpty)
-                    } else {
-                        Button(action: signIn) {
-                            HStack {
-                                Image(systemName: "key.fill")
-                                Text("Sign In")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(password.isEmpty ? Color.gray : Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(8)
-                        }
-                        .disabled(password.isEmpty)
                         
-                        Button(action: goBackToUsername) {
-                            HStack {
-                                Image(systemName: "arrow.left")
-                                Text("Back")
+                        // "K" in red (large, no bold)
+                        Text("K")
+                            .font(.system(size: 120, weight: .regular, design: .rounded))
+                            .foregroundColor(.red)
+                        
+                        // Star in red
+                        Image(systemName: "star.fill")
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(width: 32, height: 32)
+                            .foregroundColor(.red)
+                        
+                        // "ARAOKE" in white (no bold)
+                        Text("ARAOKE")
+                            .font(.system(size: 72, weight: .regular, design: .rounded))
+                            .foregroundColor(.white)
+                    }
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 2, y: 2)
+                    
+                    // Compact login card
+                    VStack(spacing: 20) {
+                        // Card header
+                        VStack(spacing: 8) {
+                            Text("Sign In")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                            
+                            Text("Role-Based Access")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            
+                            // Progress dots
+                            HStack(spacing: 8) {
+                                Circle()
+                                    .fill(loginStep == .username ? Color.blue : Color.gray.opacity(0.3))
+                                    .frame(width: 8, height: 8)
+                                
+                                Circle()
+                                    .fill(loginStep == .password ? Color.blue : Color.gray.opacity(0.3))
+                                    .frame(width: 8, height: 8)
                             }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.clear)
-                            .foregroundColor(.blue)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .stroke(Color.blue, lineWidth: 1)
-                            )
+                        }
+                        
+                        // Sequential input field
+                        VStack(spacing: 12) {
+                            if loginStep == .username {
+                                // Username field
+                                HStack {
+                                    Image(systemName: "person.circle.fill")
+                                        .foregroundColor(.blue)
+                                        .frame(width: 20)
+                                    
+                                    TextField("Username", text: $username)
+                                        .textFieldStyle(.plain)
+                                        .focused($isFieldFocused)
+                                        .autocorrectionDisabled()
+                                        .textInputAutocapitalization(.never)
+                                        .submitLabel(.next)
+                                        .onSubmit(proceedToNextStep)
+                                }
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: cornerRadius)
+                                        .fill(Color(.systemGray6))
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .leading).combined(with: .opacity),
+                                    removal: .move(edge: .trailing).combined(with: .opacity)
+                                ))
+                            } else {
+                                // Password field
+                                HStack {
+                                    Image(systemName: "lock.circle.fill")
+                                        .foregroundColor(.blue)
+                                        .frame(width: 20)
+                                    
+                                    SecureField("Password", text: $password)
+                                        .textFieldStyle(.plain)
+                                        .focused($isFieldFocused)
+                                        .textInputAutocapitalization(.never)
+                                        .submitLabel(.go)
+                                        .onSubmit(signIn)
+                                }
+                                .padding()
+                                .background(
+                                    RoundedRectangle(cornerRadius: cornerRadius)
+                                        .fill(Color(.systemGray6))
+                                )
+                                .transition(.asymmetric(
+                                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                ))
+                            }
+                            
+                            // Action buttons
+                            HStack(spacing: 12) {
+                                if loginStep == .password {
+                                    // Back button
+                                    Button(action: goBackToUsername) {
+                                        Image(systemName: "arrow.left")
+                                            .font(.headline)
+                                            .foregroundColor(.blue)
+                                            .frame(width: 44, height: 44)
+                                            .background(
+                                                Circle()
+                                                    .stroke(Color.blue, lineWidth: 1.5)
+                                            )
+                                    }
+                                }
+                                
+                                // Main action button
+                                Button(action: {
+                                    if loginStep == .username {
+                                        proceedToNextStep()
+                                    } else {
+                                        signIn()
+                                    }
+                                }) {
+                                    HStack {
+                                        if isLoading {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                        }
+                                        
+                                        Text(buttonText)
+                                            .fontWeight(.semibold)
+                                        
+                                        if loginStep == .username && !isLoading {
+                                            Image(systemName: "arrow.right")
+                                        }
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 44)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: cornerRadius)
+                                            .fill(buttonColor)
+                                    )
+                                }
+                                .disabled(isButtonDisabled)
+                            }
+                        }
+                        .animation(.easeInOut(duration: 0.3), value: loginStep)
+                        
+                        if showError {
+                            Text(errorMessage)
+                                .foregroundColor(.red)
+                                .font(.caption)
+                                .multilineTextAlignment(.center)
                         }
                     }
+                    .padding(24)
+                    .frame(maxWidth: 400)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(.ultraThinMaterial)
+                            .shadow(color: .black.opacity(0.2), radius: 20, x: 0, y: 10)
+                    )
+                    
+                    Spacer()
                 }
-                .padding(.horizontal, 40)
-                .animation(.easeInOut(duration: 0.3), value: loginStep)
-                
-                if showError {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 40)
-                }
+                .padding(.horizontal, 32)
             }
-            
-            // Credentials Helper
-            VStack(spacing: 8) {
-                Text("Valid Credentials:")
-                    .font(.caption)
-                    .foregroundColor(.gray)
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("owner / qqq")
-                    Text("admin / admin") 
-                    Text("dev / dev")
-                    Text("client / client")
-                }
-                .font(.caption)
-                .foregroundColor(.blue)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(Color.blue.opacity(0.1))
-                .cornerRadius(8)
-            }
-            
-            Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.systemGroupedBackground))
         .onAppear {
-            // Automatically focus on the current field when login view appears
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isFieldFocused = true
             }
         }
         .onDisappear {
-            // Force dismiss keyboard to prevent constraint conflicts
             isFieldFocused = false
             focusManager.forceKeyboardDismiss()
         }
         .onChange(of: loginStep) { _, _ in
-            // Auto-focus when changing steps
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 isFieldFocused = true
             }
+        }
+    }
+    
+    private var buttonText: String {
+        if isLoading {
+            return "Signing In..."
+        } else if loginStep == .username {
+            return "Next"
+        } else {
+            return "Sign In"
+        }
+    }
+    
+    private var buttonColor: Color {
+        if isButtonDisabled {
+            return .gray
+        } else {
+            return .blue
+        }
+    }
+    
+    private var isButtonDisabled: Bool {
+        if isLoading {
+            return true
+        } else if loginStep == .username {
+            return username.isEmpty
+        } else {
+            return password.isEmpty
         }
     }
     
@@ -342,40 +399,35 @@ struct LoginView: View {
             loginStep = .username
         }
         
-        // Clear error when going back
         showError = false
+        isLoading = false
     }
     
     private func signIn() {
-        // Clear focus when signing in
         isFieldFocused = false
         focusManager.clearFocus()
-        
-        print("🔐 Sign in attempt: \(username) / \(password)")
+        isLoading = true
         
         guard let expectedPassword = validCredentials[username.lowercased()],
               expectedPassword == password else {
             showError = true
             errorMessage = "Invalid username or password"
-            print("❌ Invalid credentials")
+            isLoading = false
             
-            // Go back to username step for retry
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 goBackToUsername()
             }
             return
         }
         
-        // Set the user's role based on their username
         if let role = UserRole(rawValue: username.lowercased()) {
             currentUserRole = role
-            print("✅ Valid credentials - signing in as \(role.displayName)")
         } else {
             currentUserRole = .client
-            print("⚠️ Unknown role, defaulting to client")
         }
         
         showError = false
+        isLoading = false
         isSignedIn = true
     }
 }
