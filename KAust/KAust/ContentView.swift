@@ -398,7 +398,18 @@ struct CustomVideoPlayerView: View {
                 // Pure local state - zero @Published property access
                 state = value.translation
             }
+            .onChanged { _ in
+                // PERFORMANCE: Enter ultra-performance mode on first drag movement
+                Task {
+                    await viewModel.startDragging()
+                }
+            }
             .onEnded { value in
+                // PERFORMANCE: Exit ultra-performance mode when drag ends
+                Task {
+                    await viewModel.stopDragging()
+                }
+                
                 // Commit final position - update both local and viewModel
                 basePosition = CGSize(
                     width: basePosition.width + value.translation.width,

@@ -24,6 +24,10 @@ class SongListViewModel: ObservableObject {
     @Published var showingSuggestions = false
     @Published var error: Error?
     
+    // MARK: - Performance Mode Tracking
+    @Published private(set) var isInPerformanceMode = false
+    private var suspendedObservers = false
+
     private let persistenceController = PersistenceController.shared
     private var cancellables = Set<AnyCancellable>()
     private var allSongs: [Song] = [] // Keep original list for searching
@@ -42,16 +46,118 @@ class SongListViewModel: ObservableObject {
     }
     
     private func setupObservers() {
-        // Observe Core Data changes
+        // PERFORMANCE: Setup performance mode observers first
+        setupPerformanceModeObserver()
+        
+        // PERFORMANCE: Suspend Core Data observers during video playback for smooth performance
+        NotificationCenter.default.addObserver(
+            forName: .init("SuspendCoreDataObservers"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("⏸️ PERFORMANCE: OLD SongListViewModel suspending Core Data observers for smooth video")
+            Task { @MainActor in
+                self?.suspendedObservers = true
+                self?.cancellables.removeAll() // Suspend all reactive observers
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .init("RestoreCoreDataObservers"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("▶️ PERFORMANCE: OLD SongListViewModel restoring Core Data observers")
+            Task { @MainActor in
+                self?.suspendedObservers = false
+                self?.setupObservers() // Restore observers
+            }
+        }
+        
+        // Don't setup observers if they are currently suspended
+        guard !suspendedObservers else {
+            print("⏸️ PERFORMANCE: Skipping Core Data observer setup - currently suspended")
+            return
+        }
+        
+        // PERFORMANCE: Debounced Core Data observer to prevent excessive refreshes
         NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
+            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
+                // Skip processing during performance mode
+                guard !(self?.isInPerformanceMode ?? false) else {
+                    print("⏸️ PERFORMANCE: Skipping Core Data update during video playback")
+                    return
+                }
+                
                 Task { @MainActor in
-                    print("🔄 Received Core Data change notification - Reloading songs")
+                    print("🔄 Received Core Data change notification - Reloading songs (debounced)")
                     await self?.loadSongs()
                 }
             }
             .store(in: &cancellables)
+    }
+    
+    /// Setup performance mode observer to track video playback state
+    private func setupPerformanceModeObserver() {
+        NotificationCenter.default.addObserver(
+            forName: .init("VideoPerformanceModeEnabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🚀 PERFORMANCE: OLD SongListViewModel entering performance mode")
+            Task { @MainActor in
+                self?.isInPerformanceMode = true
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .init("VideoPerformanceModeDisabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🔄 PERFORMANCE: OLD SongListViewModel exiting performance mode")
+            Task { @MainActor in
+                self?.isInPerformanceMode = false
+            }
+        }
+        
+        // ULTRA-PERFORMANCE: Additional observers for drag operations
+        NotificationCenter.default.addObserver(
+            forName: .init("VideoUltraPerformanceModeEnabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🎯 ULTRA-PERFORMANCE: OLD SongListViewModel entering ultra-performance mode")
+            Task { @MainActor in
+                self?.isInPerformanceMode = true
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .init("VideoUltraPerformanceModeDisabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🎯 ULTRA-PERFORMANCE: OLD SongListViewModel exiting ultra-performance mode")
+            Task { @MainActor in
+                // Stay in normal performance mode if video is still playing
+                if self?.getCurrentVideo() != nil {
+                    print("🎯 ULTRA-PERFORMANCE: Maintaining normal performance mode - video still playing")
+                    // Keep performance mode active
+                } else {
+                    self?.isInPerformanceMode = false
+                }
+            }
+        }
+    }
+    
+    /// Get current video from VideoPlayerViewModel (helper method)
+    private func getCurrentVideo() -> Song? {
+        // Access VideoPlayerViewModel through ContentView or use notification pattern
+        // For now, return nil to be safe
+        return nil
     }
     
     private func formatDuration(_ seconds: Double) -> String {
@@ -81,7 +187,7 @@ class SongListViewModel: ObservableObject {
                       let id = entity.id else { return nil }
                 
                 let artist = entity.artist ?? "Unknown Artist"
-                print("  - '\(artist)' - '\(title)'")
+                // PERFORMANCE: Removed individual song logging for large datasets
                 
                 return Song(
                     id: id.uuidString,
@@ -368,9 +474,21 @@ class SongListViewModel: ObservableObject {
         request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
         
         do {
-            let songEntities = try context.fetch(request)
+            // PERFORMANCE: Load in background to prevent UI blocking
+            let songEntities = try await withCheckedThrowingContinuation { continuation in
+                Task.detached {
+                    do {
+                        let entities = try context.fetch(request)
+                        continuation.resume(returning: entities)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+            
             print("📝 Found \(songEntities.count) songs in Core Data")
             
+            // PERFORMANCE: Reduce logging for large datasets
             let loadedSongs = songEntities.compactMap { Song(from: $0) }
             print("✅ Converted to \(loadedSongs.count) Song objects")
             

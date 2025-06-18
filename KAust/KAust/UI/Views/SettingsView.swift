@@ -428,7 +428,7 @@ class EnhancedFilePickerService: ObservableObject {
     private let largeSelectionThreshold = 500  // Warn for selections > 500 files
     
     // Processing state
-    private var allFiles: [URL] = []
+    private(set) var allFiles: [URL] = []
     private var currentBatchIndex = 0
     private var currentFileIndexInBatch = 0  // NEW: Track file position within current batch
     private var shouldPause = false
@@ -549,8 +549,29 @@ class EnhancedFilePickerService: ObservableObject {
         
         print("🔄 Starting automatic batch processing for \(urls.count) files")
         print("📊 Will process in batches of 30 files with 5-second pauses")
+        print("📂 Current processing mode: \(processingMode)")
         
-        await resetProcessing()
+        // CRITICAL: Only reset if we're not in folder access mode
+        // Folder access mode has already been set up with security scope
+        if processingMode != .directFolderAccess {
+            print("🧹 Resetting processing state (not in folder access mode)")
+            await resetProcessing()
+        } else {
+            print("🔒 Preserving folder access mode and security scope")
+            // Minimal reset - only clear results and counters, preserve folder access
+            await MainActor.run {
+                self.results = []
+                self.currentError = nil
+                self.currentBatchIndex = 0
+                self.currentFileIndexInBatch = 0
+                self.shouldPause = false
+                self.shouldCancel = false
+                
+                // DON'T reset processing state - it's already been set to .processing
+                // DON'T clear folder security scope or processing mode
+            }
+        }
+        
         allFiles = urls
         processingStartTime = Date()
         
@@ -832,14 +853,36 @@ class EnhancedFilePickerService: ObservableObject {
             
             // Clean up folder access if we were in direct folder access mode
             if processingMode == .directFolderAccess {
-                cleanupFolderAccess()
+                print("🔧 DEBUG: Processing complete - MAINTAINING folder access for video playback")
+                // DON'T clean up folder access immediately - maintain it for video playback
+                // The folder access will be maintained throughout the app session for smooth video playback
+                // cleanupFolderAccess()  // COMMENTED OUT - keep access active for playback performance
             }
             
             let successCount = results.filter(\.isSuccess).count
             let failCount = results.filter(\.status.isFailed).count
             let duplicateCount = results.filter(\.status.isDuplicate).count
             
-            print("✅ Processing complete! Success: \(successCount), Failed: \(failCount), Duplicates: \(duplicateCount)")
+            print("🎉 PROCESSING COMPLETE!")
+            print("   ✅ NEW SONGS ADDED: \(successCount)")
+            print("   ❌ FAILED FILES: \(failCount)") 
+            print("   📚 DUPLICATES DETECTED: \(duplicateCount) (songs already in your library)")
+            print("   🎵 TOTAL SONGS IN LIBRARY: \(successCount + duplicateCount) songs are available")
+            
+            // CRITICAL: Ensure state is ready for next operation
+            print("🔧 DEBUG: Post-completion state check:")
+            print("   - Processing state: \(processingState)")
+            print("   - Processing mode: \(processingMode)")
+            print("   - Security scope: \(folderSecurityScope?.path ?? "none")")
+            print("   - Can select new folder: \(processingState != .processing)")
+            
+            // POTENTIAL FIX: Force a small delay and explicit state reset to ensure UI can respond to new folder selections
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_000_000_000) // 1 second delay
+                print("🔧 DEBUG: Delayed state verification after completion:")
+                print("   - Processing state: \(processingState)")
+                print("   - All systems ready for new folder selection")
+            }
         }
     }
     
@@ -1050,12 +1093,30 @@ class EnhancedFilePickerService: ObservableObject {
         let filename = url.lastPathComponent
         
         do {
-            print("   📋 Validating \(filename)... (Mode: \(processingMode))")
-            // File validation
+            print("   📋 Processing \(filename)... (Mode: \(processingMode))")
+            
+            // CRITICAL: For folder access mode, ensure we can access the file
+            if processingMode == .directFolderAccess {
+                print("   🔒 Verifying folder security scope access...")
+                guard folderSecurityScope != nil else {
+                    throw FilePickerError.processingFailed(reason: "No folder security scope available for \(filename)")
+                }
+                
+                // Verify the folder scope is still active by checking if we can read basic file info
+                guard FileManager.default.fileExists(atPath: url.path) else {
+                    print("   ❌ File \(filename) not accessible via current security scope")
+                    throw FileValidationError.fileNotFound
+                }
+                
+                print("   ✅ File \(filename) accessible via folder security scope")
+            }
+            
+            print("   📋 Validating \(filename)...")
+            // File validation with improved folder access support
             try await validateFile(at: url)
             
             print("   🎵 Extracting metadata from \(filename)...")
-            // Extract metadata
+            // Extract metadata with improved folder access support
             let metadata = try await extractSimpleMetadata(from: url)
             
             // Handle file location based on processing mode
@@ -1075,6 +1136,12 @@ class EnhancedFilePickerService: ObservableObject {
                 finalURL = url
                 filePath = url.path
                 print("   📂 Direct path: \(filePath)")
+                
+                // IMPORTANT: Verify the path is accessible for future video playback
+                if !FileManager.default.isReadableFile(atPath: filePath) {
+                    print("   ⚠️ Warning: File may not be readable for future playback: \(filePath)")
+                    // Don't fail here - the file might still work for playback if folder scope is maintained
+                }
             }
             
             // Parse title and artist from filename
@@ -1241,7 +1308,7 @@ class EnhancedFilePickerService: ObservableObject {
         return avgProcessingTimePerFile * Double(remainingFiles)
     }
     
-    private func resetProcessing() async {
+    func resetProcessing() async {
         print("🎯 DEBUG: resetProcessing() called")
         currentBatchIndex = 0
         currentFileIndexInBatch = 0  // RESET file position
@@ -1249,6 +1316,19 @@ class EnhancedFilePickerService: ObservableObject {
         shouldCancel = false
         processingStartTime = nil
         avgProcessingTimePerFile = 0
+        
+        // CRITICAL: Clear all files array for fresh start
+        allFiles = []
+        
+        // CRITICAL: Release previous folder security scope
+        if let previousFolderURL = folderSecurityScope {
+            previousFolderURL.stopAccessingSecurityScopedResource()
+            folderSecurityScope = nil
+            print("🔓 Released previous folder security-scoped access for fresh start")
+        }
+        
+        // CRITICAL: Reset processing mode to default
+        processingMode = .filePickerCopy
         
         await MainActor.run {
             print("🎯 DEBUG: Setting state to idle in resetProcessing")
@@ -1271,6 +1351,9 @@ class EnhancedFilePickerService: ObservableObject {
     
     private func createSongEntity(title: String, artist: String?, duration: TimeInterval, filePath: String, fileSize: Int64) async throws -> FileProcessingResult.ProcessingStatus {
         let context = persistenceController.container.viewContext
+        
+        // CRITICAL: Clean up any corrupted PlayedSongEntity first to prevent validation errors
+        try await cleanupCorruptedPlayedSongs(context: context)
         
         // Check for existing song to prevent duplicates
         let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
@@ -1313,42 +1396,128 @@ class EnhancedFilePickerService: ObservableObject {
         return .success
     }
     
-    private func validateFile(at url: URL) async throws {
-        // Check file size (5MB to 150MB)
-        let fileSize = try getFileSize(url: url)
-        if fileSize < 5_000_000 || fileSize > 150_000_000 {
-            throw FileValidationError.invalidFileSize
+    /// Clean up any corrupted PlayedSongEntity objects that might prevent saves
+    private func cleanupCorruptedPlayedSongs(context: NSManagedObjectContext) async throws {
+        let playedSongsRequest: NSFetchRequest<PlayedSongEntity> = PlayedSongEntity.fetchRequest()
+        let playedSongs = try context.fetch(playedSongsRequest)
+        
+        var cleanedCount = 0
+        for playedSong in playedSongs {
+            if playedSong.song == nil || playedSong.user == nil {
+                print("🧹 Cleaning up corrupted PlayedSongEntity: \(playedSong.songTitleSnapshot ?? "Unknown")")
+                context.delete(playedSong)
+                cleanedCount += 1
+            }
         }
         
-        // Check file extension
+        if cleanedCount > 0 {
+            try context.save()
+            print("🔧 Cleaned up \(cleanedCount) corrupted played song entities")
+        }
+    }
+    
+    private func validateFile(at url: URL) async throws {
+        // Check file extension first (quick check)
         if !url.pathExtension.lowercased().contains("mp4") {
             throw FileValidationError.invalidFileType
+        }
+        
+        // Check file accessibility before trying to get size
+        if processingMode == .directFolderAccess {
+            // For folder access, ensure file is accessible
+            guard FileManager.default.fileExists(atPath: url.path) else {
+                print("   ❌ File validation failed: File not found at \(url.path)")
+                throw FileValidationError.fileNotFound
+            }
+            
+            guard FileManager.default.isReadableFile(atPath: url.path) else {
+                print("   ❌ File validation failed: File not readable at \(url.path)")
+                throw FileValidationError.fileNotReadable
+            }
+        }
+        
+        // Check file size (5MB to 150MB) with improved error handling
+        do {
+            let fileSize = try getFileSize(url: url)
+            if fileSize < 5_000_000 || fileSize > 150_000_000 {
+                print("   ❌ File validation failed: Invalid size \(fileSize) bytes for \(url.lastPathComponent)")
+                throw FileValidationError.invalidFileSize
+            }
+            print("   ✅ File validation passed: \(fileSize) bytes")
+        } catch {
+            if processingMode == .directFolderAccess {
+                print("   ❌ File validation failed for folder access: \(error.localizedDescription)")
+                // For folder access, provide more specific error
+                throw FileValidationError.permissionDenied
+            } else {
+                throw error
+            }
         }
     }
     
     private func extractSimpleMetadata(from url: URL) async throws -> SimpleMetadata {
         let fileSize = try getFileSize(url: url)
         
-        // Extract real metadata using AVFoundation
-        let asset = AVURLAsset(url: url)
-        let duration = try await asset.load(.duration).seconds
-        
-        var videoDimensions: CGSize?
-        if let videoTrack = try await asset.loadTracks(withMediaType: .video).first {
-            let naturalSize = try await videoTrack.load(.naturalSize)
-            videoDimensions = naturalSize
+        do {
+            // Extract real metadata using AVFoundation
+            if processingMode == .directFolderAccess {
+                print("       🎬 Extracting metadata using AVFoundation for folder file...")
+            }
+            
+            let asset = AVURLAsset(url: url)
+            let duration = try await asset.load(.duration).seconds
+            
+            var videoDimensions: CGSize?
+            if let videoTrack = try await asset.loadTracks(withMediaType: .video).first {
+                let naturalSize = try await videoTrack.load(.naturalSize)
+                videoDimensions = naturalSize
+            }
+            
+            if processingMode == .directFolderAccess {
+                print("       ✅ Metadata extracted successfully: Duration=\(duration)s, Dimensions=\(videoDimensions?.width ?? 0)x\(videoDimensions?.height ?? 0)")
+            }
+            
+            return SimpleMetadata(
+                duration: duration,
+                fileSize: fileSize,
+                videoDimensions: videoDimensions
+            )
+        } catch {
+            print("       ❌ Failed to extract metadata from \(url.lastPathComponent): \(error.localizedDescription)")
+            
+            if processingMode == .directFolderAccess {
+                print("       ❌ AVFoundation failed for folder file - likely security scope issue")
+                let nsError = error as NSError
+                print("       ❌ AVFoundation error code: \(nsError.code), domain: \(nsError.domain)")
+            }
+            
+            throw error
         }
-        
-        return SimpleMetadata(
-            duration: duration,
-            fileSize: fileSize,
-            videoDimensions: videoDimensions
-        )
     }
     
     private func getFileSize(url: URL) throws -> Int64 {
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-        return attributes[.size] as? Int64 ?? 0
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            let fileSize = attributes[.size] as? Int64 ?? 0
+            
+            if processingMode == .directFolderAccess {
+                print("       📏 File size for \(url.lastPathComponent): \(fileSize) bytes")
+            }
+            
+            return fileSize
+        } catch {
+            let nsError = error as NSError
+            print("       ❌ Failed to get file size for \(url.lastPathComponent): \(error.localizedDescription)")
+            print("       ❌ Error code: \(nsError.code), domain: \(nsError.domain)")
+            
+            if processingMode == .directFolderAccess {
+                print("       ❌ Folder access mode - security scope issue likely")
+                print("       ❌ File path: \(url.path)")
+                print("       ❌ Folder scope: \(folderSecurityScope?.path ?? "none")")
+            }
+            
+            throw error
+        }
     }
     
     var processingStats: (successful: Int, failed: Int, duplicates: Int, totalTime: TimeInterval) {
@@ -1363,15 +1532,21 @@ class EnhancedFilePickerService: ObservableObject {
     func clearResults() {
         results = []
         currentError = nil
+        allFiles = []
         processingState = .idle
+        
         batchProgress = BatchProgress(
             totalFiles: 0, completedFiles: 0, currentBatch: 0, totalBatches: 0, 
             currentBatchProgress: 0, successfulFiles: 0, failedFiles: 0, 
             duplicateFiles: 0, estimatedTimeRemaining: nil, currentFileName: nil
         )
         
-        // Clean up folder security scope if needed
-        cleanupFolderAccess()
+        // Release folder security scope
+        if let folderURL = folderSecurityScope {
+            folderURL.stopAccessingSecurityScopedResource()
+            folderSecurityScope = nil
+            processingMode = .filePickerCopy
+        }
     }
     
     private func cleanupFolderAccess() {
@@ -1811,16 +1986,7 @@ class SettingsViewModel: ObservableObject {
         print("🎯 REACTIVE MONITORING SETUP COMPLETE")
     }
     
-    // Reinitialize file picker service with optimal settings for large batches
-    private func optimizeForFileCount(_ fileCount: Int) {
-        print("🔧 Optimizing file picker service for \(fileCount) files")
-        // Clear existing subscribers
-        cancellables.removeAll()
-        // Create new optimized service
-        self.filePickerService = EnhancedFilePickerService(optimizedFor: fileCount)
-        // Re-setup reactive monitoring for the new service
-        setupProgressMonitoring()
-    }
+
     
     // MARK: - Actions
     
@@ -1830,150 +1996,133 @@ class SettingsViewModel: ObservableObject {
     }
     
     func selectMP4Folder() {
-        guard filePickerService.processingState != .processing else { return }
+        print("📁 Opening folder picker...")
+        
+        // Simple guard - don't open if already processing
+        guard filePickerService.processingState != .processing else { 
+            print("❌ Cannot open folder picker while processing files")
+            return 
+        }
+        
+        // Clear any previous state
+        filePickerService.clearResults()
+        
+        // Open the folder picker
         isShowingFolderPicker = true
     }
     
+
+    
     func handleFilesSelected(_ urls: [URL]) {
-        let fileCount = urls.count
-        print("📋 Handling selection of \(fileCount) files")
+        print("📋 Processing \(urls.count) files")
         
-        // IMMEDIATELY set processing state to trigger progress window
-        filePickerService.processingState = .processing
-        
-        // Optimize the service configuration for the file count
-        if fileCount > 100 {
-            optimizeForFileCount(fileCount)
-        }
-        
-        // Use the enhanced file selection handling
+        // Start processing
         filePickerService.handleFileSelection(urls)
         
-        // Monitor processing completion for ALL file selections
+        // Monitor completion
         monitorProcessingCompletion()
     }
     
     func handleFolderSelected(_ folderURL: URL) {
         print("📁 Folder selected: \(folderURL.path)")
         
-        // IMMEDIATELY set processing state to trigger progress window
-        filePickerService.processingState = .processing
+        // Dismiss the folder picker
+        isShowingFolderPicker = false
         
+        // Check if we're already processing files
+        if filePickerService.processingState == .processing {
+            showSingleFolderEnforcement()
+            return
+        }
+        
+        // Process the selected folder
         Task {
             await processMP4FolderAccess(folderURL)
         }
     }
     
+    /// Shows error when user tries to select multiple folders at once
+    private func showSingleFolderEnforcement() {
+        print("🚫 Enforcing single folder selection rule")
+        
+        errorAlert = ErrorAlertConfiguration(
+            title: "Cannot Download from 2 or More Folders",
+            message: "Select one folder.\n\nYou can only download from one folder at a time. Please wait for the current download to complete, or cancel it, then try selecting your new folder.",
+            primaryButton: .default(Text("OK")) { [weak self] in
+                self?.isShowingErrorAlert = false
+                self?.errorAlert = nil
+                // Take user back to previous screen (dismiss the folder picker if still shown)
+                self?.isShowingFolderPicker = false
+            }
+        )
+        isShowingErrorAlert = true
+    }
+    
     private func processMP4FolderAccess(_ folderURL: URL) async {
+        print("📂 Processing folder: \(folderURL.path)")
+        
+        // Try to access the folder
         guard folderURL.startAccessingSecurityScopedResource() else {
-            print("❌ Failed to access security-scoped resource")
-            showError(FilePickerError.processingFailed(reason: "Permission denied to access folder"))
+            await MainActor.run {
+                showError(FilePickerError.processingFailed(reason: "Cannot access folder: \(folderURL.lastPathComponent)"))
+            }
             return
         }
         
         do {
-            // Create bookmark for persistent access
+            // Save bookmark for persistent access
             let bookmark = try folderURL.bookmarkData(
                 options: .suitableForBookmarkFile,
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
-            
-            // Save bookmark for future access
             UserDefaults.standard.set(bookmark, forKey: "mp4FolderBookmark")
-            print("✅ Saved folder bookmark for future access")
             
-            // Scan for MP4 files and create bookmarks for each
-            let mp4Files = await scanForMP4FilesWithBookmarks(in: folderURL)
+            // Find MP4 files in the folder
+            let mp4Files = await scanForMP4Files(in: folderURL)
             
             await MainActor.run {
-                print("🎵 Found \(mp4Files.count) MP4 files in folder")
-                
                 if mp4Files.isEmpty {
-                    showError(FilePickerError.processingFailed(reason: "No MP4 files found in selected folder"))
+                    showError(FilePickerError.processingFailed(reason: "No MP4 files found in folder"))
+                    folderURL.stopAccessingSecurityScopedResource()
                 } else {
-                    // Process files directly from their location (no copying needed!)
-                    // Mark this as direct folder access so processing knows not to copy files
+                    print("🎵 Found \(mp4Files.count) MP4 files")
+                    
+                    // Set up folder access mode
                     filePickerService.processingMode = .directFolderAccess
                     filePickerService.folderSecurityScope = folderURL
+                    
+                    // Process the files
                     handleFilesSelected(mp4Files)
                 }
             }
             
         } catch {
             await MainActor.run {
-                print("❌ Error processing folder: \(error)")
                 showError(error)
+                folderURL.stopAccessingSecurityScopedResource()
             }
         }
     }
     
-    private func scanForMP4FilesWithBookmarks(in folderURL: URL) async -> [URL] {
+    private func scanForMP4Files(in folderURL: URL) async -> [URL] {
         let fileManager = FileManager.default
-        let resourceKeys: [URLResourceKey] = [.nameKey, .isDirectoryKey, .fileSizeKey]
-        
-        // First, collect all MP4 URLs synchronously to avoid Swift 6 async iterator issues
-        var allMP4URLs: [URL] = []
-        
-        if let enumerator = fileManager.enumerator(
-            at: folderURL,
-            includingPropertiesForKeys: resourceKeys,
-            options: [.skipsHiddenFiles]
-        ) {
-            // Swift 6 fix: collect URLs synchronously first
-            let allURLs = enumerator.allObjects.compactMap { $0 as? URL }
-            allMP4URLs = allURLs.filter { $0.pathExtension.lowercased() == "mp4" }
-        }
-        
-        print("🔍 Found \(allMP4URLs.count) MP4 files in folder before processing")
-        
-        // Now process the collected URLs (can be done async-safely)
         var mp4Files: [URL] = []
         
-        for fileURL in allMP4URLs {
-            // Try to create individual file bookmark for persistent access
-            var hasIndividualBookmark = false
-            
-            // First, try to get individual security-scoped access
-            if fileURL.startAccessingSecurityScopedResource() {
-                do {
-                    let fileBookmark = try fileURL.bookmarkData(
-                        options: .suitableForBookmarkFile,
-                        includingResourceValuesForKeys: nil,
-                        relativeTo: nil
-                    )
-                    
-                    // Store bookmark with filename as key
-                    let bookmarkKey = "fileBookmark_\(fileURL.lastPathComponent)"
-                    UserDefaults.standard.set(fileBookmark, forKey: bookmarkKey)
-                    
-                    hasIndividualBookmark = true
-                    print("📁 Created individual bookmark for: \(fileURL.lastPathComponent)")
-                    
-                } catch {
-                    print("⚠️ Failed to create individual bookmark for \(fileURL.lastPathComponent): \(error)")
-                }
-                
-                // Stop accessing individual security scope (we'll rely on folder scope for now)
-                fileURL.stopAccessingSecurityScopedResource()
-            } else {
-                print("⚠️ Failed to get individual security-scoped access for: \(fileURL.lastPathComponent)")
-            }
-            
-            // Always add the file to the list - we have folder-level access
-            // The file should be accessible through the folder's security scope
-            mp4Files.append(fileURL)
-            
-            if hasIndividualBookmark {
-                print("✅ Added file with individual bookmark: \(fileURL.lastPathComponent)")
-            } else {
-                print("📂 Added file with folder-level access: \(fileURL.lastPathComponent)")
-            }
+        // Get all files in the folder and subfolders
+        if let enumerator = fileManager.enumerator(
+            at: folderURL,
+            includingPropertiesForKeys: [.nameKey, .isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            // Collect all MP4 files
+            let allURLs = enumerator.allObjects.compactMap { $0 as? URL }
+            mp4Files = allURLs.filter { $0.pathExtension.lowercased() == "mp4" }
         }
         
-        print("✅ Scanned folder: \(mp4Files.count) MP4 files found (with folder-level access)")
+        print("📂 Found \(mp4Files.count) MP4 files in folder")
         
-        // Sort alphabetically for consistent ordering
+        // Sort alphabetically
         return mp4Files.sorted { $0.lastPathComponent < $1.lastPathComponent }
     }
     
@@ -2017,9 +2166,7 @@ class SettingsViewModel: ObservableObject {
     }
     
     func resetSettings() {
-        swipeToDeleteEnabled = false  // Reset to default OFF state
-        
-        // Clear file processing results
+        swipeToDeleteEnabled = false
         filePickerService.clearResults()
     }
     
@@ -2089,6 +2236,8 @@ class SettingsViewModel: ObservableObject {
             showError(FilePickerError.processingFailed(reason: "Failed to delete songs played history: \(error.localizedDescription)"))
         }
     }
+    
+
     
     func monitorProcessingCompletion() {
         Task {
@@ -2233,7 +2382,7 @@ struct SettingsView: View {
                 showingClearSongsAlert = false
             }
         } message: {
-            Text("This will delete all the songs in the SONG LIST")
+            Text("This will delete all songs from the SONG LIST.\n\n• Files copied to app storage will be deleted\n• Files from folder access will be preserved in their original location\n• Only metadata and bookmarks will be removed")
         }
         .alert(
             "Delete Songs Played History?",
@@ -2542,74 +2691,174 @@ struct SettingsView: View {
     }
     
     private func clearAllCoreDataSongs() async {
-        print("\n🗑️ DEBUG: Starting complete cleanup")
+        print("\n🗑️ Starting Core Data cleanup")
         
         let context = PersistenceController.shared.container.viewContext
-        let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
         
         do {
-            let songs = try context.fetch(request)
-            print("📊 Found \(songs.count) songs to clean up")
+            // Step 1: Fix corrupted PlayedSongEntity first
+            print("🔧 Step 1: Fixing corrupted played songs...")
+            let playedSongsRequest: NSFetchRequest<PlayedSongEntity> = PlayedSongEntity.fetchRequest()
+            let playedSongs = try context.fetch(playedSongsRequest)
             
-            // Get the app's Documents/Media directory path
+            // Delete any PlayedSongEntity that has nil song or nil user
+            var corruptedCount = 0
+            for playedSong in playedSongs {
+                if playedSong.song == nil || playedSong.user == nil {
+                    print("🗑️ Deleting corrupted PlayedSongEntity: \(playedSong.songTitleSnapshot ?? "Unknown")")
+                    context.delete(playedSong)
+                    corruptedCount += 1
+                }
+            }
+            
+            if corruptedCount > 0 {
+                try context.save()
+                print("  ✅ Fixed \(corruptedCount) corrupted played song entities")
+            }
+            
+            // Step 2: Clear remaining played songs history
+            print("🧹 Step 2: Clearing remaining played songs history...")
+            let deletePlayedSongsRequest = NSBatchDeleteRequest(fetchRequest: playedSongsRequest as! NSFetchRequest<NSFetchRequestResult>)
+            try context.execute(deletePlayedSongsRequest)
+            print("  ✅ Cleared played songs history")
+            
+            // Step 3: Get all songs
+            let songsRequest: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+            let songs = try context.fetch(songsRequest)
+            let totalCount = songs.count
+            print("📊 Found \(totalCount) songs to clean up")
+            
+            if totalCount == 0 {
+                print("⚠️ No songs found to delete")
+                return
+            }
+            
+            // Step 4: Clean up UserDefaults bookmarks
+            print("🧹 Step 3: Cleaning up all file bookmarks...")
+            let userDefaults = UserDefaults.standard
+            let allKeys = userDefaults.dictionaryRepresentation().keys
+            for key in allKeys {
+                if key.hasPrefix("fileBookmark_") || key.hasPrefix("mp4FolderBookmark") {
+                    userDefaults.removeObject(forKey: key)
+                }
+            }
+            print("  ✅ Cleaned up file bookmarks")
+            
+            // Step 5: Get the app's Documents/Media directory path
+            print("🧹 Step 4: Preparing file cleanup...")
             guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else {
                 print("❌ Could not access documents directory")
                 return
             }
             let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
             let mediaPath = mediaDirectory.path
+            print("📂 Media directory path: \(mediaPath)")
             
-            // Clean up UserDefaults bookmarks
-            print("🧹 Cleaning up all file bookmarks...")
-            let userDefaults = UserDefaults.standard
-            let allKeys = userDefaults.dictionaryRepresentation().keys
-            for key in allKeys {
-                if key.hasPrefix("fileBookmark_") {
-                    userDefaults.removeObject(forKey: key)
-                    print("  ✅ Removed bookmark: \(key)")
-                }
-            }
+            // Step 6: Categorize and handle files appropriately
+            print("🗂️ Step 5: Analyzing file storage locations...")
+            var internalFiles = 0
+            var externalFiles = 0
+            var internalFilesDeleted = 0
             
-            // Process each song
             for song in songs {
                 if let filePath = song.filePath {
-                    let fileName = URL(fileURLWithPath: filePath).lastPathComponent
-                    
-                    // Check if this is an internal file
                     if filePath.hasPrefix(mediaPath) {
-                        print("\n📱 Processing internal file: \(fileName)")
+                        // Internal file (copied to app storage) - safe to delete
+                        internalFiles += 1
                         
                         // Delete MP4 file
                         if FileManager.default.fileExists(atPath: filePath) {
-                            try FileManager.default.removeItem(atPath: filePath)
-                            print("  ✅ Deleted MP4 file")
+                            do {
+                                try FileManager.default.removeItem(atPath: filePath)
+                                internalFilesDeleted += 1
+                            } catch {
+                                print("    ⚠️ Failed to delete internal file: \(filePath) - \(error.localizedDescription)")
+                            }
                         }
                         
                         // Delete LRC file if exists
                         if let lrcPath = song.lrcFilePath,
                            FileManager.default.fileExists(atPath: lrcPath) {
-                            try FileManager.default.removeItem(atPath: lrcPath)
-                            print("  ✅ Deleted LRC file")
+                            do {
+                                try FileManager.default.removeItem(atPath: lrcPath)
+                            } catch {
+                                print("    ⚠️ Failed to delete LRC file: \(lrcPath)")
+                            }
                         }
                     } else {
-                        print("\n📁 Processing external file: \(fileName)")
+                        // External file (folder access mode) - only delete metadata, NOT the file
+                        externalFiles += 1
+                        print("    📁 External file preserved: \(song.title ?? "Unknown") at \(filePath)")
                     }
                 }
-                
-                // Delete Core Data entity
-                context.delete(song)
-                print("  ✅ Deleted song data from database")
             }
             
-            // Save Core Data changes
+            print("  📊 File analysis complete:")
+            print("    - Internal files (copied): \(internalFiles) (deleted \(internalFilesDeleted))")
+            print("    - External files (folder access): \(externalFiles) (preserved)")
+            
+            // Step 7: Use batch delete for Core Data - more efficient and avoids validation issues
+            print("🗑️ Step 6: Batch deleting Core Data entities...")
+            let batchDeleteRequest = NSBatchDeleteRequest(fetchRequest: songsRequest as! NSFetchRequest<NSFetchRequestResult>)
+            batchDeleteRequest.resultType = .resultTypeObjectIDs
+            
+            let result = try context.execute(batchDeleteRequest) as? NSBatchDeleteResult
+            let deletedObjectIDs = result?.result as? [NSManagedObjectID] ?? []
+            
+            // Merge changes to update any existing contexts
+            let changes = [NSDeletedObjectsKey: deletedObjectIDs]
+            NSManagedObjectContext.mergeChanges(fromRemoteContextSave: changes, into: [context])
+            
+            print("  ✅ Batch deleted \(deletedObjectIDs.count) song entities from Core Data")
+            
+            // Step 8: Force save context
             try context.save()
-            print("\n✅ Cleanup complete:")
-            print("  - Deleted \(songs.count) songs from database")
-            print("  - Cleaned up all file bookmarks")
-            print("  - Removed all internal files")
+            print("  ✅ Saved Core Data context")
+            
+            print("\n🎉 CLEANUP SUCCESSFUL:")
+            print("  - Deleted \(deletedObjectIDs.count) songs from database")
+            if internalFilesDeleted > 0 {
+                print("  - Deleted \(internalFilesDeleted) internal files from app storage")
+            }
+            if externalFiles > 0 {
+                print("  - Preserved \(externalFiles) external files (folder access mode)")
+            }
+            print("  - Cleared all played songs history")
+            print("  - Cleaned up all file bookmarks (internal and folder access)")
+            
+            // Step 9: Force UI refresh
+            await MainActor.run {
+                // Post multiple notifications to ensure UI updates
+                NotificationCenter.default.post(name: NSNotification.Name("SongImported"), object: nil)
+                NotificationCenter.default.post(name: .NSManagedObjectContextDidSave, object: context)
+                print("  ✅ Posted UI refresh notifications")
+            }
+            
+            // Small delay then force another refresh
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 seconds
+            await MainActor.run {
+                NotificationCenter.default.post(name: NSNotification.Name("SongImported"), object: nil)
+                print("  ✅ Posted delayed UI refresh notification")
+            }
             
         } catch {
-            print("\n❌ Error during cleanup: \(error.localizedDescription)")
+            print("\n❌ CLEANUP FAILED: \(error.localizedDescription)")
+            
+            // Detailed error information
+            if let nsError = error as NSError? {
+                print("❌ Error domain: \(nsError.domain)")
+                print("❌ Error code: \(nsError.code)")
+                print("❌ Error userInfo: \(nsError.userInfo)")
+                
+                // Check for validation errors
+                if nsError.domain == NSCocoaErrorDomain && nsError.code == NSValidationMissingMandatoryPropertyError {
+                    print("❌ Validation error detected - trying alternative approach...")
+                    
+                    // Try clearing context and starting fresh
+                    context.rollback()
+                    print("🔄 Rolled back context - please try the operation again")
+                }
+            }
         }
     }
     
@@ -2700,10 +2949,11 @@ struct SettingsView: View {
                     subtitle: "Remove all songs and associated files permanently",
                     icon: "trash.fill",
                     iconColor: .red,
-                    accessoryType: .disclosure
-                ) {
-                    showingClearSongsAlert = true
-                }
+                    accessoryType: .disclosure,
+                    action: {
+                        showingClearSongsAlert = true
+                    }
+                )
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)
@@ -3644,18 +3894,10 @@ struct FolderPickerView: UIViewControllerRepresentable {
     let onError: (Error) -> Void
     
     func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
-        let picker = UIDocumentPickerViewController(
-            forOpeningContentTypes: [.folder],
-            asCopy: false  // Important: Don't copy, we want direct access
-        )
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder], asCopy: false)
         picker.delegate = context.coordinator
-        picker.allowsMultipleSelection = false // Only select one folder
+        picker.allowsMultipleSelection = false
         picker.modalPresentationStyle = .formSheet
-        
-        if #available(iOS 14.0, *) {
-            picker.shouldShowFileExtensions = true
-        }
-        
         return picker
     }
     
@@ -3672,26 +3914,20 @@ struct FolderPickerView: UIViewControllerRepresentable {
         
         init(_ parent: FolderPickerView) {
             self.parent = parent
-            super.init()
         }
         
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
             parent.isPresented = false
             
-            guard let folderURL = urls.first else {
-                parent.onError(FilePickerError.processingFailed(reason: "No folder selected"))
-                return
+            if let folderURL = urls.first {
+                parent.onFolderSelected(folderURL)
             }
-            
-            print("📁 Folder selected: \(folderURL.path)")
-            parent.onFolderSelected(folderURL)
         }
         
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
             parent.isPresented = false
-            print("📁 Folder selection cancelled")
         }
-                                                     }
+    }
 }
 
 // MARK: - Preview

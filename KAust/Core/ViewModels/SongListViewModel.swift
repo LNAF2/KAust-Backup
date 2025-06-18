@@ -28,6 +28,10 @@ class SongListViewModel: ObservableObject {
     private let persistenceController: PersistenceController
     private var cancellables = Set<AnyCancellable>()
     
+    // MARK: - Performance Mode Tracking
+    @Published private(set) var isInPerformanceMode = false
+    private var suspendedObservers = false
+    
     // MARK: - Computed Properties
     var isEmpty: Bool {
         filteredSongs.isEmpty
@@ -75,9 +79,50 @@ class SongListViewModel: ObservableObject {
     }
     
     private func setupCoreDataObserver() {
-        // Observe Core Data changes for SongEntity
+        // PERFORMANCE: Setup performance mode observers first
+        setupPerformanceModeObserver()
+        
+        // PERFORMANCE: Suspend Core Data observers during video playback for smooth performance
+        NotificationCenter.default.addObserver(
+            forName: .init("SuspendCoreDataObservers"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("⏸️ PERFORMANCE: SongListViewModel suspending Core Data observers for smooth video")
+            Task { @MainActor in
+                self?.suspendedObservers = true
+                self?.cancellables.removeAll() // Suspend all reactive observers
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .init("RestoreCoreDataObservers"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("▶️ PERFORMANCE: SongListViewModel restoring Core Data observers")
+            Task { @MainActor in
+                self?.suspendedObservers = false
+                self?.setupCoreDataObserver() // Restore observers
+            }
+        }
+        
+        // Don't setup observers if they are currently suspended
+        guard !suspendedObservers else {
+            print("⏸️ PERFORMANCE: Skipping Core Data observer setup - currently suspended")
+            return
+        }
+        
+        // PERFORMANCE: Debounced Core Data observer to prevent excessive refreshes with large datasets
         NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
+            .debounce(for: .milliseconds(500), scheduler: RunLoop.main) // Debounce rapid changes
             .sink { [weak self] notification in
+                // Skip processing during performance mode
+                guard !(self?.isInPerformanceMode ?? false) else {
+                    print("⏸️ PERFORMANCE: Skipping Core Data update during video playback")
+                    return
+                }
+                
                 // Check if the notification is from our context or a related context
                 if let context = notification.object as? NSManagedObjectContext,
                    context.persistentStoreCoordinator == self?.persistenceController.container.persistentStoreCoordinator {
@@ -91,17 +136,34 @@ class SongListViewModel: ObservableObject {
                         .contains { $0 is SongEntity }
                     
                     if songChanges {
+                        // PERFORMANCE: For large datasets, only refresh if significant changes
+                        let changeCount = insertedObjects.count + updatedObjects.count + deletedObjects.count
+                        print("🔄 Core Data change detected: \(changeCount) changes")
+                        
                         Task { @MainActor in
-                            await self?.refresh()
+                            // Immediate refresh for small changes, debounced for large changes
+                            if changeCount <= 10 || self?.songs.count ?? 0 <= 1000 {
+                                await self?.refresh()
+                            } else {
+                                print("🚀 Large dataset change - using optimized refresh")
+                                await self?.optimizedRefresh()
+                            }
                         }
                     }
                 }
             }
             .store(in: &cancellables)
         
-        // Also listen for manual import notifications
+        // Also listen for manual import notifications with debouncing
         NotificationCenter.default.publisher(for: NSNotification.Name("SongImported"))
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
             .sink { [weak self] _ in
+                // Skip processing during performance mode
+                guard !(self?.isInPerformanceMode ?? false) else {
+                    print("⏸️ PERFORMANCE: Skipping song import refresh during video playback")
+                    return
+                }
+                
                 Task { @MainActor in
                     print("🔄 Received SongImported notification - refreshing song list")
                     await self?.refresh()
@@ -110,47 +172,164 @@ class SongListViewModel: ObservableObject {
             .store(in: &cancellables)
     }
     
+    /// Setup performance mode observer to track video playback state
+    private func setupPerformanceModeObserver() {
+        NotificationCenter.default.addObserver(
+            forName: .init("VideoPerformanceModeEnabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🚀 PERFORMANCE: SongListViewModel entering performance mode")
+            Task { @MainActor in
+                self?.isInPerformanceMode = true
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .init("VideoPerformanceModeDisabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🔄 PERFORMANCE: SongListViewModel exiting performance mode")
+            Task { @MainActor in
+                self?.isInPerformanceMode = false
+            }
+        }
+        
+        // ULTRA-PERFORMANCE: Additional observers for drag operations
+        NotificationCenter.default.addObserver(
+            forName: .init("VideoUltraPerformanceModeEnabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🎯 ULTRA-PERFORMANCE: SongListViewModel entering ultra-performance mode")
+            Task { @MainActor in
+                self?.isInPerformanceMode = true
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .init("VideoUltraPerformanceModeDisabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🎯 ULTRA-PERFORMANCE: SongListViewModel exiting ultra-performance mode")
+            Task { @MainActor in
+                // Keep normal performance mode if video is still playing
+                self?.isInPerformanceMode = true
+            }
+        }
+    }
+    
     // MARK: - Public Methods
     
-    /// Load all songs from Core Data
+    /// Load all songs from Core Data with performance optimizations
     func loadSongs() async {
-        print("🔄 SongListViewModel.loadSongs() - Starting to load songs...")
+        print("🔄 SongListViewModel.loadSongs() - Starting optimized load for large dataset...")
         isLoading = true
         error = nil
         
         do {
-            print("📡 SongListViewModel.loadSongs() - Calling dataProvider.fetchAllSongs()")
-            // Load songs
-            songs = try await dataProvider.fetchAllSongs(
-                sortedBy: sortOption.coreDataKey,
-                ascending: sortOption.isAscending
-            )
+            // PERFORMANCE: Load songs in background thread to prevent UI blocking
+            let loadedSongs = await withCheckedContinuation { continuation in
+                Task.detached { [weak self] in
+                    guard let self = self else {
+                        continuation.resume(returning: [])
+                        return
+                    }
+                    
+                    do {
+                        let songs = try await self.dataProvider.fetchAllSongs(
+                            sortedBy: self.sortOption.coreDataKey,
+                            ascending: self.sortOption.isAscending
+                        )
+                        
+                        // PERFORMANCE: Reduced logging for large datasets
+                        print("🎵 SongListViewModel.loadSongs() - Fetched \(songs.count) songs from Core Data")
+                        if songs.count <= 50 {
+                            // Only log individual songs for small datasets
+                            for song in songs.prefix(50) {
+                                print("  - '\(song.title ?? "Unknown")' by '\(song.artist ?? "Unknown")'")
+                            }
+                        } else {
+                            print("  - Large dataset (\(songs.count) songs) - skipping detailed logging for performance")
+                        }
+                        
+                        continuation.resume(returning: songs)
+                    } catch {
+                        print("❌ SongListViewModel.loadSongs() - Error: \(error)")
+                        continuation.resume(returning: [])
+                    }
+                }
+            }
             
-            // Debug logging
-            print("🎵 SongListViewModel.loadSongs() - Fetched \(songs.count) songs from Core Data:")
-            for song in songs {
-                print("  - '\(song.title ?? "Unknown")' by '\(song.artist ?? "Unknown")' (Added: \(song.dateAdded ?? Date()))")
+            // Update UI on main thread
+            await MainActor.run {
+                self.songs = loadedSongs
             }
             
             print("🔧 SongListViewModel.loadSongs() - Loading filter options...")
-            // Load filter options
+            // Load filter options in background
             await loadFilterOptions()
             
             print("🎯 SongListViewModel.loadSongs() - Applying filters...")
             // Apply current filters
-            applyFilters()
+            await MainActor.run {
+                self.applyFilters()
+            }
             
             print("✅ SongListViewModel.loadSongs() - Completed successfully with \(filteredSongs.count) filtered songs")
             isLoading = false
         } catch {
             print("❌ SongListViewModel.loadSongs() - Error: \(error)")
-            self.error = error
-            isLoading = false
+            await MainActor.run {
+                self.error = error
+                self.isLoading = false
+            }
         }
     }
     
     /// Refresh song list
     func refresh() async {
+        await loadSongs()
+    }
+    
+    /// Optimized refresh for large datasets - only updates if needed
+    func optimizedRefresh() async {
+        print("🚀 Performing optimized refresh for large dataset...")
+        isLoading = true
+        
+        do {
+            // Quick count check first
+            let context = persistenceController.container.viewContext
+            let countRequest: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+            let currentCount = try context.count(for: countRequest)
+            
+            // Only do full reload if count changed significantly
+            if abs(currentCount - songs.count) > 5 {
+                print("📊 Dataset size changed significantly (\(songs.count) → \(currentCount)) - full reload")
+                await loadSongs()
+            } else {
+                print("📊 Dataset size stable (\(currentCount) songs) - skipping full reload")
+                await MainActor.run {
+                    self.applyFilters() // Just re-apply filters
+                    self.isLoading = false
+                }
+            }
+        } catch {
+            // Fallback to full refresh on error
+            print("❌ Optimized refresh failed, falling back to full refresh: \(error)")
+            await loadSongs()
+        }
+    }
+    
+    /// Force complete refresh - used after major operations like clear all songs
+    func forceRefresh() async {
+        print("🔄 Forcing complete refresh - clearing cache and reloading")
+        await MainActor.run {
+            self.songs = []
+            self.filteredSongs = []
+        }
         await loadSongs()
     }
     

@@ -283,6 +283,9 @@ struct PlaylistView: View {
     // MARK: - File Resolution Methods
     
     private func findVideoURL(for song: Song) async -> URL? {
+        // CRITICAL: For external folder files, restore security access before attempting playback
+        await restoreSecurityAccessIfNeeded(for: song)
+        
         if let url = song.videoURL, FileManager.default.fileExists(atPath: url.path) {
             print("📁 PlaylistView.find - Found video at original path: \(url.path)")
             return url
@@ -290,6 +293,65 @@ struct PlaylistView: View {
             print("⚠️ PlaylistView.find - Video not at original path. Attempting migration/search...")
             return await attemptFileMigration(for: song)
         }
+    }
+    
+    /// Restore security-scoped access to external folders when needed for playback
+    private func restoreSecurityAccessIfNeeded(for song: Song) async {
+        // Check if this song is from an external folder (not in our Documents/Media directory)
+        guard let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+        let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+        
+        // If the file path is NOT in our media directory, it's likely from external folder access
+        if !song.filePath.hasPrefix(mediaDirectory.path) {
+            print("🔐 Playlist: Video file appears to be from external folder: \(song.filePath)")
+            
+            // Try to restore security access to the parent folder
+            let folderPath = URL(fileURLWithPath: song.filePath).deletingLastPathComponent()
+            await restoreSecurityAccessToFolder(folderPath)
+        }
+    }
+    
+    /// Restore security-scoped access to a specific folder using saved bookmarks
+    private func restoreSecurityAccessToFolder(_ folderURL: URL) async {
+        print("🔍 Playlist: Attempting to restore security access to: \(folderURL.path)")
+        
+        // Look for saved bookmarks in UserDefaults
+        let userDefaults = UserDefaults.standard
+        let allKeys = userDefaults.dictionaryRepresentation().keys
+        
+        for key in allKeys {
+            if key.hasPrefix("mp4FolderBookmark") {
+                if let bookmarkData = userDefaults.data(forKey: key) {
+                    do {
+                        var isStale = false
+                        let bookmarkedURL = try URL(
+                            resolvingBookmarkData: bookmarkData,
+                            options: .withoutUI,
+                            relativeTo: nil,
+                            bookmarkDataIsStale: &isStale
+                        )
+                        
+                        // Check if this bookmark matches the folder we need
+                        if bookmarkedURL.path == folderURL.path || folderURL.path.hasPrefix(bookmarkedURL.path) {
+                            if bookmarkedURL.startAccessingSecurityScopedResource() {
+                                print("✅ Playlist: Successfully restored security access to: \(bookmarkedURL.path)")
+                                
+                                // Store reference for cleanup later (optional)
+                                // Note: We intentionally don't call stopAccessingSecurityScopedResource() 
+                                // immediately as we want to maintain access for playback
+                                return
+                            } else {
+                                print("❌ Playlist: Failed to restore security access to bookmark: \(bookmarkedURL.path)")
+                            }
+                        }
+                    } catch {
+                        print("❌ Playlist: Failed to resolve bookmark \(key): \(error)")
+                    }
+                }
+            }
+        }
+        
+        print("⚠️ Playlist: No valid bookmark found for folder: \(folderURL.path)")
     }
     
     private func attemptFileMigration(for song: Song) async -> URL? {
