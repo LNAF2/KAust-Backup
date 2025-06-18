@@ -37,6 +37,20 @@ struct AppTheme {
     // For text in playlist rows
     static let rightPanelText: Color = rightPanelTextPrimary
 
+    // MARK: - Panel Border Colors (Configurable)
+    // Change these to switch between white borders and original accent colors
+    static let leftPanelBorderColor = Color.white  // Change to leftPanelAccent for purple borders
+    static let rightPanelBorderColor = Color.white // Change to rightPanelAccent for red borders
+    
+    // Alternative: Use these for quick switching
+    static let useWhiteBorders = true
+    static var leftPanelBorder: Color {
+        return useWhiteBorders ? Color.white : leftPanelAccent
+    }
+    static var rightPanelBorder: Color {
+        return useWhiteBorders ? Color.white : rightPanelAccent
+    }
+
     // MARK: - Video Player & Lyrics
     static let videoPlayerControls = Color.white
     static let videoPlayerProgressTrack = Color.gray.opacity(0.5)

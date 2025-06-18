@@ -104,7 +104,7 @@ struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.purple, lineWidth: 1)
+                        .stroke(AppTheme.leftPanelBorderColor, lineWidth: 1)
                 )
             
             // Middle Left Panel - CONTROLS  
@@ -113,10 +113,10 @@ struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.purple, lineWidth: 1)
+                        .stroke(AppTheme.leftPanelBorderColor, lineWidth: 1)
                 )
             
-            // Bottom Left Panel - SONG LIST
+            // Bottom Left Panel - SONG LIST (Keep original purple border)
             SongListView(playlistViewModel: playlistViewModel)
                 .frame(maxHeight: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -136,7 +136,7 @@ struct ContentView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.red, lineWidth: 1)
+                        .stroke(AppTheme.rightPanelBorderColor, lineWidth: 1)
                 )
             
             // Middle Right Panel - SETTINGS ACCESS
@@ -147,10 +147,10 @@ struct ContentView: View {
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
                 RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.red, lineWidth: 1)
+                    .stroke(AppTheme.rightPanelBorderColor, lineWidth: 1)
             )
             
-            // Bottom Right Panel - PLAYLIST
+            // Bottom Right Panel - PLAYLIST (Keep original red border)
             PlaylistView(
                 viewModel: playlistViewModel,
                 onSongSelected: { song in

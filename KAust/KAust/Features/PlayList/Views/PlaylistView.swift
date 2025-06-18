@@ -60,21 +60,29 @@ struct PlaylistView: View {
     }
     
     private var scrollableContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(viewModel.playlistItems) { song in
-                        playlistItemRow(for: song)
+        Group {
+            if viewModel.playlistItems.isEmpty {
+                // Empty state - show PlaylistEmptyState
+                PlaylistEmptyState()
+            } else {
+                // Show playlist content
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 0) {
+                            ForEach(viewModel.playlistItems) { song in
+                                playlistItemRow(for: song)
+                            }
+                        }
                     }
-                }
-            }
-            .background(Color.clear)
-            .padding(.vertical, 4)
-            .onReceive(viewModel.scrollToBottomPublisher) {
-                // Scroll to the last item with animation
-                if let lastSong = viewModel.playlistItems.last {
-                    withAnimation(.easeInOut(duration: 0.5)) {
-                        proxy.scrollTo(lastSong.id, anchor: .bottom)
+                    .background(Color.clear)
+                    .padding(.vertical, 4)
+                    .onReceive(viewModel.scrollToBottomPublisher) {
+                        // Scroll to the last item with animation
+                        if let lastSong = viewModel.playlistItems.last {
+                            withAnimation(.easeInOut(duration: 0.5)) {
+                                proxy.scrollTo(lastSong.id, anchor: .bottom)
+                            }
+                        }
                     }
                 }
             }
@@ -446,12 +454,32 @@ struct PlaylistView: View {
                 Text("PLAY LIST")
                     .font(.headline)
                     .foregroundColor(AppTheme.rightPanelAccent)
+                    .contentShape(Rectangle()) // Make entire text area tappable
+                    .onTapGesture {
+                        // Center video when playlist header is tapped and video is playing
+                        if videoPlayerViewModel.currentVideo != nil && videoPlayerViewModel.isMinimized {
+                            print("🎯 PLAYLIST TAP: Centering off-screen video")
+                            
+                            // Provide haptic feedback
+                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                            impactFeedback.impactOccurred()
+                            
+                            // Center the video
+                            videoPlayerViewModel.centerVideo()
+                        }
+                    }
                 
                 // Show status when video is playing or in edit mode
                 if videoPlayerViewModel.currentVideo != nil {
-                    Text("Selection disabled while video playing")
-                        .font(.caption)
-                        .foregroundColor(.orange)
+                    if videoPlayerViewModel.isMinimized {
+                        Text("Tap ↑ to center video if off-screen")
+                            .font(.caption)
+                            .foregroundColor(AppTheme.rightPanelAccent.opacity(0.7))
+                    } else {
+                        Text("Selection disabled while video playing")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                    }
                 } else if isEditing {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Song selection disabled in edit mode")

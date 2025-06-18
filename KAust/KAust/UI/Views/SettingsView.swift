@@ -2282,27 +2282,33 @@ struct SettingsView: View {
             // Black background fills the whole screen
             AppTheme.settingsBackground.ignoresSafeArea()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    // Header with RESET and DONE
-                    headerView
-
-                    // SETTINGS title heading
-                    HStack {
-                        Spacer()
-                        Text("SETTINGS")
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                        Spacer()
-                    }
-                    .padding(.vertical, 8)
-
-                    // Main settings content
-                    settingsContent
+            VStack(spacing: 0) {
+                // Fixed header with RESET and DONE - always visible
+                headerView
+                    .padding(.horizontal, 32)
+                
+                // Fixed SETTINGS title heading - always visible
+                HStack {
+                    Spacer()
+                    Text("SETTINGS")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    Spacer()
                 }
+                .padding(.vertical, 16)
                 .padding(.horizontal, 32)
-                .padding(.bottom, 32)
+                
+                // Scrollable content area
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        // Main settings content
+                        settingsContent
+                    }
+                    .padding(.horizontal, 32)
+                    .padding(.top, 8) // Small top padding for content
+                    .padding(.bottom, 32) // Bottom padding for last item
+                }
             }
         }
         .sheet(isPresented: $viewModel.isShowingFilePicker) {
@@ -2374,9 +2380,11 @@ struct SettingsView: View {
             isPresented: $showingClearSongsAlert
         ) {
             Button("Cancel", role: .cancel) {
+                print("🗑️ DEBUG: Delete cancelled by user")
                 showingClearSongsAlert = false
             }
             Button("Continue", role: .destructive) {
+                print("🗑️ DEBUG: Delete confirmed by user - starting clearAllCoreDataSongs()")
                 Task {
                     await clearAllCoreDataSongs()
                 }
@@ -2384,6 +2392,9 @@ struct SettingsView: View {
             }
         } message: {
             Text("This will delete all songs from the SONG LIST.\n\n• Files copied to app storage will be deleted\n• Files from folder access will be preserved in their original location\n• Only metadata and bookmarks will be removed")
+        }
+        .onAppear {
+            print("🗑️ DEBUG: SettingsView appeared - showingClearSongsAlert = \(showingClearSongsAlert)")
         }
         .alert(
             "Delete Songs Played History?",
@@ -2428,7 +2439,8 @@ struct SettingsView: View {
                 presentationMode.wrappedValue.dismiss()
             }
         }
-        .padding(.top, 32)
+        .padding(.top, 20) // Reduced from 32 to 20 since it's now at the true top
+        .padding(.bottom, 8) // Small bottom padding to separate from title
     }
     
     private func estimatedProcessingTime(for fileCount: Int) -> String {
@@ -2928,8 +2940,8 @@ struct SettingsView: View {
         SettingsSection(title: "Administrator Settings", icon: "gearshape") {
             VStack(spacing: 8) {
                 SettingRow(
-                    title: "Enable Swipe to Delete",
-                    subtitle: "Swipe left to delete songs in the SONG LIST",
+                    title: "Enable Delete",
+                    subtitle: "Swipe left deletes individual songs in the SONG LIST",
                     icon: "trash",
                     accessoryType: .toggle($viewModel.swipeToDeleteEnabled)
                 )
@@ -2945,11 +2957,24 @@ struct SettingsView: View {
                 
                 SettingRow(
                     title: "Delete Songs Played Table",
-                    subtitle: "Remove all entries from the songs played history",
+                    subtitle: "Deletes all entries",
                     icon: "trash.fill",
                     iconColor: .red,
                     accessoryType: .disclosure,
                     action: viewModel.deleteSongsPlayedTable
+                )
+                
+                SettingRow(
+                    title: "Delete the Song List",
+                    subtitle: "Deletes permanently metadata and MP4 files",
+                    icon: "trash.fill",
+                    iconColor: .red,
+                    accessoryType: .disclosure,
+                    action: {
+                        print("🗑️ DEBUG: Delete the Song List button tapped (from Admin Settings)!")
+                        showingClearSongsAlert = true
+                        print("🗑️ DEBUG: showingClearSongsAlert set to: \(showingClearSongsAlert)")
+                    }
                 )
             }
             .padding(.horizontal, 16)
@@ -2962,8 +2987,8 @@ struct SettingsView: View {
             VStack(spacing: 12) {
                 VStack(spacing: 16) {
                     FilePickerRow(
-                        title: "📁 Download MP4 Folder",
-                        subtitle: "✅ RECOMMENDED: Select folder with MP4s",
+                        title: "📁 Select Folder",
+                        subtitle: "✅ RECOMMENDED: Downloads MP4 metadata from the folder",
                         icon: "folder.badge.gearshape",
                         isEnabled: true,
                         isLoading: false
@@ -2972,8 +2997,8 @@ struct SettingsView: View {
                     }
                     
                     FilePickerRow(
-                        title: "📄 Select Individual MP4 Files",
-                        subtitle: "⚠️ Select up to 30 files to prevent crashes",
+                        title: "📄 Select Files",
+                        subtitle: "⚠️ Downloads metadata & MP4 files.  Only select up to 30 files at a time to avoid crashes",
                         icon: "folder.badge.plus",
                         isEnabled: viewModel.isFilePickerEnabled,
                         isLoading: false
@@ -2982,16 +3007,7 @@ struct SettingsView: View {
                     }
                 }
                 
-                SettingRow(
-                    title: "Clear All Core Data Songs",
-                    subtitle: "Remove all songs and associated files permanently",
-                    icon: "trash.fill",
-                    iconColor: .red,
-                    accessoryType: .disclosure,
-                    action: {
-                        showingClearSongsAlert = true
-                    }
-                )
+
             }
             .padding(.horizontal, 16)
             .padding(.bottom, 12)

@@ -227,7 +227,10 @@ struct SongListView: View {
     
     private var songListView: some View {
         Group {
-            if viewModel.displaySongs.isEmpty && !viewModel.searchText.isEmpty {
+            if viewModel.displaySongs.isEmpty && viewModel.searchText.isEmpty {
+                // No songs at all - show empty state
+                SonglistEmptyState()
+            } else if viewModel.displaySongs.isEmpty && !viewModel.searchText.isEmpty {
                 // No search results
                 VStack(spacing: 12) {
                     Image(systemName: "magnifyingglass")

@@ -9,17 +9,31 @@ import SwiftUI
 
 struct PlaylistEmptyState: View {
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
+            Spacer()
+            
+            // Music note icon - bigger than Songs Played table design
             Image(systemName: "music.note.list")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 64, height: 64)
-                .foregroundColor(.red).opacity(0.5)
-            Text("Please select songs from the Song List")
+                .font(.system(size: 80))
+                .foregroundColor(.red.opacity(0.8))
+            
+            // Main heading
+            Text("No Songs Selected")
                 .font(.title2)
-                .foregroundColor(.red).opacity(0.5)
+                .fontWeight(.medium)
+                .foregroundColor(.red.opacity(0.8))
+                .padding(.top, 16)
+            
+            // Explanation text
+            Text("Select songs from the SONG LIST")
+                .font(.subheadline)
+                .foregroundColor(.red.opacity(0.8))
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+                .padding(.top, 8)
+            
+            Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.vertical, 40)
     }
 }
