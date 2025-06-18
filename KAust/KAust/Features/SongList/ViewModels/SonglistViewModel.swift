@@ -10,13 +10,18 @@ import CoreData
 import Combine
 
 @MainActor
-class SongListViewModel: ObservableObject {
+class SonglistViewModel: ObservableObject {
     @Published var songs: [Song] = []
     @Published private(set) var displaySongs: [Song] = []
     @Published var filteredSongs: [Song] = []
     @Published var searchText = "" {
         didSet {
-            updateDisplaySongs()
+            // Debounce search to improve performance
+            searchDebounceTask?.cancel()
+            searchDebounceTask = Task { @MainActor in
+                try await Task.sleep(nanoseconds: 300_000_000) // 300ms delay
+                updateDisplaySongs()
+            }
         }
     }
     @Published var searchSuggestions: [SearchSuggestion] = []
@@ -32,6 +37,7 @@ class SongListViewModel: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     private var allSongs: [Song] = [] // Keep original list for searching
     private let searchSubject = PassthroughSubject<String, Never>()
+    private var searchDebounceTask: Task<Void, Error>?
     
     // Computed property for display
     var displayCount: Int {
@@ -43,6 +49,10 @@ class SongListViewModel: ObservableObject {
         Task {
             await loadSongs()
         }
+    }
+    
+    deinit {
+        searchDebounceTask?.cancel()
     }
     
     private func setupObservers() {
@@ -227,44 +237,113 @@ class SongListViewModel: ObservableObject {
         }
         
         isSearching = true
-        print("🔍 Performing fuzzy search for: '\(searchText)'")
+        print("🔍 Performing optimized search for: '\(searchText)'")
         
-        let searchResults = fuzzySearchSongs(query: searchText)
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.filteredSongs = searchResults.songs
-            self?.searchSuggestions = searchResults.suggestions
-            self?.showingSuggestions = !searchResults.suggestions.isEmpty
-            self?.isSearching = false
+        // Perform search in background to avoid UI blocking
+        Task.detached { [weak self] in
+            guard let self = self else { return }
             
-            print("🎯 Search results: \(searchResults.songs.count) songs, \(searchResults.suggestions.count) suggestions")
+            let searchResults = await self.optimizedFuzzySearch(query: searchText)
+            
+            await MainActor.run { [weak self] in
+                // Check if this is still the current search
+                guard self?.searchText == searchText else { return }
+                
+                self?.filteredSongs = searchResults.songs
+                self?.searchSuggestions = searchResults.suggestions
+                self?.showingSuggestions = !searchResults.suggestions.isEmpty
+                self?.isSearching = false
+                
+                print("🎯 Search results: \(searchResults.songs.count) songs, \(searchResults.suggestions.count) suggestions")
+            }
         }
     }
     
-    private func fuzzySearchSongs(query: String) -> (songs: [Song], suggestions: [SearchSuggestion]) {
+    private func optimizedFuzzySearch(query: String) async -> (songs: [Song], suggestions: [SearchSuggestion]) {
         let normalizedQuery = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         let queryWords = normalizedQuery.components(separatedBy: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)).filter { !$0.isEmpty }
         
+        print("🔍 DEBUG: Searching through \(allSongs.count) songs for query: '\(normalizedQuery)'")
+        
         var scoredSongs: [(song: Song, score: Double)] = []
         var suggestionSet: Set<String> = []
+        let maxResults = 100 // Limit results for performance
         
-        for song in allSongs {
-            let score = calculateFuzzyScore(song: song, query: normalizedQuery, queryWords: queryWords)
-            
-            if score > 0 {
-                scoredSongs.append((song: song, score: score))
+        // Process songs in chunks to avoid blocking
+        let chunkSize = 100
+        let songChunks = allSongs.chunked(into: chunkSize)
+        
+        for chunk in songChunks {
+            // Fast path: Simple contains search first
+            for song in chunk {
+                let artist = song.cleanArtist.lowercased()
+                let title = song.cleanTitle.lowercased()
                 
-                // Generate suggestions
-                addSuggestions(for: song, query: normalizedQuery, to: &suggestionSet)
+                var score: Double = 0
+                
+                // 1. Exact matches (fastest)
+                if artist.contains(normalizedQuery) || title.contains(normalizedQuery) {
+                    score += 100
+                }
+                
+                // 2. Word matches (fast)
+                for word in queryWords {
+                    if artist.contains(word) { score += 50 }
+                    if title.contains(word) { score += 50 }
+                }
+                
+                // 3. Prefix matches (fast)
+                for word in queryWords {
+                    if artist.hasPrefix(word) { score += 25 }
+                    if title.hasPrefix(word) { score += 25 }
+                }
+                
+                // 4. Only do expensive fuzzy matching if we don't have enough results yet
+                if score < 50 && scoredSongs.count < maxResults && normalizedQuery.count > 2 {
+                    score += calculateLimitedFuzzyScore(song: song, query: normalizedQuery)
+                }
+                
+                if score > 0 {
+                    scoredSongs.append((song: song, score: score))
+                    
+                    // Generate suggestions (limit to top matches)
+                    if score > 50 {
+                        addSuggestions(for: song, query: normalizedQuery, to: &suggestionSet)
+                    }
+                }
             }
+            
+            // Yield control periodically to avoid blocking
+            await Task.yield()
         }
         
-        // Sort by score (highest first)
+        // Sort by score and limit results
         scoredSongs.sort { $0.score > $1.score }
+        let topSongs = Array(scoredSongs.prefix(maxResults))
         
         let suggestions = Array(suggestionSet.prefix(5)).map { SearchSuggestion(text: $0, type: .completion) }
         
-        return (songs: scoredSongs.map { $0.song }, suggestions: suggestions)
+        print("🎯 Found \(topSongs.count) matches (limited from \(scoredSongs.count) total)")
+        
+        return (songs: topSongs.map { $0.song }, suggestions: suggestions)
+    }
+    
+    private func calculateLimitedFuzzyScore(song: Song, query: String) -> Double {
+        let artist = song.cleanArtist.lowercased()
+        let title = song.cleanTitle.lowercased()
+        
+        // Only calculate fuzzy score for shorter strings to save time
+        let maxLength = 30
+        let truncatedArtist = String(artist.prefix(maxLength))
+        let truncatedTitle = String(title.prefix(maxLength))
+        
+        let artistDistance = levenshteinDistance(truncatedArtist, query)
+        let titleDistance = levenshteinDistance(truncatedTitle, query)
+        
+        let artistScore = max(0, Double(truncatedArtist.count - artistDistance) / Double(max(truncatedArtist.count, 1))) * 20
+        let titleScore = max(0, Double(truncatedTitle.count - titleDistance) / Double(max(truncatedTitle.count, 1))) * 20
+        
+        return max(artistScore, titleScore)
     }
     
     private func calculateFuzzyScore(song: Song, query: String, queryWords: [String]) -> Double {
@@ -495,6 +574,7 @@ class SongListViewModel: ObservableObject {
             // Update the UI on the main thread
             await MainActor.run {
                 self.songs = loadedSongs
+                self.allSongs = loadedSongs  // CRITICAL: Update allSongs for fuzzy search!
                 self.updateDisplaySongs()
                 self.error = nil
                 print("🎵 Updated UI with \(self.displaySongs.count) songs")
@@ -507,17 +587,19 @@ class SongListViewModel: ObservableObject {
         }
     }
     
-    /// Update display songs based on search text or other filters
+    /// Update display songs based on search text using fuzzy search
     private func updateDisplaySongs() {
         if searchText.isEmpty {
             displaySongs = songs.sorted { $0.cleanTitle < $1.cleanTitle }
+            filteredSongs = []
+            searchSuggestions = []
+            showingSuggestions = false
+            isSearching = false
             print("📋 Displaying all \(displaySongs.count) songs")
         } else {
-            displaySongs = songs.filter { song in
-                song.cleanTitle.localizedCaseInsensitiveContains(searchText) ||
-                song.cleanArtist.localizedCaseInsensitiveContains(searchText)
-            }.sorted { $0.cleanTitle < $1.cleanTitle }
-            print("🔍 Filtered to \(displaySongs.count) songs matching '\(searchText)'")
+            // Use optimized fuzzy search for advanced matching
+            performFuzzySearch(searchText)
+            displaySongs = filteredSongs
         }
     }
     
@@ -636,5 +718,15 @@ struct SearchSuggestion: Identifiable, Hashable {
         case artist
         case song
         case combined
+    }
+}
+
+// MARK: - Array Extension for Chunking
+
+extension Array {
+    func chunked(into size: Int) -> [[Element]] {
+        return stride(from: 0, to: count, by: size).map {
+            Array(self[$0..<Swift.min($0 + size, count)])
+        }
     }
 }

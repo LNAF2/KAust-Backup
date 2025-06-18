@@ -3,12 +3,10 @@ import CoreData
 
 // MARK: - Song List Display View
 
-/// Main view for displaying songs from Core Data with search and filtering
+/// Main view for displaying songs from Core Data with fuzzy search
 struct SongListDisplayView: View {
-    @StateObject private var viewModel = SongListViewModel()
-    @State private var showingFilterSheet = false
-    @State private var showingSortSheet = false
-    @State private var selectedSong: SongEntity?
+    @StateObject private var viewModel = SonglistViewModel()
+    @State private var selectedSong: Song?
     @AppStorage("swipeToDeleteEnabled") private var swipeToDeleteEnabled = false
     
     var body: some View {
@@ -25,18 +23,13 @@ struct SongListDisplayView: View {
         }
         .onAppear {
             Task {
-                await viewModel.refresh()
+                await viewModel.loadSongs()
             }
         }
         .refreshable {
-            await viewModel.refresh()
+            await viewModel.loadSongs()
         }
-        .sheet(isPresented: $showingFilterSheet) {
-            FilterSheet(viewModel: viewModel)
-        }
-        .actionSheet(isPresented: $showingSortSheet) {
-            sortActionSheet
-        }
+
         .alert("Error", isPresented: .constant(viewModel.error != nil)) {
             Button("OK") {
                 // Error handling
@@ -48,7 +41,7 @@ struct SongListDisplayView: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: {
                     Task {
-                        await viewModel.refresh()
+                        await viewModel.loadSongs()
                     }
                 }) {
                     Image(systemName: "arrow.clockwise")
@@ -70,8 +63,8 @@ struct SongListDisplayView: View {
                         .fontWeight(.bold)
                         .foregroundColor(AppTheme.primaryText)
                     
-                    if viewModel.totalSongCount > 0 {
-                        Text("\(viewModel.songCount) of \(viewModel.totalSongCount) songs")
+                    if viewModel.displayCount > 0 {
+                        Text("\(viewModel.displayCount) songs")
                             .font(.subheadline)
                             .foregroundColor(AppTheme.secondaryText)
                     }
@@ -81,22 +74,8 @@ struct SongListDisplayView: View {
                 
                 // Action buttons
                 HStack(spacing: 12) {
-                    // Filter button
-                    Button(action: { showingFilterSheet.toggle() }) {
-                        Image(systemName: hasActiveFilters ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                            .font(.title2)
-                            .foregroundColor(hasActiveFilters ? AppTheme.accent : AppTheme.secondaryText)
-                    }
-                    
-                    // Sort button
-                    Button(action: { showingSortSheet.toggle() }) {
-                        Image(systemName: "arrow.up.arrow.down.circle")
-                            .font(.title2)
-                            .foregroundColor(AppTheme.secondaryText)
-                    }
-                    
                     // Refresh button
-                    Button(action: { Task { await viewModel.refresh() } }) {
+                    Button(action: { Task { await viewModel.loadSongs() } }) {
                         Image(systemName: "arrow.clockwise.circle")
                             .font(.title2)
                             .foregroundColor(AppTheme.secondaryText)
@@ -106,11 +85,6 @@ struct SongListDisplayView: View {
             
             // Search bar
             SearchBarView(text: $viewModel.searchText)
-            
-            // Active filters
-            if hasActiveFilters {
-                ActiveFiltersView(viewModel: viewModel)
-            }
         }
         .padding(.horizontal, AppConstants.Layout.defaultPadding)
         .padding(.top, AppConstants.Layout.defaultPadding)
@@ -120,11 +94,9 @@ struct SongListDisplayView: View {
     
     private var mainContent: some View {
         Group {
-            if viewModel.isLoading {
-                LoadingView()
-            } else if viewModel.isEmpty && viewModel.totalSongCount == 0 {
+            if viewModel.displaySongs.isEmpty && viewModel.songs.isEmpty {
                 EmptyLibraryView()
-            } else if viewModel.isEmpty {
+            } else if viewModel.displaySongs.isEmpty {
                 NoResultsView(searchText: viewModel.searchText)
             } else {
                 songList
@@ -135,12 +107,8 @@ struct SongListDisplayView: View {
     // MARK: - Song List
     
     private var songList: some View {
-        List(viewModel.filteredSongs, id: \.id) { song in
-            SongRowView(song: song) {
-                Task {
-                    await viewModel.playedSong(song)
-                }
-            }
+        List(viewModel.displaySongs, id: \.id) { song in
+            SongRowView(song: song)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
             .if(swipeToDeleteEnabled) { view in
@@ -158,25 +126,7 @@ struct SongListDisplayView: View {
         .padding(.horizontal, AppConstants.Layout.defaultPadding)
     }
     
-    // MARK: - Computed Properties
-    
-    private var hasActiveFilters: Bool {
-        !viewModel.searchText.isEmpty ||
-        !viewModel.selectedGenres.isEmpty ||
-        viewModel.selectedLanguage != nil ||
-        viewModel.selectedEvent != nil
-    }
-    
-    private var sortActionSheet: ActionSheet {
-        ActionSheet(
-            title: Text("Sort Songs"),
-            buttons: SortOption.allCases.map { option in
-                .default(Text(option.rawValue)) {
-                    viewModel.sortOption = option
-                }
-            } + [.cancel()]
-        )
-    }
+
 }
 
 // MARK: - Search Bar View
@@ -220,8 +170,7 @@ struct SearchBarView: View {
 // MARK: - Song Row View
 
 struct SongRowView: View {
-    let song: SongEntity
-    let onPlay: () -> Void
+    let song: Song
     
     var body: some View {
         VStack(spacing: 0) {
@@ -238,38 +187,20 @@ struct SongRowView: View {
                 
                 // Song info
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(song.title ?? "Unknown Title")
+                    Text(song.cleanTitle)
                         .font(.headline)
                         .foregroundColor(AppTheme.primaryText)
                         .lineLimit(1)
                     
-                    Text(song.artist ?? "Unknown Artist")
+                    Text(song.cleanArtist)
                         .font(.subheadline)
                         .foregroundColor(AppTheme.secondaryText)
                         .lineLimit(1)
                     
                     HStack {
-                        Text(song.formattedDuration)
+                        Text(song.duration)
                             .font(.caption)
                             .foregroundColor(AppTheme.secondaryText)
-                        
-                        if !song.genreNames.isEmpty {
-                            Text("•")
-                                .foregroundColor(AppTheme.secondaryText)
-                            
-                            Text(song.genreNames.first ?? "")
-                                .font(.caption)
-                                .foregroundColor(AppTheme.accent)
-                        }
-                        
-                        if song.playCount > 0 {
-                            Text("•")
-                                .foregroundColor(AppTheme.secondaryText)
-                            
-                            Text("Played \(song.playCount) times")
-                                .font(.caption)
-                                .foregroundColor(AppTheme.secondaryText)
-                        }
                         
                         Spacer()
                     }
@@ -277,12 +208,10 @@ struct SongRowView: View {
                 
                 Spacer()
                 
-                // Play button
-                Button(action: onPlay) {
-                    Image(systemName: "play.circle.fill")
-                        .font(.title)
-                        .foregroundColor(AppTheme.accent)
-                }
+                // Play icon (non-interactive for display)
+                Image(systemName: "play.circle.fill")
+                    .font(.title)
+                    .foregroundColor(AppTheme.accent.opacity(0.6))
             }
             .padding(.vertical, 8)
             .contentShape(Rectangle())
@@ -295,180 +224,7 @@ struct SongRowView: View {
     }
 }
 
-// MARK: - Active Filters View
 
-struct ActiveFiltersView: View {
-    @ObservedObject var viewModel: SongListViewModel
-    
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                // Clear all filters
-                Button("Clear All") {
-                    viewModel.clearFilters()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(AppTheme.accent)
-                .foregroundColor(.white)
-                .font(.caption)
-                .cornerRadius(AppConstants.UI.cornerRadius)
-                
-                // Genre filters
-                ForEach(Array(viewModel.selectedGenres), id: \.self) { genre in
-                    Button(action: { viewModel.removeGenreFilter(genre) }) {
-                        HStack(spacing: 4) {
-                            Text(genre)
-                            Image(systemName: "xmark")
-                                .font(.caption2)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppTheme.cardBackground)
-                    .foregroundColor(AppTheme.primaryText)
-                    .font(.caption)
-                    .cornerRadius(AppConstants.UI.cornerRadius)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: AppConstants.UI.cornerRadius)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
-                }
-                
-                // Language filter
-                if let language = viewModel.selectedLanguage {
-                    Button(action: { viewModel.selectedLanguage = nil }) {
-                        HStack(spacing: 4) {
-                            Text("Language: \(language)")
-                            Image(systemName: "xmark")
-                                .font(.caption2)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppTheme.cardBackground)
-                    .foregroundColor(AppTheme.primaryText)
-                    .font(.caption)
-                    .cornerRadius(AppConstants.UI.cornerRadius)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: AppConstants.UI.cornerRadius)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
-                }
-                
-                // Event filter
-                if let event = viewModel.selectedEvent {
-                    Button(action: { viewModel.selectedEvent = nil }) {
-                        HStack(spacing: 4) {
-                            Text("Event: \(event)")
-                            Image(systemName: "xmark")
-                                .font(.caption2)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(AppTheme.cardBackground)
-                    .foregroundColor(AppTheme.primaryText)
-                    .font(.caption)
-                    .cornerRadius(AppConstants.UI.cornerRadius)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: AppConstants.UI.cornerRadius)
-                            .stroke(AppTheme.borderColor, lineWidth: 1)
-                    )
-                }
-            }
-            .padding(.horizontal, AppConstants.Layout.defaultPadding)
-        }
-    }
-}
-
-// MARK: - Filter Sheet
-
-struct FilterSheet: View {
-    @ObservedObject var viewModel: SongListViewModel
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                // Genres section
-                if !viewModel.availableGenres.isEmpty {
-                    Section("Genres") {
-                        ForEach(viewModel.availableGenres, id: \.id) { genre in
-                            HStack {
-                                Text(genre.name ?? "Unknown")
-                                Spacer()
-                                if viewModel.selectedGenres.contains(genre.name ?? "") {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(AppTheme.accent)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                viewModel.toggleGenreFilter(genre.name ?? "")
-                            }
-                        }
-                    }
-                }
-                
-                // Languages section
-                if !viewModel.availableLanguages.isEmpty {
-                    Section("Languages") {
-                        ForEach(viewModel.availableLanguages, id: \.self) { language in
-                            HStack {
-                                Text(language)
-                                Spacer()
-                                if viewModel.selectedLanguage == language {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(AppTheme.accent)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                viewModel.selectedLanguage = viewModel.selectedLanguage == language ? nil : language
-                            }
-                        }
-                    }
-                }
-                
-                // Events section
-                if !viewModel.availableEvents.isEmpty {
-                    Section("Events") {
-                        ForEach(viewModel.availableEvents, id: \.self) { event in
-                            HStack {
-                                Text(event)
-                                Spacer()
-                                if viewModel.selectedEvent == event {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(AppTheme.accent)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                viewModel.selectedEvent = viewModel.selectedEvent == event ? nil : event
-                            }
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Filter Songs")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Clear All") {
-                        viewModel.clearFilters()
-                    }
-                }
-                
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
 
 // MARK: - Empty States
 

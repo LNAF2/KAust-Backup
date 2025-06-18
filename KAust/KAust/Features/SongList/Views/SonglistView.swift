@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SongListView: View {
-    @StateObject private var viewModel = SongListViewModel()
+    @StateObject private var viewModel = SonglistViewModel()
     @ObservedObject var playlistViewModel: PlaylistViewModel
     @EnvironmentObject var videoPlayerViewModel: VideoPlayerViewModel
     @FocusState private var isSearchFocused: Bool
