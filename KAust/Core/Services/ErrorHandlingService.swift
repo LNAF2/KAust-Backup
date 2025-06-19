@@ -92,7 +92,7 @@ final class ErrorHandlingService: ErrorHandlingServiceProtocol {
         // Determine if the error is retryable
         if let mediaError = error as? MediaMetadataError {
             switch mediaError {
-            case .fileSizeOutOfRange:
+            case .fileSizeOutOfRange, .fileSizeTooSmall:
                 return false // Can't retry, need different file
             case .invalidFileSize, .unreadableFile, .invalidDuration, .noValidTracks:
                 return true // Might work with different file
@@ -126,6 +126,9 @@ final class ErrorHandlingService: ErrorHandlingServiceProtocol {
                 actions.append(.selectDifferentFile)
                 actions.append(.compressFile)
                 
+            case .fileSizeTooSmall:
+                actions.append(.selectDifferentFile)
+                
             case .unreadableFile, .noValidTracks:
                 actions.append(.selectDifferentFile)
                 actions.append(.checkFileFormat)
@@ -149,7 +152,7 @@ final class ErrorHandlingService: ErrorHandlingServiceProtocol {
     private func determineErrorSeverity(_ error: Error) -> ErrorSeverity {
         if let mediaError = error as? MediaMetadataError {
             switch mediaError {
-            case .fileSizeOutOfRange:
+            case .fileSizeOutOfRange, .fileSizeTooSmall:
                 return .warning // User can select different file
             case .unreadableFile, .noValidTracks:
                 return .error // File is problematic
@@ -204,7 +207,15 @@ final class ErrorHandlingService: ErrorHandlingServiceProtocol {
                 let maxMB = max / (1024 * 1024)
                 return (
                     "File Size Issue",
-                    "The selected file is \(currentMB)MB, but must be between \(minMB)MB and \(maxMB)MB."
+                    "The selected file is \(currentMB)MB, but must be between \(minMB)MB and \(maxMB)MB for copied files."
+                )
+                
+            case .fileSizeTooSmall(let current, let min):
+                let currentMB = current / (1024 * 1024)
+                let minMB = min / (1024 * 1024)
+                return (
+                    "File Too Small",
+                    "The selected file is \(currentMB)MB, but must be at least \(minMB)MB for quality assurance."
                 )
                 
             case .unreadableFile:
@@ -330,10 +341,14 @@ extension MediaMetadataError {
             let currentMB = current / (1024 * 1024)
             let maxMB = max / (1024 * 1024)
             if currentMB > maxMB {
-                return "Try compressing the file or selecting a smaller one."
+                return "Try compressing the file or selecting a smaller one, or use folder access mode for larger files."
             } else {
                 return "The file is too small. Please select a larger MP4 file."
             }
+            
+        case .fileSizeTooSmall(let current, let min):
+            let minMB = min / (1024 * 1024)
+            return "Select a larger MP4 file (minimum \(minMB)MB). Small files may not provide adequate quality for karaoke use."
             
         case .unreadableFile:
             return "Verify the file isn't corrupted by playing it in another app first."

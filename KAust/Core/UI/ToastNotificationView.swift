@@ -372,7 +372,7 @@ struct ToastNotificationView_Previews: PreviewProvider {
                 notification: ToastNotification(
                     type: .error,
                     title: "Import Failed",
-                    message: "File size exceeds the 150MB limit.",
+                    message: "File size exceeds the 200MB limit.",
                     duration: 0,
                     action: ToastAction(title: "Select Different File") {}
                 ),

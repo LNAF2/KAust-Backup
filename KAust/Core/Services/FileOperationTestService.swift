@@ -135,7 +135,7 @@ final class FileOperationTestService: FileOperationTestServiceProtocol {
             MediaMetadataError.fileSizeOutOfRange(
                 current: 200 * 1024 * 1024,
                 min: 5 * 1024 * 1024,
-                max: 150 * 1024 * 1024
+                max: 200 * 1024 * 1024
             ),
             MediaMetadataError.unreadableFile,
             MediaMetadataError.noValidTracks,
@@ -157,7 +157,7 @@ final class FileOperationTestService: FileOperationTestServiceProtocol {
             .fileSizeOutOfRange(
                 current: 200 * 1024 * 1024,
                 min: 5 * 1024 * 1024,
-                max: 150 * 1024 * 1024
+                max: 200 * 1024 * 1024
             ),
             .invalidFileSize,
             .unreadableFile

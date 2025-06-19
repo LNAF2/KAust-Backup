@@ -101,7 +101,7 @@ struct ImportReadyView: View {
                     .font(.headline)
                     .foregroundColor(AppTheme.text)
                 
-                Text("Select MP4 files to add to your karaoke library. Files must be between 5MB and 150MB.")
+                Text("Select MP4 files to add to your karaoke library. Files must be at least 5MB. When copying files to app storage, maximum size is 200MB.")
                     .font(.body)
                     .foregroundColor(AppTheme.textSecondary)
                     .multilineTextAlignment(.center)

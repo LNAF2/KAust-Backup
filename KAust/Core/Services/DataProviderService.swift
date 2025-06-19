@@ -91,8 +91,8 @@ final class DataProviderService: DataProviderServiceProtocol {
                    genres: [String]) async throws -> SongEntity {
         let sourceURL = URL(fileURLWithPath: filePath)
         
-        // Validate MP4 file
-        try await metadataService.validateMP4File(at: sourceURL)
+        // Validate MP4 file with processing mode (DataProviderService always copies files)
+        try await metadataService.validateMP4File(at: sourceURL, processingMode: .filePickerCopy)
         
         // Extract metadata
         let metadata = try await metadataService.extractMetadata(from: sourceURL)

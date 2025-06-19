@@ -274,7 +274,13 @@ struct FailedFileRow: View {
         if let validationError = error as? FileValidationError {
             switch validationError {
             case .invalidFileSize:
-                return "File size must be between 5MB and 150MB"
+                return "Invalid file size detected"
+            case .fileSizeTooSmallForCopy:
+                return "File too small for copying to app storage (minimum 5MB required)"
+            case .fileSizeTooBigForCopy:
+                return "File too large for copying to app storage (maximum 200MB to prevent storage bloat)"
+            case .fileSizeTooSmallForQuality:
+                return "File too small for quality standards (minimum 5MB required)"
             case .invalidFileType:
                 return "Only MP4 files are supported"
             case .fileNotFound:

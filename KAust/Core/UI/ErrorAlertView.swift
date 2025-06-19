@@ -122,10 +122,22 @@ private struct ErrorDisplayInfo {
             let maxMB = max / (1024 * 1024)
             return ErrorDisplayInfo(
                 title: "File Size Out of Range",
-                description: "File size (\(currentMB)MB) must be between \(minMB)MB and \(maxMB)MB",
-                recoverySuggestion: "Please select a different MP4 file within the size limits.",
+                description: "File size (\(currentMB)MB) must be between \(minMB)MB and \(maxMB)MB for copied files",
+                recoverySuggestion: "Please select a different MP4 file within the size limits, or use folder access mode for larger files.",
                 iconName: "scale.3d",
                 iconColor: .red,
+                isRetryable: false
+            )
+            
+        case .fileSizeTooSmall(let current, let min):
+            let currentMB = current / (1024 * 1024)
+            let minMB = min / (1024 * 1024)
+            return ErrorDisplayInfo(
+                title: "File Too Small",
+                description: "File size (\(currentMB)MB) is below the minimum \(minMB)MB required for quality assurance",
+                recoverySuggestion: "Please select a larger MP4 file. Small files may not provide adequate audio/video quality for karaoke use.",
+                iconName: "scale.3d",
+                iconColor: .orange,
                 isRetryable: false
             )
             
@@ -262,7 +274,7 @@ struct ErrorAlertView_Previews: PreviewProvider {
                 error: MediaMetadataError.fileSizeOutOfRange(
                     current: 200 * 1024 * 1024,
                     min: 5 * 1024 * 1024,
-                    max: 150 * 1024 * 1024
+                    max: 200 * 1024 * 1024
                 ),
                 retryAction: {},
                 dismissAction: {}

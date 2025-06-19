@@ -90,7 +90,7 @@ struct ErrorHandlingDemoView: View {
                                 error: MediaMetadataError.fileSizeOutOfRange(
                                     current: 200 * 1024 * 1024,
                                     min: 5 * 1024 * 1024,
-                                    max: 150 * 1024 * 1024
+                                    max: 200 * 1024 * 1024
                                 )
                             )
                             

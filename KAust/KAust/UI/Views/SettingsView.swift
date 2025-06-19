@@ -14,10 +14,15 @@ import CoreData
 
 // Note: DataProviderService should be available since DataProviderServiceProtocol is already imported via existing protocol file structure
 
+// ProcessingMode is now defined in Shared/Constants.swift
+
 // MARK: - File Validation Errors
 
 enum FileValidationError: LocalizedError {
     case invalidFileSize
+    case fileSizeTooSmallForCopy
+    case fileSizeTooBigForCopy
+    case fileSizeTooSmallForQuality
     case invalidFileType
     case fileNotFound
     case permissionDenied
@@ -26,7 +31,13 @@ enum FileValidationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidFileSize:
-            return "File size must be between 5MB and 150MB"
+            return "Invalid file size"
+        case .fileSizeTooSmallForCopy:
+            return "File too small for copying - must be at least 5MB"
+        case .fileSizeTooBigForCopy:
+            return "File too large for copying - must be under 200MB to prevent storage bloat"
+        case .fileSizeTooSmallForQuality:
+            return "File too small - must be at least 5MB for quality assurance"
         case .invalidFileType:
             return "Only MP4 files are supported"
         case .fileNotFound:
@@ -376,11 +387,7 @@ struct BatchProgress {
     }
 }
 
-/// Processing mode for file picker service
-enum ProcessingMode {
-    case filePickerCopy    // Traditional: copy files to app storage
-    case directFolderAccess // New: use files directly from their location
-}
+// ProcessingMode is now defined in MediaMetadataService.swift
 
 /// Enhanced file picker service with crash recovery and chunked processing
 @MainActor
@@ -1436,14 +1443,34 @@ class EnhancedFilePickerService: ObservableObject {
             }
         }
         
-        // Check file size (5MB to 150MB) with improved error handling
+        // Check file size based on processing mode
         do {
             let fileSize = try getFileSize(url: url)
-            if fileSize < 5_000_000 || fileSize > 150_000_000 {
-                print("   ❌ File validation failed: Invalid size \(fileSize) bytes for \(url.lastPathComponent)")
-                throw FileValidationError.invalidFileSize
+            let minSize: Int64 = 5_000_000  // 5MB (quality control for both modes)
+            
+            // Only apply max size limit when copying files to app storage
+            if processingMode == .filePickerCopy {
+                let maxSize: Int64 = 200_000_000  // 200MB
+                let sizeMB = fileSize / (1024 * 1024)
+                
+                if fileSize < minSize {
+                    print("   ❌ File validation failed: File too small \(sizeMB)MB for \(url.lastPathComponent) (minimum 5MB for copied files)")
+                    throw FileValidationError.fileSizeTooSmallForCopy
+                } else if fileSize > maxSize {
+                    print("   ❌ File validation failed: File too large \(sizeMB)MB for \(url.lastPathComponent) (maximum 200MB for copied files)")
+                    throw FileValidationError.fileSizeTooBigForCopy
+                }
+                print("   ✅ File validation passed: \(sizeMB)MB (within 5-200MB range for copied files)")
+            } else {
+                // For direct folder access, only check minimum size for quality
+                let sizeMB = fileSize / (1024 * 1024)
+                
+                if fileSize < minSize {
+                    print("   ❌ File validation failed: File too small \(sizeMB)MB for \(url.lastPathComponent) (minimum 5MB for quality)")
+                    throw FileValidationError.fileSizeTooSmallForQuality
+                }
+                print("   ✅ File validation passed: \(sizeMB)MB (above 5MB minimum, no max limit for folder access)")
             }
-            print("   ✅ File validation passed: \(fileSize) bytes")
         } catch {
             if processingMode == .directFolderAccess {
                 print("   ❌ File validation failed for folder access: \(error.localizedDescription)")
@@ -1793,7 +1820,13 @@ struct FileResultRow: View {
         if let validationError = error as? FileValidationError {
             switch validationError {
             case .invalidFileSize:
-                return "File size must be between 5MB and 150MB"
+                return "Invalid file size detected"
+            case .fileSizeTooSmallForCopy:
+                return "File too small for copying to app storage (minimum 5MB required)"
+            case .fileSizeTooBigForCopy:
+                return "File too large for copying to app storage (maximum 200MB to prevent storage bloat)"
+            case .fileSizeTooSmallForQuality:
+                return "File too small for quality standards (minimum 5MB required)"
             case .invalidFileType:
                 return "Only MP4 files are supported"
             case .fileNotFound:
@@ -2490,10 +2523,8 @@ struct SettingsView: View {
                 accountSection
             }
             
-            // App Info section - Admin, Dev, Owner only
-            if roleManager.canAccessAdministratorSettings {
-                appInfoSection
-            }
+            // App Info section - Visible to all users
+            appInfoSection
             
             // Programmer Management section - Dev and Owner only
             if roleManager.canAccessAllSettings {
@@ -2949,13 +2980,6 @@ struct SettingsView: View {
         SettingsSection(title: "Administrator Settings", icon: "gearshape") {
             VStack(spacing: 8) {
                 SettingRow(
-                    title: "Enable Delete",
-                    subtitle: "Swipe left deletes individual songs in the SONG LIST",
-                    icon: "trash",
-                    accessoryType: .toggle($viewModel.swipeToDeleteEnabled)
-                )
-                
-                SettingRow(
                     title: "Songs Played Table",
                     subtitle: "Manage the songs played history table",
                     icon: "table",
@@ -3002,6 +3026,14 @@ struct SettingsView: View {
                         viewModel.openFilePicker()
                     }
                 }
+                
+                // Enable Delete option (moved from Administrator Settings)
+                SettingRow(
+                    title: "Enable Delete",
+                    subtitle: "Swipe left deletes individual songs in the SONG LIST",
+                    icon: "trash",
+                    accessoryType: .toggle($viewModel.swipeToDeleteEnabled)
+                )
                 
                 // Delete Song List option
                 SettingRow(

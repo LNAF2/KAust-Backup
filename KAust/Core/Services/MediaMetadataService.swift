@@ -4,7 +4,7 @@ import AVFoundation
 // MARK: - Protocol Definition
 
 protocol MediaMetadataServiceProtocol {
-    func validateMP4File(at url: URL) async throws
+    func validateMP4File(at url: URL, processingMode: ProcessingMode) async throws
     func extractMetadata(from url: URL) async throws -> MediaMetadata
 }
 
@@ -17,9 +17,9 @@ final class MediaMetadataService: MediaMetadataServiceProtocol {
         self.fileManager = fileManager
     }
     
-    func validateMP4File(at url: URL) async throws {
-        // Check file size constraints (5MB - 150MB)
-        try validateFileSize(at: url)
+    func validateMP4File(at url: URL, processingMode: ProcessingMode = .filePickerCopy) async throws {
+        // Check file size constraints based on processing mode
+        try validateFileSize(at: url, processingMode: processingMode)
         
         // Verify it's a valid media file
         try await validateMediaFile(at: url)
@@ -67,17 +67,25 @@ final class MediaMetadataService: MediaMetadataServiceProtocol {
     
     // MARK: - Private Helper Methods
     
-    private func validateFileSize(at url: URL) throws {
+    private func validateFileSize(at url: URL, processingMode: ProcessingMode) throws {
         let attributes = try fileManager.attributesOfItem(atPath: url.path)
         guard let fileSize = attributes[.size] as? Int64 else {
             throw MediaMetadataError.invalidFileSize
         }
         
-        let minSize: Int64 = 5 * 1024 * 1024  // 5MB
-        let maxSize: Int64 = 150 * 1024 * 1024  // 150MB
+        let minSize: Int64 = 5 * 1024 * 1024  // 5MB (keep for quality control)
         
-        guard fileSize >= minSize && fileSize <= maxSize else {
-            throw MediaMetadataError.fileSizeOutOfRange(current: fileSize, min: minSize, max: maxSize)
+        // Only apply max size limit when copying files to app storage
+        if processingMode == .filePickerCopy {
+            let maxSize: Int64 = 200 * 1024 * 1024  // 200MB
+            guard fileSize >= minSize && fileSize <= maxSize else {
+                throw MediaMetadataError.fileSizeOutOfRange(current: fileSize, min: minSize, max: maxSize)
+            }
+        } else {
+            // For direct folder access, only check minimum size for quality
+            guard fileSize >= minSize else {
+                throw MediaMetadataError.fileSizeTooSmall(current: fileSize, min: minSize)
+            }
         }
     }
     
@@ -199,10 +207,12 @@ struct MediaMetadata {
 enum MediaMetadataError: Error, LocalizedError {
     case invalidFileSize
     case fileSizeOutOfRange(current: Int64, min: Int64, max: Int64)
+    case fileSizeTooSmall(current: Int64, min: Int64)
     case unreadableFile
     case invalidDuration
     case noValidTracks
     case metadataExtractionFailed
+    case fileSizeTooSmall(current: Int64, min: Int64)
     
     var errorDescription: String? {
         switch self {
@@ -213,6 +223,10 @@ enum MediaMetadataError: Error, LocalizedError {
             let minMB = min / (1024 * 1024)
             let maxMB = max / (1024 * 1024)
             return "File size (\(currentMB)MB) must be between \(minMB)MB and \(maxMB)MB"
+        case .fileSizeTooSmall(let current, let min):
+            let currentMB = current / (1024 * 1024)
+            let minMB = min / (1024 * 1024)
+            return "File size (\(currentMB)MB) must be at least \(minMB)MB for quality assurance"
         case .unreadableFile:
             return "The media file cannot be read or is corrupted"
         case .invalidDuration:
@@ -221,6 +235,10 @@ enum MediaMetadataError: Error, LocalizedError {
             return "No valid audio or video tracks found in the file"
         case .metadataExtractionFailed:
             return "Failed to extract metadata from the media file"
+        case .fileSizeTooSmall(let current, let min):
+            let currentMB = current / (1024 * 1024)
+            let minMB = min / (1024 * 1024)
+            return "File size (\(currentMB)MB) must be at least \(minMB)MB"
         }
     }
 } 

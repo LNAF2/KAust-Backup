@@ -32,7 +32,7 @@ enum AppConstants {
     // MARK: - File System
     enum FileSystem {
         static let minMP4SizeMB: Double = 5.0
-        static let maxMP4SizeMB: Double = 150.0
+        static let maxMP4SizeMB: Double = 200.0
         static let bytesInMegabyte: Double = 1024 * 1024
     }
 
@@ -41,4 +41,12 @@ enum AppConstants {
     // enum API {
     //     static let baseURL = "https://api.example.com"
     // }
+}
+
+// MARK: - Processing Mode
+
+/// Processing mode for file operations
+enum ProcessingMode {
+    case filePickerCopy    // Traditional: copy files to app storage
+    case directFolderAccess // New: use files directly from their location
 }

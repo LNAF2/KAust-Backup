@@ -360,24 +360,8 @@ class FileImportViewModel: ObservableObject {
     
     /// Validate file before processing
     private func validateFile(_ fileURL: URL) async throws {
-        // File size validation (5MB - 150MB)
-        let fileSize = try getFileSize(fileURL)
-        let minSize: Int64 = 5 * 1024 * 1024  // 5MB
-        let maxSize: Int64 = 150 * 1024 * 1024  // 150MB
-        
-        guard fileSize >= minSize && fileSize <= maxSize else {
-            throw MediaMetadataError.fileSizeOutOfRange(actual: fileSize, min: minSize, max: maxSize)
-        }
-        
-        // File type validation
-        guard fileURL.pathExtension.lowercased() == "mp4" else {
-            throw MediaMetadataError.unreadableFile
-        }
-        
-        // File accessibility validation
-        guard FileManager.default.isReadableFile(atPath: fileURL.path) else {
-            throw MediaMetadataError.unreadableFile
-        }
+        // Use MediaMetadataService validation with filePickerCopy mode (FileImportViewModel copies files)
+        try await mediaMetadataService.validateMP4File(at: fileURL, processingMode: .filePickerCopy)
     }
     
     /// Save extracted metadata to Core Data
