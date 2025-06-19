@@ -674,7 +674,7 @@ struct CustomVideoPlayerView: View {
                     ), in: 0...max(viewModel.duration, 1))
                     .accentColor(.white)
                     
-                    Text(viewModel.formattedDuration)
+                    Text(viewModel.formattedTimeRemaining)
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(.white)
                     

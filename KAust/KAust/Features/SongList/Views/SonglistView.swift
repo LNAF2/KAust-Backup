@@ -96,14 +96,14 @@ struct SongListView: View {
                 print("  - Swipe to delete enabled: \(swipeToDeleteEnabled)")
                 print("  - Number of songs: \(viewModel.displaySongs.count)")
                 
-                // Always set focus to search bar when view appears
-                isSearchFocused = true
-                focusManager.focus(.search)
+                // Use only native SwiftUI focus - no competing FocusManager
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isSearchFocused = true
+                }
             }
             .onDisappear {
-                // Force dismiss keyboard to prevent constraint conflicts
+                // Simple focus dismissal - no competing systems
                 isSearchFocused = false
-                focusManager.forceKeyboardDismiss()
             }
     }
 
@@ -149,12 +149,6 @@ struct SongListView: View {
                     .onSubmit {
                         viewModel.showingSuggestions = false
                         isSearchFocused = false
-                        focusManager.clearFocus()
-                    }
-                    .onChange(of: isSearchFocused) { _, focused in
-                        if !focused {
-                            focusManager.clearFocus()
-                        }
                     }
                     .onChange(of: viewModel.searchText) {
                         if !viewModel.searchText.isEmpty {
@@ -166,7 +160,6 @@ struct SongListView: View {
                     Button(action: {
                         viewModel.clearSearch()
                         isSearchFocused = true
-                        focusManager.focus(.search)
                     }) {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundColor(AppTheme.leftPanelAccent.opacity(0.6))
@@ -202,7 +195,6 @@ struct SongListView: View {
                 Button(action: {
                     viewModel.selectSuggestion(suggestion)
                     isSearchFocused = false
-                    focusManager.clearFocus()
                 }) {
                     HStack {
                         Image(systemName: "magnifyingglass")
@@ -266,7 +258,6 @@ struct SongListView: View {
                         viewModel.clearSearch()
                         // Maintain focus on search bar after clearing
                         isSearchFocused = true
-                        focusManager.focus(.search)
                     }
                     .foregroundColor(AppTheme.leftPanelAccent)
                 }

@@ -3,6 +3,7 @@ import AVFoundation
 import Combine
 import CoreData
 import SwiftUI
+import UIKit
 
 // MARK: - Notification Names
 extension Notification.Name {
@@ -24,6 +25,7 @@ final class VideoPlayerViewModel: ObservableObject {
     @Published var duration: Double = 0
     @Published var formattedCurrentTime: String = "00:00"
     @Published var formattedDuration: String = "00:00"
+    @Published var formattedTimeRemaining: String = "-00:00"
     
     // MARK: - Performance Isolation for Smooth Video Playback
     @Published private(set) var isInPerformanceMode = false
@@ -45,6 +47,13 @@ final class VideoPlayerViewModel: ObservableObject {
     
     // MARK: - Deferred Database Operations
     private var deferredSongPlayRecord: Song?
+    
+    // MARK: - System-Level Video Prioritization
+    nonisolated(unsafe) private var backgroundTaskID: UIBackgroundTaskIdentifier = .invalid
+    nonisolated(unsafe) private var originalAudioCategory: AVAudioSession.Category?
+    nonisolated(unsafe) private var originalAudioMode: AVAudioSession.Mode?
+    nonisolated(unsafe) private var systemInterruptionObserver: NSObjectProtocol?
+    nonisolated(unsafe) private var appLifecycleObservers: [NSObjectProtocol] = []
     
     // MARK: - Drag State Management
 
@@ -126,6 +135,11 @@ final class VideoPlayerViewModel: ObservableObject {
         // 3. Notify UI components to reduce unnecessary updates
         NotificationCenter.default.post(name: .init("VideoPerformanceModeEnabled"), object: nil)
         
+        // 4. NEW: Configure system-level video prioritization
+        await configureSystemVideoProfile()
+        await requestBackgroundVideoTask()
+        await setupSystemInterruptionHandling()
+        
         print("✅ PERFORMANCE: High-performance mode active - video should now be silky smooth")
     }
 
@@ -151,6 +165,11 @@ final class VideoPlayerViewModel: ObservableObject {
         
         // 4. Notify UI components to resume normal updates
         NotificationCenter.default.post(name: .init("VideoPerformanceModeDisabled"), object: nil)
+        
+        // 5. NEW: Cleanup system-level video prioritization
+        await cleanupSystemVideoProfile()
+        await endBackgroundVideoTask()
+        await removeSystemInterruptionHandling()
         
         print("✅ PERFORMANCE: Normal mode restored")
     }
@@ -205,6 +224,324 @@ final class VideoPlayerViewModel: ObservableObject {
         
         print("✅ PERFORMANCE: Deferred database operations completed")
     }
+    
+    // MARK: - System-Level Video Prioritization Methods
+    
+    /// Configure iOS audio session and system settings for optimal video playback
+    private func configureSystemVideoProfile() async {
+        print("🎵 SYSTEM: Configuring audio session for video priority")
+        
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            
+            // Save original settings for restoration
+            originalAudioCategory = audioSession.category
+            originalAudioMode = audioSession.mode
+            
+            // Configure for video playback with optimal performance
+            try audioSession.setCategory(
+                .playback,
+                mode: .moviePlayback,
+                options: [.allowAirPlay, .allowBluetooth, .allowBluetoothA2DP]
+            )
+            
+            // Activate the session
+            try audioSession.setActive(true)
+            
+            print("✅ SYSTEM: Audio session configured for video priority")
+            
+        } catch {
+            print("⚠️ SYSTEM: Failed to configure audio session: \(error.localizedDescription)")
+            // Continue anyway - this is an optimization, not a requirement
+        }
+    }
+    
+    /// Request background task to continue video playback if app goes to background
+    private func requestBackgroundVideoTask() async {
+        print("📱 SYSTEM: Requesting background task for video continuity")
+        
+        // End any existing background task first
+        if backgroundTaskID != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            backgroundTaskID = .invalid
+        }
+        
+        // Request new background task
+        backgroundTaskID = UIApplication.shared.beginBackgroundTask(withName: "VideoPlayback") { [weak self] in
+            print("⏰ SYSTEM: Background task expiring - gracefully ending video")
+            Task { @MainActor [weak self] in
+                await self?.handleBackgroundTaskExpiration()
+            }
+        }
+        
+        if backgroundTaskID != .invalid {
+            print("✅ SYSTEM: Background task granted for video continuity")
+        } else {
+            print("⚠️ SYSTEM: Background task denied - video may pause in background")
+        }
+    }
+    
+    /// Setup system interruption handling for calls, alarms, etc.
+    private func setupSystemInterruptionHandling() async {
+        print("📞 SYSTEM: Setting up interruption handling")
+        
+        // Remove existing observer
+        if let observer = systemInterruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
+        
+        // Observe audio session interruptions
+        systemInterruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance(),
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                await self?.handleSystemInterruption(notification)
+            }
+        }
+        
+        // Setup app lifecycle observers
+        setupAppLifecycleObservers()
+        
+        print("✅ SYSTEM: Interruption handling configured")
+    }
+    
+    /// Setup app lifecycle observers for background/foreground transitions
+    private func setupAppLifecycleObservers() {
+        // Clear existing observers
+        appLifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        appLifecycleObservers.removeAll()
+        
+        // App entering background
+        let backgroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.handleAppEnterBackground()
+            }
+        }
+        appLifecycleObservers.append(backgroundObserver)
+        
+        // App entering foreground
+        let foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.handleAppEnterForeground()
+            }
+        }
+        appLifecycleObservers.append(foregroundObserver)
+        
+        // App becoming active
+        let activeObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.handleAppBecomeActive()
+            }
+        }
+        appLifecycleObservers.append(activeObserver)
+    }
+    
+    /// Handle system audio interruptions (calls, alarms, etc.)
+    private func handleSystemInterruption(_ notification: Notification) async {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            print("📞 SYSTEM: Interruption began - pausing video gracefully")
+            if isPlaying {
+                _player?.pause()
+                isPlaying = false
+            }
+            
+        case .ended:
+            print("📞 SYSTEM: Interruption ended - checking if we should resume")
+            
+            // Check if we should resume
+            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                if options.contains(.shouldResume) {
+                    print("📞 SYSTEM: System suggests resume - restarting video")
+                    
+                    // Re-activate audio session and resume playback
+                    do {
+                        try AVAudioSession.sharedInstance().setActive(true)
+                        _player?.play()
+                        isPlaying = true
+                    } catch {
+                        print("⚠️ SYSTEM: Failed to resume after interruption: \(error)")
+                    }
+                }
+            }
+            
+        @unknown default:
+            print("⚠️ SYSTEM: Unknown interruption type")
+        }
+    }
+    
+    /// Handle app entering background
+    private func handleAppEnterBackground() async {
+        print("📱 SYSTEM: App entering background - maintaining video priority")
+        
+        // Keep video playing in background if possible
+        // The background task we requested earlier should handle this
+        
+        // Reduce non-essential operations
+        await suspendCoreDataObservers()
+        
+        print("✅ SYSTEM: Background transition optimized for video")
+    }
+    
+    /// Handle app entering foreground
+    private func handleAppEnterForeground() async {
+        print("📱 SYSTEM: App entering foreground - restoring full performance")
+        
+        // Restore full functionality
+        if isInPerformanceMode {
+            // Restore essential observers for performance mode
+            await restoreTimeObserver()
+        } else {
+            // Restore all observers if not in performance mode
+            await restoreCoreDataObservers()
+        }
+        
+        print("✅ SYSTEM: Foreground transition completed")
+    }
+    
+    /// Handle app becoming active (after being inactive)
+    private func handleAppBecomeActive() async {
+        print("📱 SYSTEM: App became active - verifying video state")
+        
+        // Verify and restore video playback if needed
+        if let player = _player, currentVideo != nil {
+            // Ensure audio session is still active
+            do {
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                print("⚠️ SYSTEM: Failed to reactivate audio session: \(error)")
+            }
+            
+            // Restore playback state if it was interrupted
+            if isPlaying && player.rate == 0 {
+                print("📱 SYSTEM: Restoring interrupted playback")
+                player.play()
+            }
+        }
+        
+        print("✅ SYSTEM: App active state verified")
+    }
+    
+    /// Handle background task expiration gracefully
+    private func handleBackgroundTaskExpiration() async {
+        print("⏰ SYSTEM: Background task expiring - pausing video to preserve state")
+        
+        // Pause video gracefully
+        _player?.pause()
+        isPlaying = false
+        
+        // End the background task
+        if backgroundTaskID != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            backgroundTaskID = .invalid
+        }
+        
+        print("✅ SYSTEM: Background task ended gracefully")
+    }
+    
+    /// Cleanup system video profile and restore original settings
+    private func cleanupSystemVideoProfile() async {
+        print("🎵 SYSTEM: Restoring original audio session settings")
+        
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            
+            // Restore original category and mode if we saved them
+            if let originalCategory = originalAudioCategory,
+               let originalMode = originalAudioMode {
+                try audioSession.setCategory(originalCategory, mode: originalMode)
+                print("✅ SYSTEM: Audio session restored to original settings")
+            }
+            
+            // Clear saved settings
+            originalAudioCategory = nil
+            originalAudioMode = nil
+            
+        } catch {
+            print("⚠️ SYSTEM: Failed to restore audio session: \(error.localizedDescription)")
+            // Continue anyway - this is cleanup, not critical
+        }
+    }
+    
+    /// End background video task
+    private func endBackgroundVideoTask() async {
+        if backgroundTaskID != .invalid {
+            print("📱 SYSTEM: Ending background video task")
+            UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            backgroundTaskID = .invalid
+            print("✅ SYSTEM: Background task ended")
+        }
+    }
+    
+    /// Remove system interruption handling
+    private func removeSystemInterruptionHandling() async {
+        print("📞 SYSTEM: Removing interruption handling")
+        
+        // Remove audio session interruption observer
+        if let observer = systemInterruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+            systemInterruptionObserver = nil
+        }
+        
+        // Remove app lifecycle observers
+        appLifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        appLifecycleObservers.removeAll()
+        
+        print("✅ SYSTEM: Interruption handling removed")
+    }
+    
+    /// Synchronous cleanup for use in reset() and deinit
+    nonisolated private func cleanupSystemResourcesSync() {
+        // End background task synchronously
+        if backgroundTaskID != .invalid {
+            // Use MainActor.assumeIsolated since cleanup should run on main thread
+            MainActor.assumeIsolated {
+                UIApplication.shared.endBackgroundTask(backgroundTaskID)
+            }
+            backgroundTaskID = .invalid
+        }
+        
+        // Remove observers synchronously
+        if let observer = systemInterruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+            systemInterruptionObserver = nil
+        }
+        
+        appLifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        appLifecycleObservers.removeAll()
+        
+        // Reset audio session to default (best effort)
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.ambient)
+        } catch {
+            // Ignore errors during cleanup
+        }
+        
+        // Clear saved settings
+        originalAudioCategory = nil
+        originalAudioMode = nil
+    }
 
     private func reset() {
         print("🔄 VideoPlayerViewModel.reset - Resetting player state to initial values.")
@@ -237,9 +574,13 @@ final class VideoPlayerViewModel: ObservableObject {
         duration = 0
         formattedCurrentTime = "00:00"
         formattedDuration = "00:00"
+        formattedTimeRemaining = "-00:00"
         
         // Ensure performance mode is disabled when player is reset
         isInPerformanceMode = false
+        
+        // NEW: Cleanup system resources synchronously
+        cleanupSystemResourcesSync()
         
         print("✅ VideoPlayerViewModel.reset - State reset complete.")
     }
@@ -451,6 +792,10 @@ final class VideoPlayerViewModel: ObservableObject {
     private func updateTimeDisplay() {
         formattedCurrentTime = formatTime(currentTime)
         formattedDuration = formatTime(duration)
+        
+        // Calculate time remaining
+        let remainingTime = max(0, duration - currentTime)
+        formattedTimeRemaining = "-" + formatTime(remainingTime)
     }
     
     private func formatTime(_ time: Double) -> String {
@@ -475,6 +820,9 @@ final class VideoPlayerViewModel: ObservableObject {
         _player?.replaceCurrentItem(with: nil)
         _player = nil
         playerItem = nil
+        
+        // NEW: Cleanup system resources synchronously
+        cleanupSystemResourcesSync()
     }
     
     private func attemptFileMigration(for song: Song) async -> URL? {
