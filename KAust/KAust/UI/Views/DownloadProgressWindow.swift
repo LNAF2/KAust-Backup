@@ -63,7 +63,7 @@ struct DownloadProgressWindow: View {
     private var windowTitle: some View {
         HStack {
             Spacer()
-            Text("DOWNLOAD PROGRESS WINDOW")
+            Text("DOWNLOAD PROGRESS")
                 .font(.title)
                 .fontWeight(.bold)
                 .foregroundColor(.white)

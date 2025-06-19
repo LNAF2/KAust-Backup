@@ -15,6 +15,10 @@ struct DownloadResultsView: View {
     let results: [FileProcessingResult]
     let onDismiss: () -> Void
     
+    private var successfulResults: [FileProcessingResult] {
+        results.filter { $0.status == .success }
+    }
+    
     private var failedResults: [FileProcessingResult] {
         results.filter { $0.status == .failed }
     }
@@ -58,48 +62,102 @@ struct DownloadResultsView: View {
                 .padding(.horizontal, 32)
                 .padding(.top, 20)
                 
-                // Results sections - ONLY Failed Files and Duplicates
+                // Results sections - Successful, Failed, and Duplicates
                 ScrollView {
                     VStack(spacing: 20) {
+                        // Successful section
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Successful")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.green)
+                                Spacer()
+                            }
+                            
+                            if successfulResults.isEmpty {
+                                Text("0 songs were successfully downloaded")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.green.opacity(0.1))
+                                    )
+                            } else {
+                                Text("\(successfulResults.count) songs were successfully downloaded")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.green.opacity(0.1))
+                                    )
+                            }
+                        }
+                        .padding(.horizontal, 32)
+                        
                         // Failed files section
-                        if !failedResults.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Text("Failed Files")
-                                        .font(.title3)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.red)
-                                    Spacer()
-                                }
-                                
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Failed")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.red)
+                                Spacer()
+                            }
+                            
+                            if failedResults.isEmpty {
+                                Text("0 songs failed to download")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.red.opacity(0.1))
+                                    )
+                            } else {
                                 LazyVStack(spacing: 8) {
                                     ForEach(failedResults.indices, id: \.self) { index in
                                         FailedFileRow(result: failedResults[index])
                                     }
                                 }
                             }
-                            .padding(.horizontal, 32)
                         }
+                        .padding(.horizontal, 32)
                         
                         // Duplicate files section
-                        if !duplicateResults.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                HStack {
-                                    Text("Duplicates")
-                                        .font(.title3)
-                                        .fontWeight(.semibold)
-                                        .foregroundColor(.orange)
-                                    Spacer()
-                                }
-                                
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text("Duplicates")
+                                    .font(.title3)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.orange)
+                                Spacer()
+                            }
+                            
+                            if duplicateResults.isEmpty {
+                                Text("0 duplicate songs were downloaded")
+                                    .font(.system(size: 16, weight: .medium))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 12)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(Color.orange.opacity(0.1))
+                                    )
+                            } else {
                                 LazyVStack(spacing: 8) {
                                     ForEach(duplicateResults.indices, id: \.self) { index in
                                         DuplicateFileRow(result: duplicateResults[index])
                                     }
                                 }
                             }
-                            .padding(.horizontal, 32)
                         }
+                        .padding(.horizontal, 32)
                     }
                 }
                 
