@@ -57,7 +57,7 @@ enum UserRole: String, CaseIterable, Comparable {
         return self >= requiredRole
     }
     
-    // Settings access levels based on GitHub commit specifications
+    // Settings access levels based on user specifications
     var canAccessSettings: Bool {
         switch self {
         case .client, .dev, .admin, .owner: return true  // All roles can access settings panel
@@ -72,15 +72,36 @@ enum UserRole: String, CaseIterable, Comparable {
     
     var canAccessAdministratorSettings: Bool {
         switch self {
-        case .client: return false                       // Client: Only Airplay
-        case .admin, .dev, .owner: return true          // Admin/Dev/Owner: Airplay + Admin settings
+        case .client: return false                       // Client: Only Airplay, Volume, App Info
+        case .admin, .dev, .owner: return true          // Admin/Dev/Owner: Can see Admin settings
+        }
+    }
+    
+    var canAccessOwnerSettings: Bool {
+        switch self {
+        case .client, .admin: return false               // Client/Admin: Cannot see Owner settings
+        case .dev, .owner: return true                   // Dev/Owner: Can see Owner settings
+        }
+    }
+    
+    var canAccessKioskModeSettings: Bool {
+        switch self {
+        case .client: return false                       // Client: Cannot see Kiosk Mode panel
+        case .admin, .dev, .owner: return true          // Admin/Dev/Owner: Can see Kiosk Mode
+        }
+    }
+    
+    var canAccessProgrammerManagement: Bool {
+        switch self {
+        case .client, .admin, .owner: return false      // Client/Admin/Owner: Cannot see Programmer Management
+        case .dev: return true                           // Only Developer: Can see Programmer Management
         }
     }
     
     var canAccessAllSettings: Bool {
         switch self {
         case .client, .admin: return false               // Client/Admin: Limited access
-        case .dev, .owner: return true                   // Dev/Owner: Full access
+        case .dev, .owner: return true                   // Dev/Owner: Full access (but Owner excludes Programmer Management)
         }
     }
 }

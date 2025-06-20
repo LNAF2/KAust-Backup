@@ -84,6 +84,18 @@ class UserRoleManager: ObservableObject {
         currentRole.canAccessAdministratorSettings
     }
     
+    var canAccessOwnerSettings: Bool {
+        currentRole.canAccessOwnerSettings
+    }
+    
+    var canAccessKioskModeSettings: Bool {
+        currentRole.canAccessKioskModeSettings
+    }
+    
+    var canAccessProgrammerManagement: Bool {
+        currentRole.canAccessProgrammerManagement
+    }
+    
     var canAccessAllSettings: Bool {
         currentRole.canAccessAllSettings
     }

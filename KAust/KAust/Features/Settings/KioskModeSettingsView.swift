@@ -25,8 +25,8 @@ struct KioskModeSettingsView: View {
             if kioskModeService.isKioskModeActive {
                 // Kiosk Mode Active - Show limited options
                 kioskActiveSection
-            } else if roleManager.canAccessAdministratorSettings {
-                // Admin/Owner - Show full Kiosk Mode management
+            } else if roleManager.canAccessKioskModeSettings {
+                // Admin/Dev/Owner - Show full Kiosk Mode management (Client cannot see)
                 kioskManagementSection
             }
             // Clients and other roles see nothing

@@ -2755,9 +2755,11 @@ struct SettingsView: View {
     
     private var normalModeContent: some View {
         VStack(alignment: .leading, spacing: 24) {
-            // Kiosk Mode Management - Admin/Owner only (when not in Kiosk Mode)
-            KioskModeSettingsView(kioskModeService: kioskModeService)
-                .environmentObject(roleManager)
+            // Kiosk Mode Management - Admin/Dev/Owner only (when not in Kiosk Mode) - Client cannot see this
+            if roleManager.canAccessKioskModeSettings {
+                KioskModeSettingsView(kioskModeService: kioskModeService)
+                    .environmentObject(roleManager)
+            }
             
             // AirPlay section - Everyone can see this
             if roleManager.canAccessAirplaySettings {
@@ -2767,17 +2769,17 @@ struct SettingsView: View {
             // Volume Control section - Everyone can see this
             volumeControlSection
             
-            // Administrator Settings section - Admin, Dev, Owner only
+            // Administrator Settings section - Admin, Dev, Owner only (Client cannot see)
             if roleManager.canAccessAdministratorSettings {
                 appSettingsSection
             }
             
-            // Owner Settings section - Dev and Owner only
-            if roleManager.canAccessAllSettings {
+            // Owner Settings section - Dev and Owner only (Client and Admin cannot see)
+            if roleManager.canAccessOwnerSettings {
                 ownerSettingsSection
             }
             
-            // Account section - Admin, Dev, Owner only  
+            // Account section - Admin, Dev, Owner only (Client cannot see)  
             if roleManager.canAccessAdministratorSettings {
                 accountSection
             }
@@ -2785,12 +2787,12 @@ struct SettingsView: View {
             // App Info section - Visible to all users
             appInfoSection
             
-            // Programmer Management section - Dev and Owner only
-            if roleManager.canAccessAllSettings {
+            // Programmer Management section - Developer only (Client, Admin, Owner cannot see)
+            if roleManager.canAccessProgrammerManagement {
                 programmerListManagementSection
             }
             
-            // Storage Management - Admin, Dev, Owner only
+            // Storage Management - Admin, Dev, Owner only (Client cannot see)
             if roleManager.canAccessAdministratorSettings {
                 Section("Storage") {
                 }
@@ -2813,7 +2815,13 @@ struct SettingsView: View {
                 Text("  • Admin Settings: \(roleManager.canAccessAdministratorSettings ? "✅" : "❌")")
                     .font(.caption)
                     .foregroundColor(.gray)
-                Text("  • All Settings: \(roleManager.canAccessAllSettings ? "✅" : "❌")")
+                Text("  • Owner Settings: \(roleManager.canAccessOwnerSettings ? "✅" : "❌")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text("  • Kiosk Mode: \(roleManager.canAccessKioskModeSettings ? "✅" : "❌")")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text("  • Programmer Mgmt: \(roleManager.canAccessProgrammerManagement ? "✅" : "❌")")
                     .font(.caption)
                     .foregroundColor(.gray)
             }
