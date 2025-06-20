@@ -101,6 +101,11 @@ final class KioskModeService: ObservableObject, @preconcurrency KioskModeService
         self.authService = authService
         loadKioskModeState()
         setupObservers()
+        
+        // Set up default PIN if none exists
+        Task {
+            await setupDefaultPINIfNeeded()
+        }
     }
     
     // MARK: - Private Setup
@@ -121,6 +126,19 @@ final class KioskModeService: ObservableObject, @preconcurrency KioskModeService
                 }
             }
             .store(in: &cancellables)
+    }
+    
+    private nonisolated func setupDefaultPINIfNeeded() async {
+        // Only set up default PIN if no PIN exists
+        if getPINFromKeychain() == nil {
+            do {
+                let defaultPIN = "123456"
+                try storePINInKeychain(defaultPIN)
+                print("✅ Default Kiosk Mode PIN (123456) set up automatically")
+            } catch {
+                print("⚠️ Failed to set up default Kiosk Mode PIN: \(error)")
+            }
+        }
     }
     
     // MARK: - Public Methods
