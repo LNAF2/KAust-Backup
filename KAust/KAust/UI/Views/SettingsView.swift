@@ -1901,6 +1901,9 @@ class SettingsViewModel: ObservableObject {
     
     @AppStorage("swipeToDeleteEnabled") var swipeToDeleteEnabled = false  // Use @AppStorage for automatic persistence
     
+    // Volume control properties
+    @Published var masterVolume: Float = 1.0
+    @Published var isMuted: Bool = false
     
     // Shared access to swipe-to-delete setting
     static var shared: SettingsViewModel = SettingsViewModel()
@@ -1954,8 +1957,13 @@ class SettingsViewModel: ObservableObject {
         // The service will be reconfigured dynamically based on file count
         self.filePickerService = EnhancedFilePickerService()
         
+        // Load volume settings from UserDefaults
+        loadVolumeSettings()
+        
         // SETUP REACTIVE MONITORING FOR UI STATE
         setupProgressMonitoring()
+        
+        print("🎛️ SettingsViewModel initialized - Volume: \(Int(masterVolume * 100))%, Muted: \(isMuted)")
     }
     
     private func setupProgressMonitoring() {
@@ -2217,6 +2225,104 @@ class SettingsViewModel: ObservableObject {
     func resetSettings() {
         swipeToDeleteEnabled = false
         filePickerService.clearResults()
+        
+        // Reset volume settings to defaults
+        resetVolumeSettings()
+        
+        print("🔄 Settings reset completed - Volume: 100%, Mute: OFF")
+    }
+    
+    // MARK: - Volume Control Actions
+    
+    /// Load volume settings from UserDefaults
+    private func loadVolumeSettings() {
+        let userDefaults = UserDefaults.standard
+        
+        // Load volume with default of 1.0 (100%)
+        if userDefaults.object(forKey: "user_preferences_volume") == nil {
+            userDefaults.set(1.0, forKey: "user_preferences_volume")
+        }
+        masterVolume = userDefaults.float(forKey: "user_preferences_volume")
+        
+        // Load mute state with default of false (OFF)
+        isMuted = userDefaults.bool(forKey: "user_preferences_is_muted")
+        
+        // Apply current settings to system
+        applyVolumeToSystem()
+    }
+    
+    /// Reset volume settings to defaults
+    private func resetVolumeSettings() {
+        let userDefaults = UserDefaults.standard
+        userDefaults.set(1.0, forKey: "user_preferences_volume")
+        userDefaults.set(false, forKey: "user_preferences_is_muted")
+        
+        masterVolume = 1.0
+        isMuted = false
+        
+        applyVolumeToSystem()
+    }
+    
+    /// Update master volume
+    func setMasterVolume(_ volume: Float) {
+        let clampedVolume = max(0.0, min(1.0, volume))
+        
+        // Save to UserDefaults
+        UserDefaults.standard.set(clampedVolume, forKey: "user_preferences_volume")
+        masterVolume = clampedVolume
+        
+        // Apply to system if not muted
+        applyVolumeToSystem()
+        
+        print("🔊 Master volume set to: \(Int(clampedVolume * 100))%")
+    }
+    
+    /// Toggle mute state
+    func toggleMute() {
+        isMuted.toggle()
+        
+        // Save to UserDefaults
+        UserDefaults.standard.set(isMuted, forKey: "user_preferences_is_muted")
+        
+        // Apply to system
+        applyVolumeToSystem()
+        
+        print("🔇 Mute toggled: \(isMuted ? "ON" : "OFF")")
+    }
+    
+         /// Apply volume settings to the system
+     private func applyVolumeToSystem() {
+         print("🎛️ SETTINGS: Applying volume to system - Volume: \(Int(masterVolume * 100))%, Muted: \(isMuted)")
+         
+         // Post notification for VideoPlayerViewModel to apply volume
+         // Send the raw volume value and mute state, let the player calculate effective volume
+         NotificationCenter.default.post(
+             name: NSNotification.Name("ApplyAppVolume"),
+             object: nil,
+             userInfo: ["volume": masterVolume, "isMuted": isMuted]
+         )
+         
+         print("🎛️ SETTINGS: Volume notification sent successfully")
+     }
+    
+    /// Get volume icon name based on current state
+    var volumeIconName: String {
+        if isMuted {
+            return "speaker.slash.fill"
+        } else if masterVolume == 0.0 {
+            return "speaker.fill"
+        } else if masterVolume < 0.33 {
+            return "speaker.wave.1.fill"
+        } else if masterVolume < 0.66 {
+            return "speaker.wave.2.fill"
+        } else {
+            return "speaker.wave.3.fill"
+        }
+    }
+    
+    /// Get volume percentage for display
+    var volumePercentage: Int {
+        return Int(masterVolume * 100)
     }
     
     // MARK: - File Processing Controls
@@ -3255,41 +3361,56 @@ struct SettingsView: View {
         }
     }
     
-    // MARK: - Volume Control Section (for Kiosk Mode)
+    // MARK: - Volume Control Section (Working Implementation)
     
     private var volumeControlSection: some View {
-        SettingsSection(title: "Volume", icon: "speaker.wave.3") {
+        SettingsSection(title: "Volume", icon: viewModel.volumeIconName) {
             VStack(spacing: 12) {
                 // Volume Control Row
                 HStack(spacing: 12) {
-                    Image(systemName: "speaker.wave.3")
-                        .foregroundColor(.blue)
+                    Image(systemName: viewModel.volumeIconName)
+                        .foregroundColor(viewModel.isMuted ? .red : .blue)
                         .font(.system(size: 20, weight: .medium))
                         .frame(width: 28)
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Master Volume")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(AppTheme.settingsText)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        HStack {
+                            Text("Master Volume")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(AppTheme.settingsText)
+                            
+                            Spacer()
+                            
+                            Text("\(viewModel.volumePercentage)%")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(viewModel.isMuted ? .secondary : AppTheme.settingsText)
+                        }
                         
-                        Text("System audio volume control")
+                        Text(viewModel.isMuted ? "Audio is muted" : "App audio volume control")
                             .font(.system(size: 14))
                             .foregroundColor(AppTheme.settingsText.opacity(0.7))
-                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     
                     Spacer()
                     
-                    // Volume slider placeholder (would connect to system volume)
+                    // Working Volume Slider
                     HStack(spacing: 8) {
                         Image(systemName: "speaker.wave.1")
                             .foregroundColor(.secondary)
                             .font(.caption)
                         
-                        Slider(value: .constant(0.7), in: 0...1)
-                            .frame(width: 100)
-                            .disabled(true) // Placeholder
+                        Slider(
+                            value: Binding(
+                                get: { viewModel.masterVolume },
+                                set: { newValue in
+                                    viewModel.setMasterVolume(newValue)
+                                }
+                            ),
+                            in: 0...1
+                        )
+                        .frame(width: 100)
+                        .disabled(viewModel.isMuted)
+                        .opacity(viewModel.isMuted ? 0.5 : 1.0)
                         
                         Image(systemName: "speaker.wave.3")
                             .foregroundColor(.secondary)
@@ -3300,16 +3421,21 @@ struct SettingsView: View {
                 .padding(.vertical, 12)
                 .background(
                     RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
-                        .fill(AppTheme.settingsText.opacity(0.05))
+                        .fill(AppTheme.settingsText.opacity(viewModel.isMuted ? 0.02 : 0.05))
                 )
                 
-                // Mute Toggle
+                // Working Mute Toggle
                 SettingRow(
                     title: "Mute",
-                    subtitle: "Disable all audio output",
-                    icon: "speaker.slash",
-                    iconColor: .red,
-                    accessoryType: .toggle(.constant(false)) // Placeholder
+                    subtitle: viewModel.isMuted ? "Audio is disabled" : "Disable all audio output",
+                    icon: viewModel.isMuted ? "speaker.slash.fill" : "speaker.slash",
+                    iconColor: viewModel.isMuted ? .red : .gray,
+                    accessoryType: .toggle(
+                        Binding(
+                            get: { viewModel.isMuted },
+                            set: { _ in viewModel.toggleMute() }
+                        )
+                    )
                 )
             }
             .padding(.horizontal, 16)

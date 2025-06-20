@@ -23,4 +23,9 @@ protocol UserPreferencesServiceProtocol {
 
     // Function to reset relevant settings to their defaults
     func resetToDefaults()
+    
+    // Convenience methods for volume control
+    func toggleMute()
+    var volumeIconName: String { get }
+    var volumePercentage: Int { get }
 }

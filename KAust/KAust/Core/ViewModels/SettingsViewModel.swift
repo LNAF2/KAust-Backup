@@ -16,6 +16,10 @@ class SettingsViewModel: ObservableObject {
     // Settings states
     @Published var swipeToDeleteEnabled = false
     
+    // Volume control states
+    @Published var masterVolume: Float = 1.0
+    @Published var isMuted: Bool = false
+    
     // Error handling
     @Published var errorAlert: ErrorAlertConfiguration?
     @Published var isShowingErrorAlert = false
@@ -29,6 +33,7 @@ class SettingsViewModel: ObservableObject {
     private let dataProviderService: DataProviderServiceProtocol
     private let mediaMetadataService: MediaMetadataServiceProtocol
     private let filePickerService: EnhancedFilePickerService
+    private let userPreferencesService: UserPreferencesServiceProtocol
     
     // MARK: - Private Properties
     
@@ -41,12 +46,14 @@ class SettingsViewModel: ObservableObject {
         errorHandlingService: ErrorHandlingServiceProtocol = ErrorHandlingService(),
         dataProviderService: DataProviderServiceProtocol = DataProviderService.shared,
         mediaMetadataService: MediaMetadataServiceProtocol = MediaMetadataService(),
-        filePickerService: EnhancedFilePickerService = EnhancedFilePickerService()
+        filePickerService: EnhancedFilePickerService = EnhancedFilePickerService(),
+        userPreferencesService: UserPreferencesServiceProtocol = UserPreferencesService()
     ) {
         self.errorHandlingService = errorHandlingService
         self.dataProviderService = dataProviderService
         self.mediaMetadataService = mediaMetadataService
         self.filePickerService = filePickerService
+        self.userPreferencesService = userPreferencesService
         
         setupBindings()
         loadSettings()
@@ -61,11 +68,16 @@ class SettingsViewModel: ObservableObject {
     }
     
     private func loadSettings() {
-        // Storage optimization setting removed as it was redundant
+        // Load volume settings from UserPreferencesService
+        masterVolume = userPreferencesService.volume
+        isMuted = userPreferencesService.isMuted
+        
+        print("🎛️ Settings loaded - Volume: \(Int(masterVolume * 100))%, Muted: \(isMuted)")
     }
     
     private func saveSettings() {
-        // Storage optimization setting removed as it was redundant
+        // Volume settings are automatically saved by UserPreferencesService
+        // No additional saving needed as UserDefaults are used directly
     }
     
     // MARK: - Actions
@@ -73,10 +85,48 @@ class SettingsViewModel: ObservableObject {
     func resetSettings() {
         swipeToDeleteEnabled = false  // Reset to default OFF state
         
+        // Reset volume settings to defaults
+        userPreferencesService.resetToDefaults()
+        
+        // Update published properties
+        masterVolume = userPreferencesService.volume
+        isMuted = userPreferencesService.isMuted
+        
         // Clear file processing results
         filePickerService.clearResults()
         
         // Save the reset settings
         saveSettings()
+        
+        print("🔄 Settings reset completed - Volume: 100%, Mute: OFF")
+    }
+    
+    // MARK: - Volume Control Actions
+    
+    /// Update master volume
+    func setMasterVolume(_ volume: Float) {
+        let clampedVolume = max(0.0, min(1.0, volume))
+        userPreferencesService.volume = clampedVolume
+        masterVolume = clampedVolume
+        
+        print("🔊 Master volume set to: \(Int(clampedVolume * 100))%")
+    }
+    
+    /// Toggle mute state
+    func toggleMute() {
+        userPreferencesService.toggleMute()
+        isMuted = userPreferencesService.isMuted
+        
+        print("🔇 Mute toggled: \(isMuted ? "ON" : "OFF")")
+    }
+    
+    /// Get volume icon name based on current state
+    var volumeIconName: String {
+        return userPreferencesService.volumeIconName
+    }
+    
+    /// Get volume percentage for display
+    var volumePercentage: Int {
+        return userPreferencesService.volumePercentage
     } 
 } 
