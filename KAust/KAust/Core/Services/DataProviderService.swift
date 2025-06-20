@@ -424,6 +424,127 @@ final class DataProviderService: DataProviderServiceProtocol {
         filterMapping.addToMappedGenres(genre)
         try context.save()
     }
+    
+    // MARK: - Factory Reset
+    
+    /// Performs a complete factory reset of all app data
+    /// - Warning: This will delete ALL data except the current user's authentication
+    func performFactoryReset() async throws {
+        print("\n🏭 Starting Factory Reset - Complete app data cleanup")
+        
+        let context = persistenceController.container.viewContext
+        
+        do {
+            // Step 1: Delete all playlists
+            print("🗑️ Step 1: Deleting all playlists...")
+            let playlistRequest: NSFetchRequest<PlaylistEntity> = PlaylistEntity.fetchRequest()
+            let batchDeletePlaylists = NSBatchDeleteRequest(fetchRequest: playlistRequest as! NSFetchRequest<NSFetchRequestResult>)
+            try context.execute(batchDeletePlaylists)
+            print("  ✅ Deleted all playlists")
+            
+            // Step 2: Delete all played song history
+            print("🗑️ Step 2: Deleting all played song history...")
+            let playedSongsRequest: NSFetchRequest<PlayedSongEntity> = PlayedSongEntity.fetchRequest()
+            let batchDeletePlayedSongs = NSBatchDeleteRequest(fetchRequest: playedSongsRequest as! NSFetchRequest<NSFetchRequestResult>)
+            try context.execute(batchDeletePlayedSongs)
+            print("  ✅ Deleted all played song history")
+            
+            // Step 3: Delete all filter genre mappings
+            print("🗑️ Step 3: Deleting all filter genre mappings...")
+            let filterMappingRequest: NSFetchRequest<FilterGenreMappingEntity> = FilterGenreMappingEntity.fetchRequest()
+            let batchDeleteFilterMappings = NSBatchDeleteRequest(fetchRequest: filterMappingRequest as! NSFetchRequest<NSFetchRequestResult>)
+            try context.execute(batchDeleteFilterMappings)
+            print("  ✅ Deleted all filter genre mappings")
+            
+            // Step 4: Delete all songs (includes file cleanup)
+            print("🗑️ Step 4: Deleting all songs and associated files...")
+            let songsRequest: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+            let songs = try context.fetch(songsRequest)
+            
+            // Clean up files first (internal files only - external files are preserved)
+            let documentsDirectory = try fileManager.url(
+                for: .documentDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+            )
+            let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+            let mediaPath = mediaDirectory.path
+            
+            var internalFilesDeleted = 0
+            for song in songs {
+                if let filePath = song.filePath, filePath.hasPrefix(mediaPath) {
+                    if fileManager.fileExists(atPath: filePath) {
+                        try fileManager.removeItem(atPath: filePath)
+                        internalFilesDeleted += 1
+                    }
+                    // Delete LRC file if exists
+                    if let lrcPath = song.lrcFilePath, fileManager.fileExists(atPath: lrcPath) {
+                        try fileManager.removeItem(atPath: lrcPath)
+                    }
+                }
+            }
+            
+            // Batch delete all songs from Core Data
+            let batchDeleteSongs = NSBatchDeleteRequest(fetchRequest: songsRequest as! NSFetchRequest<NSFetchRequestResult>)
+            try context.execute(batchDeleteSongs)
+            print("  ✅ Deleted all songs from database and \(internalFilesDeleted) internal files")
+            
+            // Step 5: Delete all genres
+            print("🗑️ Step 5: Deleting all genres...")
+            let genresRequest: NSFetchRequest<GenreEntity> = GenreEntity.fetchRequest()
+            let batchDeleteGenres = NSBatchDeleteRequest(fetchRequest: genresRequest as! NSFetchRequest<NSFetchRequestResult>)
+            try context.execute(batchDeleteGenres)
+            print("  ✅ Deleted all genres")
+            
+            // Step 6: Delete all users EXCEPT the current authenticated user
+            print("🗑️ Step 6: Deleting all users except current user...")
+            let currentUserID = getCurrentAuthenticatedUserID()
+            let usersRequest: NSFetchRequest<UserEntity> = UserEntity.fetchRequest()
+            if let currentUserID = currentUserID {
+                // Keep the current user, delete all others
+                usersRequest.predicate = NSPredicate(format: "appleUserID != %@", currentUserID)
+            }
+            let users = try context.fetch(usersRequest)
+            for user in users {
+                context.delete(user)
+            }
+            print("  ✅ Deleted \(users.count) other users (preserved current user)")
+            
+            // Step 7: Clean up entire Media directory if it exists
+            print("🗑️ Step 7: Cleaning up Media directory...")
+            if fileManager.fileExists(atPath: mediaPath) {
+                try fileManager.removeItem(at: mediaDirectory)
+                try fileManager.createDirectory(at: mediaDirectory, withIntermediateDirectories: true)
+                print("  ✅ Cleaned up Media directory")
+            }
+            
+            // Step 8: Save context changes
+            try context.save()
+            print("  ✅ Saved all database changes")
+            
+            print("\n🎉 FACTORY RESET COMPLETED SUCCESSFULLY:")
+            print("  - All songs and media files deleted")
+            print("  - All playlists deleted")
+            print("  - All played song history deleted")
+            print("  - All genres and filter mappings deleted")
+            print("  - All other users deleted (current user preserved)")
+            print("  - Media directory cleaned")
+            print("  - App restored to initial state")
+            
+        } catch {
+            print("❌ Factory reset failed: \(error)")
+            throw DataProviderError.coreDataError
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    /// Get the current authenticated user's Apple ID
+    private func getCurrentAuthenticatedUserID() -> String? {
+        // Get from UserDefaults (matches AuthenticationService)
+        return UserDefaults.standard.string(forKey: "user_id")
+    }
 }
 
 // MARK: - Supporting Types

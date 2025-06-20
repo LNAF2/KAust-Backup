@@ -109,4 +109,12 @@ struct PersistenceController {
         }
         return result
     }()
+    
+    // MARK: - Factory Reset
+    
+    /// Performs a complete factory reset using the DataProviderService
+    func factoryReset() async throws {
+        let dataProviderService = DataProviderService(persistenceController: self)
+        try await dataProviderService.performFactoryReset()
+    }
 }

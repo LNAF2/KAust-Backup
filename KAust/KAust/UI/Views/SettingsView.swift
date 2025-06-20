@@ -1897,6 +1897,7 @@ class SettingsViewModel: ObservableObject {
     @Published var isShowingErrorAlert = false
     @Published var isShowingSongsPlayedTable = false
     @Published var showingDeleteSongsPlayedAlert = false
+    @Published var showingFactoryResetAlert = false
     
     @AppStorage("swipeToDeleteEnabled") var swipeToDeleteEnabled = false  // Use @AppStorage for automatic persistence
     
@@ -2263,6 +2264,77 @@ class SettingsViewModel: ObservableObject {
         showingDeleteSongsPlayedAlert = true
     }
     
+    func factoryReset() {
+        print("🏭 Factory Reset requested")
+        showingFactoryResetAlert = true
+    }
+    
+    func confirmFactoryReset() async {
+        print("🏭 Factory Reset confirmed - starting complete app cleanup")
+        
+        do {
+            // Step 1: Perform Core Data and file system cleanup
+            try await PersistenceController.shared.factoryReset()
+            
+            // Step 2: Clean up UserDefaults (preserve essential authentication)
+            await cleanupUserDefaults()
+            
+            // Step 3: Force UI refresh
+            await MainActor.run {
+                NotificationCenter.default.post(name: NSNotification.Name("FactoryResetCompleted"), object: nil)
+            }
+            
+            print("✅ Factory Reset completed successfully")
+            
+        } catch {
+            print("❌ Factory Reset failed: \(error)")
+            await MainActor.run {
+                errorAlert = ErrorAlertConfiguration(
+                    title: "Factory Reset Failed",
+                    message: "An error occurred during factory reset: \(error.localizedDescription)",
+                    primaryButton: .default(Text("OK")) { [weak self] in
+                        self?.isShowingErrorAlert = false
+                    }
+                )
+                isShowingErrorAlert = true
+            }
+        }
+    }
+    
+    private func cleanupUserDefaults() async {
+        print("🧹 Cleaning up UserDefaults...")
+        
+        let userDefaults = UserDefaults.standard
+        let preservedKeys = [
+            // Preserve authentication data to keep user logged in
+            "is_authenticated",
+            "user_id", 
+            "username",
+            "user_role",
+            "display_name",
+            "login_date",
+            "login_method"
+        ]
+        
+        // Get all current keys
+        let allKeys = Set(userDefaults.dictionaryRepresentation().keys)
+        
+        // Remove all keys except preserved ones
+        for key in allKeys {
+            if !preservedKeys.contains(key) {
+                userDefaults.removeObject(forKey: key)
+                print("  🗑️ Removed UserDefaults key: \(key)")
+            }
+        }
+        
+        // Reset app-specific settings to defaults
+        await MainActor.run {
+            swipeToDeleteEnabled = false
+        }
+        
+        print("  ✅ UserDefaults cleanup completed")
+    }
+    
     func confirmDeleteSongsPlayedTable() async {
         print("🗑️ Executing delete of all songs played history")
         
@@ -2454,6 +2526,22 @@ struct SettingsView: View {
             }
         } message: {
             Text("This will permanently delete all songs played history records. This action cannot be undone.")
+        }
+        .alert(
+            "⚠️ Factory Reset Warning",
+            isPresented: $viewModel.showingFactoryResetAlert
+        ) {
+            Button("Cancel", role: .cancel) {
+                viewModel.showingFactoryResetAlert = false
+            }
+            Button("RESET APP", role: .destructive) {
+                Task {
+                    await viewModel.confirmFactoryReset()
+                }
+                viewModel.showingFactoryResetAlert = false
+            }
+        } message: {
+            Text("⚠️ THIS WILL COMPLETELY RESET THE APP TO ITS INITIAL STATE\n\n• All songs and playlists will be deleted\n• All media files will be removed\n• All play history will be cleared\n• All app settings will reset\n• You will remain logged in\n\nThis action CANNOT be undone!")
         }
         .onChange(of: viewModel.filePickerService.processingState) { oldState, newState in
             print("🎯 Processing state: \(oldState) → \(newState)")
@@ -3114,6 +3202,19 @@ struct SettingsView: View {
                         print("🗑️ DEBUG: Delete the Song List button tapped (from Owner Settings)!")
                         showingClearSongsAlert = true
                         print("🗑️ DEBUG: showingClearSongsAlert set to: \(showingClearSongsAlert)")
+                    }
+                )
+                
+                // Factory Reset option
+                SettingRow(
+                    title: "Factory Reset",
+                    subtitle: "⚠️ RESETS APP TO INITIAL STATE - Deletes all data except user login",
+                    icon: "exclamationmark.triangle.fill",
+                    iconColor: .red,
+                    accessoryType: .disclosure,
+                    action: {
+                        print("🏭 DEBUG: Factory Reset button tapped (from Owner Settings)!")
+                        viewModel.factoryReset()
                     }
                 )
 

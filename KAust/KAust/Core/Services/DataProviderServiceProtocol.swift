@@ -52,4 +52,10 @@ protocol DataProviderServiceProtocol {
     // Note: Actual file system operations might be handled within these methods or by a separate utility
     // For example, deleteSong would also trigger deletion of the MP4 from disk.
     // importSong would involve copying the file to the app's sandbox.
+    
+    // MARK: - Factory Reset
+    
+    /// Performs a complete factory reset of all app data
+    /// - Warning: This will delete ALL data except the current user's authentication
+    func performFactoryReset() async throws
 }
