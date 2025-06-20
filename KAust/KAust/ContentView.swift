@@ -485,9 +485,9 @@ struct ContentView: View {
                 object: nil,
                 queue: .main
             ) { notification in
-                if let song = notification.object as? Song {
-                    print("🗑️ ContentView - Removing song from playlist: \(song.title)")
-                    Task {
+                Task { @MainActor in
+                    if let song = notification.object as? Song {
+                        print("🗑️ ContentView - Removing song from playlist: \(song.title)")
                         await playlistViewModel.removeFromPlaylist(song)
                     }
                 }
@@ -505,6 +505,23 @@ struct ContentView: View {
                 // Small delay to ensure Settings dismisses before presenting folder picker
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     settingsViewModel.isShowingFolderPicker = true
+                }
+            }
+            
+            // Handle next song requests from video player
+            NotificationCenter.default.addObserver(
+                forName: .playNextSongFromPlaylist,
+                object: nil,
+                queue: .main
+            ) { _ in
+                Task { @MainActor in
+                    print("⏭️ ContentView - Next song requested from video player")
+                    if let nextSong = playlistViewModel.playlistItems.first {
+                        print("🎵 ContentView - Playing next song: '\(nextSong.title)'")
+                        playlistViewModel.playSong(nextSong)
+                    } else {
+                        print("📭 ContentView - No songs in playlist to play next")
+                    }
                 }
             }
         }
@@ -718,8 +735,8 @@ struct CustomVideoPlayerView: View {
                     .buttonStyle(VideoControlButtonStyle())
                 }
                 
-                // Progress bar with times and delete button
-                HStack(spacing: 12) {
+                // Progress bar with times, delete button, and next button
+                HStack(spacing: 10) {
                     Text(viewModel.formattedCurrentTime)
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(.white)
@@ -741,6 +758,15 @@ struct CustomVideoPlayerView: View {
                         viewModel.deleteSong()
                     }) {
                         Image(systemName: "trash")
+                            .foregroundColor(.white)
+                            .font(.title2)
+                    }
+                    .buttonStyle(VideoControlButtonStyle())
+                    
+                    Button(action: { 
+                        viewModel.playNextSong()
+                    }) {
+                        Image(systemName: "forward.end.fill")
                             .foregroundColor(.white)
                             .font(.title2)
                     }
@@ -774,6 +800,15 @@ struct CustomVideoPlayerView: View {
                     viewModel.deleteSong()
                 }) {
                     Image(systemName: "trash")
+                        .foregroundColor(.white)
+                        .font(.title2)
+                }
+                
+                // Next button in AirPlay mode
+                Button(action: { 
+                    viewModel.playNextSong()
+                }) {
+                    Image(systemName: "forward.end.fill")
                         .foregroundColor(.white)
                         .font(.title2)
                 }

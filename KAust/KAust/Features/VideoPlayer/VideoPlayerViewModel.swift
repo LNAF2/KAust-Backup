@@ -10,6 +10,7 @@ extension Notification.Name {
     static let deleteSongFromPlaylist = Notification.Name("deleteSongFromPlaylist")
     static let playbackFailed = Notification.Name("playbackFailed")
     static let requestFolderPicker = Notification.Name("requestFolderPicker")
+    static let playNextSongFromPlaylist = Notification.Name("playNextSongFromPlaylist")
 }
 
 @MainActor
@@ -1217,5 +1218,12 @@ final class VideoPlayerViewModel: ObservableObject {
         if let song = songToDelete {
             NotificationCenter.default.post(name: .deleteSongFromPlaylist, object: song)
         }
+    }
+    
+    func playNextSong() {
+        print("⏭️ VideoPlayerViewModel - Next song requested")
+        stop()
+        // Notify the ContentView to play the next song from playlist
+        NotificationCenter.default.post(name: .playNextSongFromPlaylist, object: nil)
     }
 } 
