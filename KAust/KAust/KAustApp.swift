@@ -6,13 +6,25 @@
 //
 
 import SwiftUI
+import Foundation
+import Combine
+import Security
 
 @main
 struct KAustApp: App {
     @State private var isSignedIn = false
     @State private var currentUserRole: UserRole = .client
     @StateObject private var focusManager = FocusManager()
+    @StateObject private var authenticationService = AuthenticationService()
+    @StateObject private var kioskModeService: KioskModeService
     let persistenceController = PersistenceController.shared
+    
+    init() {
+        let authService = AuthenticationService()
+        let kiosk = KioskModeService(authService: authService)
+        self._authenticationService = StateObject(wrappedValue: authService)
+        self._kioskModeService = StateObject(wrappedValue: kiosk)
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -22,10 +34,13 @@ struct KAustApp: App {
                     .environment(\.managedObjectContext, persistenceController.container.viewContext)
                     .environmentObject(UserRoleManager(role: currentUserRole))
                     .environmentObject(focusManager)
+                    .environmentObject(authenticationService)
+                    .environmentObject(kioskModeService)
             } else {
                 // Beautiful new purple login screen with large title!
                 BeautifulLoginView(isSignedIn: $isSignedIn, currentUserRole: $currentUserRole)
                     .environmentObject(focusManager)
+                    .environmentObject(authenticationService)
             }
         }
         .backgroundTask(.appRefresh("keyboard-cleanup")) {
@@ -48,48 +63,7 @@ extension EnvironmentValues {
     }
 }
 
-enum UserRole: String, CaseIterable {
-    case client = "client"
-    case dev = "dev" 
-    case admin = "admin"
-    case owner = "owner"
-    
-    var displayName: String {
-        switch self {
-        case .client: return "Client"
-        case .dev: return "Developer"
-        case .admin: return "Admin"
-        case .owner: return "Owner"
-        }
-    }
-    
-    // Settings access levels based on GitHub commit specifications
-    var canAccessSettings: Bool {
-        switch self {
-        case .client, .dev, .admin, .owner: return true  // All roles can access settings panel
-        }
-    }
-    
-    var canAccessAirplaySettings: Bool {
-        switch self {
-        case .client, .dev, .admin, .owner: return true  // Everyone sees Airplay settings
-        }
-    }
-    
-    var canAccessAdministratorSettings: Bool {
-        switch self {
-        case .client: return false                       // Client: Only Airplay
-        case .admin, .dev, .owner: return true          // Admin/Dev/Owner: Airplay + Admin settings
-        }
-    }
-    
-    var canAccessAllSettings: Bool {
-        switch self {
-        case .client, .admin: return false               // Client/Admin: Limited access
-        case .dev, .owner: return true                   // Dev/Owner: See everything
-        }
-    }
-}
+// UserRole moved to User.swift to avoid duplicate definitions
 
 class UserRoleManager: ObservableObject {
     @Published var currentRole: UserRole
@@ -119,6 +93,8 @@ class UserRoleManager: ObservableObject {
     }
 }
 
+
+
 // MARK: - Beautiful Purple Login Screen
 
 struct BeautifulLoginView: View {
@@ -140,6 +116,7 @@ struct BeautifulLoginView: View {
     
     // Focus management for automatic cursor movement
     @EnvironmentObject var focusManager: FocusManager
+    @EnvironmentObject var authenticationService: AuthenticationService
     @FocusState private var isFieldFocused: Bool
     
     // Valid credentials
@@ -420,14 +397,42 @@ struct BeautifulLoginView: View {
             return
         }
         
-        if let role = UserRole(rawValue: username.lowercased()) {
-            currentUserRole = role
+        // Determine user role
+        if let userRole = UserRole(rawValue: username.lowercased()) {
+            currentUserRole = userRole
         } else {
             currentUserRole = .client
         }
         
-        showError = false
-        isLoading = false
-        isSignedIn = true
+        // Authenticate through AuthenticationService
+        Task {
+            do {
+                let credentials = LoginCredentials(
+                    username: username.lowercased(),
+                    password: password
+                )
+                
+                try await authenticationService.signIn(with: credentials)
+                
+                await MainActor.run {
+                    showError = false
+                    isLoading = false
+                    isSignedIn = true
+                }
+            } catch {
+                await MainActor.run {
+                    showError = true
+                    errorMessage = "Authentication failed: \(error.localizedDescription)"
+                    isLoading = false
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        goBackToUsername()
+                    }
+                }
+            }
+        }
     }
 }
+
+// MARK: - Kiosk Mode Implementation Complete
+// All Kiosk Mode components are now in separate files and added to Xcode project target

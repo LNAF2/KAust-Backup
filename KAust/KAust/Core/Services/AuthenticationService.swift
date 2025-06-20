@@ -11,7 +11,7 @@ import Combine
 
 /// Main authentication service implementation
 @MainActor
-final class AuthenticationService: ObservableObject, AuthenticationServiceProtocol {
+final class AuthenticationService: ObservableObject, @preconcurrency AuthenticationServiceProtocol {
     
     // MARK: - Published Properties
     
@@ -139,7 +139,7 @@ final class AuthenticationService: ObservableObject, AuthenticationServiceProtoc
         let session = UserSession(
             id: appleUserID,
             username: userName,
-            role: UserRole(rawValue: userEntity.role) ?? .client,
+            role: UserRole(rawValue: userEntity.role ?? "client") ?? .client,
             displayName: userName,
             loginDate: Date(),
             loginMethod: .appleID
@@ -210,12 +210,24 @@ final class AuthenticationService: ObservableObject, AuthenticationServiceProtoc
         print("✅ User signed out successfully")
     }
     
-    func getCurrentAppleUserID() -> String? {
-        guard let user = currentUser,
-              user.loginMethod == .appleID else {
+    nonisolated func getCurrentAppleUserID() -> String? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrAccount as String: "apple_user_id",
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        
+        guard status == errSecSuccess,
+              let data = result as? Data,
+              let userID = String(data: data, encoding: .utf8) else {
             return nil
         }
-        return user.id
+        
+        return userID
     }
     
     // MARK: - Permission Checking
@@ -311,4 +323,82 @@ extension FeaturePermission: CaseIterable {
         .deleteFiles, .viewSettings, .manageSettings, .viewAnalytics,
         .manageUsers, .systemAdmin, .developerTools
     ]
+}
+
+// MARK: - Mock Authentication Service for Previews
+
+@MainActor
+final class MockAuthenticationService: ObservableObject, @preconcurrency AuthenticationServiceProtocol {
+    
+    @Published var isAuthenticated = false
+    @Published var currentUser: UserSession?
+    @Published var authenticationError: AuthenticationError?
+    
+    var isAuthenticatedPublisher: Published<Bool>.Publisher {
+        $isAuthenticated
+    }
+    
+    init(authenticated: Bool = false, userRole: UserRole = .admin) {
+        if authenticated {
+            currentUser = UserSession(
+                id: UUID().uuidString,
+                username: "admin",
+                role: userRole,
+                displayName: userRole.displayName,
+                loginDate: Date(),
+                loginMethod: .password
+            )
+            isAuthenticated = true
+        }
+    }
+    
+    func signIn(with credentials: LoginCredentials) async throws {
+        currentUser = UserSession(
+            id: UUID().uuidString,
+            username: credentials.username,
+            role: .admin,
+            displayName: "Admin User",
+            loginDate: Date(),
+            loginMethod: .password
+        )
+        isAuthenticated = true
+    }
+    
+    func signInWithApple(request: ASAuthorizationAppleIDRequest, nonce: String?) async throws -> ASAuthorizationAppleIDCredential {
+        throw AuthenticationError.networkError
+    }
+    
+    func handleSignInWithAppleCompletion(credential: ASAuthorizationAppleIDCredential, nonce: String?) async throws {
+        // Mock implementation
+    }
+    
+    func checkAuthenticationStatus() async {
+        // Mock implementation
+    }
+    
+    func signOut() async {
+        currentUser = nil
+        isAuthenticated = false
+    }
+    
+    nonisolated func getCurrentAppleUserID() -> String? {
+        return "mock_apple_user_id"
+    }
+    
+    func hasPermission(for feature: FeaturePermission) -> Bool {
+        return currentUser?.role.hasPermission(for: feature.requiredRole) ?? false
+    }
+    
+    func requirePermission(for feature: FeaturePermission) throws {
+        guard let user = currentUser else {
+            throw AuthenticationError.sessionExpired
+        }
+        
+        guard user.role.hasPermission(for: feature.requiredRole) else {
+            throw AuthenticationError.insufficientPermissions(
+                required: feature.requiredRole,
+                current: user.role
+            )
+        }
+    }
 } 

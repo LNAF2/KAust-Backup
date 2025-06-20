@@ -2320,6 +2320,7 @@ struct SettingsView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var viewModel: SettingsViewModel  // Use injected view model
     @EnvironmentObject var roleManager: UserRoleManager  // Add role manager for access control
+    @ObservedObject var kioskModeService: KioskModeService  // Add Kiosk Mode service
     @State private var showingClearSongsAlert = false
     @State private var showingCompletionOverlay = false
     @State private var hasCompletionResults = false  // Track when results are ready to show
@@ -2503,10 +2504,74 @@ struct SettingsView: View {
     
     private var settingsContent: some View {
         VStack(alignment: .leading, spacing: 24) {
+            if kioskModeService.isKioskModeActive {
+                // KIOSK MODE: Show only limited settings
+                kioskModeRestrictedContent
+            } else {
+                // NORMAL MODE: Show all role-based settings
+                normalModeContent
+            }
+        }
+    }
+    
+    // MARK: - Kiosk Mode Restricted Content
+    
+    private var kioskModeRestrictedContent: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // Kiosk Mode Management Section (Admin Access Button)
+            KioskModeSettingsView(kioskModeService: kioskModeService)
+                .environmentObject(roleManager)
+            
+            // AirPlay section - Always visible in Kiosk Mode
+            airPlaySection
+            
+            // Volume Control section - Always visible in Kiosk Mode
+            volumeControlSection
+            
+            // Print Played Songs section - Always visible in Kiosk Mode
+            printPlayedSongsSection
+            
+            // Kiosk Mode indicator
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "lock.shield.fill")
+                        .foregroundColor(.green)
+                    Text("🔒 Kiosk Mode Active")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.green)
+                    Spacer()
+                }
+                Text("Settings access is restricted. Use Admin Access to manage all settings.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(Color.green.opacity(0.1))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.green.opacity(0.3), lineWidth: 1)
+            )
+            .cornerRadius(8)
+        }
+    }
+    
+    // MARK: - Normal Mode Content
+    
+    private var normalModeContent: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            // Kiosk Mode Management - Admin/Owner only (when not in Kiosk Mode)
+            KioskModeSettingsView(kioskModeService: kioskModeService)
+                .environmentObject(roleManager)
+            
             // AirPlay section - Everyone can see this
             if roleManager.canAccessAirplaySettings {
                 airPlaySection
             }
+            
+            // Volume Control section - Everyone can see this
+            volumeControlSection
             
             // Administrator Settings section - Admin, Dev, Owner only
             if roleManager.canAccessAdministratorSettings {
@@ -2537,9 +2602,12 @@ struct SettingsView: View {
                 }
             }
             
-            // Debug: Show current role for testing
+            // Debug: Show current role and kiosk mode status for testing
             VStack(alignment: .leading, spacing: 8) {
                 Text("🔐 Current Role: \(roleManager.roleDisplayName)")
+                    .font(.caption)
+                    .foregroundColor(.gray)
+                Text("🔒 Kiosk Mode: \(kioskModeService.isKioskModeActive ? "Active" : "Inactive")")
                     .font(.caption)
                     .foregroundColor(.gray)
                 Text("🎯 Access Level:")
@@ -3079,6 +3147,87 @@ struct SettingsView: View {
                     icon: "app.badge",
                     iconColor: .gray,
                     accessoryType: .value(viewModel.appVersion)
+                )
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+    }
+    
+    // MARK: - Volume Control Section (for Kiosk Mode)
+    
+    private var volumeControlSection: some View {
+        SettingsSection(title: "Volume", icon: "speaker.wave.3") {
+            VStack(spacing: 12) {
+                // Volume Control Row
+                HStack(spacing: 12) {
+                    Image(systemName: "speaker.wave.3")
+                        .foregroundColor(.blue)
+                        .font(.system(size: 20, weight: .medium))
+                        .frame(width: 28)
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Master Volume")
+                            .font(.system(size: 16, weight: .medium))
+                            .foregroundColor(AppTheme.settingsText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        
+                        Text("System audio volume control")
+                            .font(.system(size: 14))
+                            .foregroundColor(AppTheme.settingsText.opacity(0.7))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    
+                    Spacer()
+                    
+                    // Volume slider placeholder (would connect to system volume)
+                    HStack(spacing: 8) {
+                        Image(systemName: "speaker.wave.1")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                        
+                        Slider(value: .constant(0.7), in: 0...1)
+                            .frame(width: 100)
+                            .disabled(true) // Placeholder
+                        
+                        Image(systemName: "speaker.wave.3")
+                            .foregroundColor(.secondary)
+                            .font(.caption)
+                    }
+                }
+                .padding(.horizontal, 32)
+                .padding(.vertical, 12)
+                .background(
+                    RoundedRectangle(cornerRadius: AppConstants.Layout.panelCornerRadius)
+                        .fill(AppTheme.settingsText.opacity(0.05))
+                )
+                
+                // Mute Toggle
+                SettingRow(
+                    title: "Mute",
+                    subtitle: "Disable all audio output",
+                    icon: "speaker.slash",
+                    iconColor: .red,
+                    accessoryType: .toggle(.constant(false)) // Placeholder
+                )
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+    }
+    
+    // MARK: - Print Played Songs Section (for Kiosk Mode)
+    
+    private var printPlayedSongsSection: some View {
+        SettingsSection(title: "Reports", icon: "doc.text") {
+            VStack(spacing: 8) {
+                SettingRow(
+                    title: "Print Played Songs",
+                    subtitle: "Generate a report of all played songs",
+                    icon: "printer",
+                    iconColor: .blue,
+                    accessoryType: .disclosure,
+                    action: viewModel.showSongsPlayedTable
                 )
             }
             .padding(.horizontal, 16)
@@ -4052,7 +4201,12 @@ struct AirPlayPickerViewWrapper: UIViewRepresentable {
 
 struct SettingsView_Previews: PreviewProvider {
     static var previews: some View {
-        SettingsView()
+        let mockAuthService = MockAuthenticationService(authenticated: true, userRole: .admin)
+        let mockKioskService = KioskModeService(authService: mockAuthService)
+        let mockRoleManager = UserRoleManager(role: .admin)
+        
+        SettingsView(kioskModeService: mockKioskService)
             .environmentObject(SettingsViewModel())
+            .environmentObject(mockRoleManager)
     }
 }

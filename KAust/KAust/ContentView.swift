@@ -388,6 +388,7 @@ struct ContentView: View {
     @StateObject private var playlistViewModel: PlaylistViewModel
     @StateObject private var videoPlayerViewModel = VideoPlayerViewModel()
     @StateObject private var settingsViewModel = SettingsViewModel()  // Global settings view model
+    @EnvironmentObject var kioskModeService: KioskModeService  // Add Kiosk Mode service
     @State private var showSettings = false
     @State private var showingDownloadProgressWindow = false  // Global download progress state
     @State private var showingCustomResults = false  // For showing download results
@@ -445,7 +446,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showSettings) {
-            SettingsView()
+            SettingsView(kioskModeService: kioskModeService)
                 .environmentObject(settingsViewModel)  // Pass shared settings view model
         }
         .sheet(isPresented: $settingsViewModel.isShowingFolderPicker) {

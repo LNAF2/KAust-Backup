@@ -56,6 +56,33 @@ enum UserRole: String, CaseIterable, Comparable {
     func hasPermission(for requiredRole: UserRole) -> Bool {
         return self >= requiredRole
     }
+    
+    // Settings access levels based on GitHub commit specifications
+    var canAccessSettings: Bool {
+        switch self {
+        case .client, .dev, .admin, .owner: return true  // All roles can access settings panel
+        }
+    }
+    
+    var canAccessAirplaySettings: Bool {
+        switch self {
+        case .client, .dev, .admin, .owner: return true  // Everyone sees Airplay settings
+        }
+    }
+    
+    var canAccessAdministratorSettings: Bool {
+        switch self {
+        case .client: return false                       // Client: Only Airplay
+        case .admin, .dev, .owner: return true          // Admin/Dev/Owner: Airplay + Admin settings
+        }
+    }
+    
+    var canAccessAllSettings: Bool {
+        switch self {
+        case .client, .admin: return false               // Client/Admin: Limited access
+        case .dev, .owner: return true                   // Dev/Owner: Full access
+        }
+    }
 }
 
 // MARK: - Authentication Models

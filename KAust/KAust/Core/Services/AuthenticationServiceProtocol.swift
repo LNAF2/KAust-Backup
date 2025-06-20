@@ -13,6 +13,7 @@ protocol AuthenticationServiceProtocol {
     // Published property to observe authentication state
     var isAuthenticatedPublisher: Published<Bool>.Publisher { get }
     var isAuthenticated: Bool { get }
+    var currentUser: UserSession? { get }
 
     // Function to initiate Sign in with Apple
     // The completion handler will receive the result of the authorization
