@@ -673,14 +673,6 @@ struct CustomVideoPlayerView: View {
                             viewModel.toggleSize()
                         }
                     }
-                    .onTapGesture(count: 3) {
-                        if dragOffset == .zero && viewModel.isMinimized {
-                            print("👆👆👆 TRIPLE TAP detected - centering video")
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
-                            impactFeedback.impactOccurred()
-                            viewModel.centerVideo()
-                        }
-                    }
             }
             
             // Custom controls overlay - ALWAYS in the same container
