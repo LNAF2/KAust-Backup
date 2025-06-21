@@ -781,14 +781,27 @@ final class VideoPlayerViewModel: ObservableObject {
     
     func togglePlayPause() {
         guard let player = _player else { return }
-        if isPlaying { player.pause() } else { player.play() }
-        isPlaying.toggle()
-        showControls()
+        if isPlaying { 
+            player.pause() 
+            isPlaying = false
+            // When pausing, show controls and keep them visible (don't fade)
+            showControlsWithoutFade()
+        } else { 
+            player.play() 
+            isPlaying = true
+            // When playing, show controls and start fade timer
+            showControls()
+        }
     }
     
     func toggleSize() {
         isMinimized.toggle()
-        showControls()
+        // Show controls appropriately based on play state
+        if isPlaying {
+            showControls() // Will fade if playing
+        } else {
+            showControlsWithoutFade() // Won't fade if paused
+        }
         if !isMinimized {
             // When going fullscreen, position doesn't matter (fullscreen)
         } else {
@@ -800,7 +813,12 @@ final class VideoPlayerViewModel: ObservableObject {
     
     func centerVideo() {
         overlayOffset = .zero
-        showControls()
+        // Show controls appropriately based on play state
+        if isPlaying {
+            showControls() // Will fade if playing
+        } else {
+            showControlsWithoutFade() // Won't fade if paused
+        }
         print("🎯 Video manually centered")
     }
     
@@ -823,9 +841,30 @@ final class VideoPlayerViewModel: ObservableObject {
         // The position should persist wherever the user dragged it
     }
     
+    /// Show controls without starting fade timer (for paused state)
+    func showControlsWithoutFade() {
+        areControlsVisible = true
+        cancelControlsFadeTimer()
+        print("🎛️ Controls shown without fade (video paused)")
+        // CRITICAL: Never reset overlayOffset when showing controls
+        // The position should persist wherever the user dragged it
+    }
+    
+    /// Cancel the controls fade timer
+    private func cancelControlsFadeTimer() {
+        controlsFadeTimer?.invalidate()
+        controlsFadeTimer = nil
+        print("⏰ Controls fade timer cancelled")
+    }
+    
     func seek(to time: Double) async {
         await _player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
-        showControls()
+        // Show controls appropriately based on play state
+        if isPlaying {
+            showControls() // Will fade if playing
+        } else {
+            showControlsWithoutFade() // Won't fade if paused
+        }
     }
     
     private func setupTimeObserver() {
@@ -900,14 +939,28 @@ final class VideoPlayerViewModel: ObservableObject {
     
     private func startControlsFadeTimer() {
         controlsFadeTimer?.invalidate()
+        
+        // Only start fade timer if video is playing
+        guard isPlaying else {
+            print("⏰ Skipping controls fade timer - video is paused")
+            return
+        }
+        
         controlsFadeTimer = Timer.scheduledTimer(withTimeInterval: controlsFadeDelay, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
+                // Double-check that video is still playing before fading controls
+                guard self.isPlaying else {
+                    print("⏰ Cancelled controls fade - video was paused")
+                    return
+                }
                 withAnimation(.easeInOut(duration: 0.3)) {
                     self.areControlsVisible = false
                 }
+                print("🎛️ Controls faded after \(self.controlsFadeDelay) seconds")
             }
         }
+        print("⏰ Started controls fade timer (\(controlsFadeDelay) seconds)")
     }
     
     private func updateTimeDisplay() {
@@ -1074,8 +1127,12 @@ final class VideoPlayerViewModel: ObservableObject {
                         self.areControlsVisible = false
                         print("🎛️ Custom controls hidden - AirPlay native controls active")
                     } else {
-                        // Show custom controls when AirPlay is inactive
-                        self.showControls()
+                        // Show custom controls when AirPlay is inactive - appropriately based on play state
+                        if self.isPlaying {
+                            self.showControls() // Will fade if playing
+                        } else {
+                            self.showControlsWithoutFade() // Won't fade if paused
+                        }
                         print("🎛️ Custom controls restored - AirPlay disconnected")
                     }
                 }

@@ -662,7 +662,12 @@ struct CustomVideoPlayerView: View {
                     .onTapGesture(count: 1) {
                         if dragOffset == .zero {
                             print("👆 SINGLE TAP detected - showing controls")
-                            viewModel.showControls()
+                            // Show controls appropriately based on play state
+                            if viewModel.isPlaying {
+                                viewModel.showControls() // Will fade if playing
+                            } else {
+                                viewModel.showControlsWithoutFade() // Won't fade if paused
+                            }
                         }
                     }
                     .onTapGesture(count: 2) {
@@ -698,7 +703,6 @@ struct CustomVideoPlayerView: View {
                 HStack(spacing: 30) {
                     Button(action: { 
                         Task { await viewModel.skipBackward() }
-                        viewModel.showControls()
                     }) {
                         Image(systemName: "gobackward.10")
                             .foregroundColor(.white)
@@ -708,7 +712,6 @@ struct CustomVideoPlayerView: View {
                     
                     Button(action: { 
                         viewModel.togglePlayPause()
-                        viewModel.showControls()
                     }) {
                         Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
                             .foregroundColor(.white)
@@ -718,7 +721,6 @@ struct CustomVideoPlayerView: View {
                     
                     Button(action: { 
                         Task { await viewModel.skipForward() }
-                        viewModel.showControls()
                     }) {
                         Image(systemName: "goforward.10")
                             .foregroundColor(.white)
@@ -737,7 +739,6 @@ struct CustomVideoPlayerView: View {
                         get: { viewModel.currentTime },
                         set: { newValue in
                             Task { await viewModel.seek(to: newValue) }
-                            viewModel.showControls()
                         }
                     ), in: 0...max(viewModel.duration, 1))
                     .accentColor(.white)
