@@ -31,6 +31,7 @@ final class VideoPlayerViewModel: ObservableObject {
     // MARK: - Performance Isolation for Smooth Video Playback
     @Published private(set) var isInPerformanceMode = false
     @Published private(set) var isDragging = false
+    @Published private(set) var isScrubbing = false
     
     // MARK: - Constants
     private let skipInterval: Double = 10.0
@@ -45,6 +46,7 @@ final class VideoPlayerViewModel: ObservableObject {
     private var controlsFadeTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
     private var originalUpdateFrequency: TimeInterval = 0.5
+    private var wasPlayingBeforeScrub = false
     
     // MARK: - Deferred Database Operations
     private var deferredSongPlayRecord: Song?
@@ -820,6 +822,47 @@ final class VideoPlayerViewModel: ObservableObject {
             showControlsWithoutFade() // Won't fade if paused
         }
         print("🎯 Video manually centered")
+    }
+    
+    /// Start scrubbing the progress bar (YouTube-style pause behavior)
+    func startScrubbing() {
+        guard !isScrubbing else { return }
+        
+        print("🎛️ Starting progress bar scrubbing")
+        isScrubbing = true
+        wasPlayingBeforeScrub = isPlaying
+        
+        // Pause video during scrubbing for precise control (YouTube behavior)
+        if isPlaying {
+            _player?.pause()
+            isPlaying = false
+            print("⏸️ Paused video for scrubbing")
+        }
+        
+        // Show controls without fade during scrubbing
+        showControlsWithoutFade()
+    }
+    
+    /// End scrubbing the progress bar (YouTube-style resume behavior)
+    func endScrubbing() {
+        guard isScrubbing else { return }
+        
+        print("🎛️ Ending progress bar scrubbing")
+        isScrubbing = false
+        
+        // Resume playback if it was playing before scrubbing
+        if wasPlayingBeforeScrub {
+            _player?.play()
+            isPlaying = true
+            print("▶️ Resumed video after scrubbing")
+            // Show controls with fade timer since we're playing again
+            showControls()
+        } else {
+            // Keep controls visible without fade if video was paused
+            showControlsWithoutFade()
+        }
+        
+        wasPlayingBeforeScrub = false
     }
     
     func skipForward() async {

@@ -735,14 +735,23 @@ struct CustomVideoPlayerView: View {
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(.white)
                     
-                    Slider(value: Binding(
-                        get: { viewModel.currentTime },
-                        set: { newValue in
-                            Task { await viewModel.seek(to: newValue) }
+                    Slider(
+                        value: Binding(
+                            get: { viewModel.currentTime },
+                            set: { newValue in
+                                Task { await viewModel.seek(to: newValue) }
+                            }
+                        ),
+                        in: 0...max(viewModel.duration, 1),
+                        onEditingChanged: { isEditing in
+                            if isEditing {
+                                viewModel.startScrubbing()
+                            } else {
+                                viewModel.endScrubbing()
+                            }
                         }
-                    ), in: 0...max(viewModel.duration, 1))
-                    .accentColor(.white)
-                    
+                    )
+                    .accentColor(.white)                    
                     Text(viewModel.formattedTimeRemaining)
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(.white)
@@ -768,8 +777,8 @@ struct CustomVideoPlayerView: View {
             }
             .padding(20)
             .background(Color.black.opacity(0.1))
+            .allowsHitTesting(true) // CRITICAL: Ensure controls are always tappable
         }
-        .allowsHitTesting(true) // CRITICAL: Ensure controls are always tappable
     }
     
     @ViewBuilder
@@ -851,7 +860,6 @@ struct CustomVideoPlayerView: View {
     private func calculateMinimizedHeight(_ geometry: GeometryProxy) -> CGFloat {
         return calculateMinimizedWidth(geometry) / aspectRatio
     }
-}
 
 // MARK: - Custom button style to prevent gesture interference
 struct VideoControlButtonStyle: ButtonStyle {
@@ -861,4 +869,5 @@ struct VideoControlButtonStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.8 : 1.0)
             .allowsHitTesting(true)
     }
+}
 }
