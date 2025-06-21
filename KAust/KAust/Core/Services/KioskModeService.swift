@@ -50,7 +50,7 @@ enum KioskModeError: LocalizedError {
         case .keychainError(let message):
             return "Keychain error: \(message)"
         case .authenticationRequired:
-            return "Authentication required to manage Kiosk Mode"
+            return "Admin, Developer, or Owner access required to manage Kiosk Mode"
         }
     }
     
@@ -67,7 +67,7 @@ enum KioskModeError: LocalizedError {
         case .keychainError:
             return "Try restarting the app or contact support"
         case .authenticationRequired:
-            return "Sign in with Administrator or Owner privileges"
+            return "Sign in with Administrator, Developer, or Owner privileges"
         }
     }
 }
@@ -226,7 +226,7 @@ final class KioskModeService: ObservableObject, @preconcurrency KioskModeService
             throw KioskModeError.authenticationRequired
         }
         
-        guard currentUser.role == UserRole.admin || currentUser.role == UserRole.owner else {
+        guard currentUser.role == UserRole.admin || currentUser.role == UserRole.dev || currentUser.role == UserRole.owner else {
             throw KioskModeError.authenticationRequired
         }
     }

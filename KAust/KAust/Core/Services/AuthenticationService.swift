@@ -34,7 +34,8 @@ final class AuthenticationService: ObservableObject, @preconcurrency Authenticat
     // Hardcoded credentials for role-based authentication
     private let roleCredentials: [String: (password: String, role: UserRole)] = [
         "owner": ("qqq", .owner),
-        "admin": ("admin", .admin), 
+        "admin": ("admin", .admin),
+        "123456": ("123456", .admin), // Default admin credentials for ease of use
         "client": ("client", .client),
         "dev": ("dev", .dev)
     ]

@@ -373,10 +373,32 @@ struct RoleBasedSignInView: View {
                 
                 Spacer()
                 
-                Text("Contact your administrator for role changes")
+                VStack(spacing: 8) {
+                    Text("Default Credentials")
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("• Admin: username 'admin', password 'admin'")
+                        Text("• Quick Admin: username '123456', password '123456'")
+                        Text("• Owner: username 'owner', password 'qqq'")
+                        Text("• Client: username 'client', password 'client'")
+                        Text("• Developer: username 'dev', password 'dev'")
+                    }
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    .padding(.bottom)
+                    
+                    Text("Contact your administrator for role changes")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 8)
+                }
+                .padding()
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color(.systemGray6))
+                )
+                .padding(.bottom)
             }
             .navigationTitle("User Roles")
             .navigationBarTitleDisplayMode(.inline)
