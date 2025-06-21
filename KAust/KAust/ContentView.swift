@@ -10,6 +10,60 @@ import AVKit
 import Foundation
 import UIKit
 
+// MARK: - Corner Radius Constants
+private enum CornerRadius {
+    static let standard: CGFloat = 8
+    static let small: CGFloat = 4    // Half of standard
+    static let large: CGFloat = 16   // Double of standard
+}
+
+// MARK: - Enhanced Progress Slider Component
+struct EnhancedProgressSlider: View {
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let onEditingChanged: (Bool) -> Void
+    
+    var body: some View {
+        Slider(
+            value: $value,
+            in: range,
+            onEditingChanged: onEditingChanged
+        )
+        .accentColor(.white)
+        .onAppear {
+            // Configure slider appearance for better visibility
+            configureSliderAppearance()
+        }
+    }
+    
+    private func configureSliderAppearance() {
+        // Customize slider appearance
+        UISlider.appearance().setThumbImage(createThumbImage(), for: .normal)
+        UISlider.appearance().setThumbImage(createThumbImage(highlighted: true), for: .highlighted)
+    }
+    
+    private func createThumbImage(highlighted: Bool = false) -> UIImage {
+        let size = CGSize(width: 20, height: 20)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        
+        return renderer.image { context in
+            let rect = CGRect(origin: .zero, size: size)
+            
+            // Draw thumb as white circle with shadow
+            context.cgContext.setShadow(offset: CGSize(width: 0, height: 1), blur: 2, color: UIColor.black.withAlphaComponent(0.3).cgColor)
+            context.cgContext.setFillColor(UIColor.white.cgColor)
+            context.cgContext.fillEllipse(in: rect.insetBy(dx: 2, dy: 2))
+            
+            if highlighted {
+                // Draw larger circle when highlighted
+                context.cgContext.setShadow(offset: CGSize(width: 0, height: 2), blur: 4, color: UIColor.black.withAlphaComponent(0.4).cgColor)
+                context.cgContext.setFillColor(UIColor.white.cgColor)
+                context.cgContext.fillEllipse(in: rect.insetBy(dx: 1, dy: 1))
+            }
+        }
+    }
+}
+
 /// Custom Download Results View as requested by user
 struct DownloadResultsView: View {
     let results: [FileProcessingResult]
@@ -695,89 +749,191 @@ struct CustomVideoPlayerView: View {
     
     @ViewBuilder
     private func customControlsOverlay() -> some View {
-        VStack {
-            Spacer()
-            
-            VStack(spacing: 16) {
-                // Play/Pause and Skip Controls
-                HStack(spacing: 30) {
-                    Button(action: { 
-                        Task { await viewModel.skipBackward() }
-                    }) {
-                        Image(systemName: "gobackward.10")
-                            .foregroundColor(.white)
-                            .font(.title2)
-                    }
-                    .buttonStyle(VideoControlButtonStyle())
-                    
-                    Button(action: { 
-                        viewModel.togglePlayPause()
-                    }) {
-                        Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                            .foregroundColor(.white)
-                            .font(.title)
-                    }
-                    .buttonStyle(VideoControlButtonStyle())
-                    
-                    Button(action: { 
-                        Task { await viewModel.skipForward() }
-                    }) {
-                        Image(systemName: "goforward.10")
-                            .foregroundColor(.white)
-                            .font(.title2)
-                    }
-                    .buttonStyle(VideoControlButtonStyle())
-                }
+        if viewModel.isMinimized {
+            // SMALL SCREEN: Play controls top, time display second line, action buttons third, progress bar bottom
+            VStack(spacing: 0) {
+                Spacer()
                 
-                // Progress bar with times, delete button, and next button
-                HStack(spacing: 10) {
-                    Text(viewModel.formattedCurrentTime)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.white)
-                    
-                    Slider(
-                        value: Binding(
-                            get: { viewModel.currentTime },
-                            set: { newValue in
-                                Task { await viewModel.seek(to: newValue) }
-                            }
-                        ),
-                        in: 0...max(viewModel.duration, 1),
-                        onEditingChanged: { isEditing in
-                            if isEditing {
-                                viewModel.startScrubbing()
-                            } else {
-                                viewModel.endScrubbing()
-                            }
+                VStack(spacing: 8) {
+                    // Top row: Play controls only (centered)
+                    HStack(spacing: 30) {
+                        Button(action: { 
+                            Task { await viewModel.skipBackward() }
+                        }) {
+                            Image(systemName: "gobackward.10")
+                                .foregroundColor(.white)
+                                .font(.title2)
                         }
-                    )
-                    .accentColor(.white)                    
-                    Text(viewModel.formattedTimeRemaining)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.white)
-                    
-                    Button(action: { 
-                        viewModel.deleteSong()
-                    }) {
-                        Image(systemName: "trash")
-                            .foregroundColor(.white)
-                            .font(.title2)
+                        .buttonStyle(VideoControlButtonStyle())
+                        
+                        Button(action: { 
+                            viewModel.togglePlayPause()
+                        }) {
+                            Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+                                .foregroundColor(.white)
+                                .font(.title)
+                        }
+                        .buttonStyle(VideoControlButtonStyle())
+                        
+                        Button(action: { 
+                            Task { await viewModel.skipForward() }
+                        }) {
+                            Image(systemName: "goforward.10")
+                                .foregroundColor(.white)
+                                .font(.title2)
+                        }
+                        .buttonStyle(VideoControlButtonStyle())
                     }
-                    .buttonStyle(VideoControlButtonStyle())
                     
-                    Button(action: { 
-                        viewModel.playNextSong()
-                    }) {
-                        Image(systemName: "forward.end.fill")
+                    // Second row: Time display only (left-justified)
+                    HStack {
+                        Text("\(viewModel.formattedCurrentTime) / \(viewModel.formattedDuration)")
+                            .font(.system(.body, design: .monospaced))
                             .foregroundColor(.white)
-                            .font(.title2)
+                        Spacer()
                     }
-                    .buttonStyle(VideoControlButtonStyle())
+                    
+                    // Third row: Action buttons only
+                    HStack {
+                        Spacer()
+                        
+                        HStack(spacing: 30) {
+                            Button(action: { 
+                                viewModel.deleteSong()
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.white)
+                                    .font(.title2)
+                            }
+                            .buttonStyle(VideoControlButtonStyle())
+                            
+                            Button(action: { 
+                                viewModel.playNextSong()
+                            }) {
+                                Image(systemName: "forward.end.fill")
+                                    .foregroundColor(.white)
+                                    .font(.title2)
+                            }
+                            .buttonStyle(VideoControlButtonStyle())
+                        }
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .background(Color.black.opacity(0.1))
+                
+                // Bottom row: Progress bar flush with bottom of video
+                EnhancedProgressSlider(
+                    value: Binding(
+                        get: { viewModel.currentTime },
+                        set: { newValue in
+                            Task { await viewModel.seek(to: newValue) }
+                        }
+                    ),
+                    range: 0...max(viewModel.duration, 1),
+                    onEditingChanged: { isEditing in
+                        if isEditing {
+                            viewModel.startScrubbing()
+                        } else {
+                            viewModel.endScrubbing()
+                        }
+                    }
+                )
+                .padding(.horizontal, 20)
+                .background(Color.black.opacity(0.1))
             }
-            .padding(20)
-            .background(Color.black.opacity(0.1))
-            .allowsHitTesting(true) // CRITICAL: Ensure controls are always tappable
+        } else {
+            // BIG SCREEN: Progress bar at bottom of video / top of control overlay
+            VStack(spacing: 0) {
+                Spacer()
+                
+                // Progress bar at bottom of video / top of control overlay
+                EnhancedProgressSlider(
+                    value: Binding(
+                        get: { viewModel.currentTime },
+                        set: { newValue in
+                            Task { await viewModel.seek(to: newValue) }
+                        }
+                    ),
+                    range: 0...max(viewModel.duration, 1),
+                    onEditingChanged: { isEditing in
+                        if isEditing {
+                            viewModel.startScrubbing()
+                        } else {
+                            viewModel.endScrubbing()
+                        }
+                    }
+                )
+                .padding(.horizontal, 20)
+                .background(Color.black.opacity(0.1))
+                
+                VStack(spacing: 8) {  // Controls below progress bar - move UP by adding more bottom padding
+                    // Top row: Play/Pause and Skip Controls (centered)
+                    HStack(spacing: 30) {
+                        Button(action: { 
+                            Task { await viewModel.skipBackward() }
+                        }) {
+                            Image(systemName: "gobackward.10")
+                                .foregroundColor(.white)
+                                .font(.title2)
+                        }
+                        .buttonStyle(VideoControlButtonStyle())
+                        
+                        Button(action: { 
+                            viewModel.togglePlayPause()
+                        }) {
+                            Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+                                .foregroundColor(.white)
+                                .font(.title)
+                        }
+                        .buttonStyle(VideoControlButtonStyle())
+                        
+                        Button(action: { 
+                            Task { await viewModel.skipForward() }
+                        }) {
+                            Image(systemName: "goforward.10")
+                                .foregroundColor(.white)
+                                .font(.title2)
+                        }
+                        .buttonStyle(VideoControlButtonStyle())
+                    }
+                    
+                    // Bottom row: Time display (left) and action buttons (right)
+                    HStack {
+                        // YouTube-style time display: "current / total"
+                        Text("\(viewModel.formattedCurrentTime) / \(viewModel.formattedDuration)")
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                        
+                        // Action buttons with same spacing as upper controls
+                        HStack(spacing: 30) {
+                            Button(action: { 
+                                viewModel.deleteSong()
+                            }) {
+                                Image(systemName: "trash")
+                                    .foregroundColor(.white)
+                                    .font(.title2)
+                            }
+                            .buttonStyle(VideoControlButtonStyle())
+                            
+                            Button(action: { 
+                                viewModel.playNextSong()
+                            }) {
+                                Image(systemName: "forward.end.fill")
+                                    .foregroundColor(.white)
+                                    .font(.title2)
+                            }
+                            .buttonStyle(VideoControlButtonStyle())
+                        }
+                    }
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 8)
+                .padding(.bottom, 50)  // MOVE CONTROLS UP by 50 points as requested
+                .background(Color.black.opacity(0.1))
+            }
         }
     }
     
@@ -860,6 +1016,7 @@ struct CustomVideoPlayerView: View {
     private func calculateMinimizedHeight(_ geometry: GeometryProxy) -> CGFloat {
         return calculateMinimizedWidth(geometry) / aspectRatio
     }
+}
 
 // MARK: - Custom button style to prevent gesture interference
 struct VideoControlButtonStyle: ButtonStyle {
@@ -867,7 +1024,5 @@ struct VideoControlButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
             .opacity(configuration.isPressed ? 0.8 : 1.0)
-            .allowsHitTesting(true)
     }
-}
 }
