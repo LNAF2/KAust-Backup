@@ -1200,14 +1200,12 @@ final class VideoPlayerViewModel: ObservableObject {
         // CRITICAL: Enter performance mode before starting video playback
         await enterPerformanceMode()
 
-        // 1. Save current position before reset
-        let savedOffset = overlayOffset
-        
-        // 2. Reset everything to a clean state
+        // 1. Reset everything to a clean state
         reset()
         
-        // 3. Restore the saved position
-        overlayOffset = savedOffset
+        // 2. CENTER the video when playing a new song - users expect it to be visible
+        overlayOffset = .zero
+        print("📺 New video starting - CENTERED at origin for visibility")
 
         // 4. Find the video file, with migration fallback
         let videoURL = await findVideoURL(for: song)
