@@ -670,16 +670,10 @@ struct CustomVideoPlayerView: View {
                             }
                         }
                     }
-                    .onTapGesture(count: 2) {
-                        if dragOffset == .zero {
-                            print("👆👆 DOUBLE TAP detected - toggling size")
-                            let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                            impactFeedback.impactOccurred()
-                            viewModel.toggleSize()
-                        }
-                    }
+
             }
             
+
             // Custom controls overlay - ALWAYS in the same container
             // Hide custom controls when AirPlay is active, let native controls take over
             // CRITICAL: Always show controls during scrubbing, even if they would normally be hidden
@@ -701,97 +695,132 @@ struct CustomVideoPlayerView: View {
         VStack {
             Spacer()
             
-            VStack(spacing: 16) {
-                // Play/Pause and Skip Controls
-                HStack(spacing: 30) {
-                    Button(action: { 
-                        Task { await viewModel.skipBackward() }
-                    }) {
-                        Image(systemName: "gobackward.10")
-                            .foregroundColor(.white)
-                            .font(.title2)
-                    }
-                    .buttonStyle(VideoControlButtonStyle())
-                    
-                    Button(action: { 
-                        viewModel.togglePlayPause()
-                    }) {
-                        Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                            .foregroundColor(.white)
-                            .font(.title)
-                    }
-                    .buttonStyle(VideoControlButtonStyle())
-                    
-                    Button(action: { 
-                        Task { await viewModel.skipForward() }
-                    }) {
-                        Image(systemName: "goforward.10")
-                            .foregroundColor(.white)
-                            .font(.title2)
-                    }
-                    .buttonStyle(VideoControlButtonStyle())
-                }
-                
-                // Progress bar with times, delete button, and next button
-                HStack(spacing: 10) {
-                    Text(viewModel.formattedCurrentTime)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.white)
-                    
-                    Slider(
-                        value: Binding(
-                            get: { 
-                                // Use scrub position during dragging for immediate visual feedback
-                                // Otherwise use current time for normal playback tracking
-                                viewModel.isScrubbing ? viewModel.scrubPosition : viewModel.currentTime 
-                            },
-                            set: { newValue in
-                                // CRITICAL: Use fast synchronous seeking for immediate response
-                                // This eliminates any async overhead that causes lag
-                                viewModel.fastSliderSeek(to: newValue)
-                            }
-                        ), 
-                        in: 0...max(viewModel.duration, 1),
-                        onEditingChanged: { isEditing in
-                            // Handle drag start/end for proper state management
-                            if !isEditing {
-                                // Only handle drag end - start is handled by fastSliderSeek
-                                Task {
-                                    await viewModel.stopSliderDrag()
-                                }
-                            }
-                        }
-                    )
-                    .accentColor(.white)
-                    .allowsHitTesting(true) // CRITICAL: Always allow interaction
-                    
-                    Text(viewModel.formattedTimeRemaining)
-                        .font(.system(.body, design: .monospaced))
-                        .foregroundColor(.white)
-                    
-                    Button(action: { 
-                        viewModel.deleteSong()
-                    }) {
-                        Image(systemName: "trash")
-                            .foregroundColor(.white)
-                            .font(.title2)
-                    }
-                    .buttonStyle(VideoControlButtonStyle())
-                    
-                    Button(action: { 
-                        viewModel.playNextSong()
-                    }) {
-                        Image(systemName: "forward.end.fill")
-                            .foregroundColor(.white)
-                            .font(.title2)
-                    }
-                    .buttonStyle(VideoControlButtonStyle())
-                }
+            // Conditional ordering: Big screen (fullscreen) = slider first, Small screen (minimized) = controls first
+            if viewModel.isMinimized {
+                // Small screen: Main controls first, then slider
+                mainControlRow()
+                progressBarRow()
+            } else {
+                // Big screen: Slider first, then main controls
+                progressBarRow()
+                mainControlRow()
             }
-            .padding(20)
-            .background(Color.black.opacity(0.1))
         }
+        .padding(.horizontal, 20)
+        .padding(.top, 20)
+        .padding(.bottom, viewModel.isMinimized ? 0 : 70) // Flush bottom for small screen, 50 points up for big screen
+        .background(Color.black.opacity(0.1))
         .allowsHitTesting(true) // CRITICAL: Ensure controls are always tappable
+    }
+    
+    @ViewBuilder
+    private func mainControlRow() -> some View {
+        // Main control row: time, play controls, action buttons
+        HStack {
+            // Combined time display on left
+            Text("\(viewModel.formattedCurrentTime) / \(viewModel.formattedTimeRemaining.replacingOccurrences(of: "-", with: ""))")
+                .font(.system(.body, design: .monospaced))
+                .foregroundColor(.white)
+            
+            Spacer()
+            
+            // Center play controls with consistent spacing
+            HStack(spacing: 30) {
+                Button(action: { 
+                    Task { await viewModel.skipBackward() }
+                }) {
+                    Image(systemName: "gobackward.10")
+                        .foregroundColor(.white)
+                        .font(.title2)
+                }
+                .buttonStyle(VideoControlButtonStyle())
+                
+                Button(action: { 
+                    viewModel.togglePlayPause()
+                }) {
+                    Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
+                        .foregroundColor(.white)
+                        .font(.title)
+                }
+                .buttonStyle(VideoControlButtonStyle())
+                
+                Button(action: { 
+                    Task { await viewModel.skipForward() }
+                }) {
+                    Image(systemName: "goforward.10")
+                        .foregroundColor(.white)
+                        .font(.title2)
+                }
+                .buttonStyle(VideoControlButtonStyle())
+            }
+            
+            Spacer()
+            
+            // Right-aligned action buttons with same spacing as play controls
+            HStack(spacing: 30) {
+                Button(action: { 
+                    viewModel.deleteSong()
+                }) {
+                    Image(systemName: "trash")
+                        .foregroundColor(.white)
+                        .font(.title2)
+                }
+                .buttonStyle(VideoControlButtonStyle())
+                
+                Button(action: { 
+                    viewModel.playNextSong()
+                }) {
+                    Image(systemName: "forward.end.fill")
+                        .foregroundColor(.white)
+                        .font(.title2)
+                }
+                .buttonStyle(VideoControlButtonStyle())
+                
+                Button(action: { 
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                    impactFeedback.impactOccurred()
+                    viewModel.toggleSize()
+                }) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .foregroundColor(.white)
+                        .font(.title2)
+                }
+                .buttonStyle(VideoControlButtonStyle())
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func progressBarRow() -> some View {
+        // Progress bar with conditional positioning
+        HStack(spacing: 10) {
+            Slider(
+                value: Binding(
+                    get: { 
+                        // Use scrub position during dragging for immediate visual feedback
+                        // Otherwise use current time for normal playback tracking
+                        viewModel.isScrubbing ? viewModel.scrubPosition : viewModel.currentTime 
+                    },
+                    set: { newValue in
+                        // CRITICAL: Use fast synchronous seeking for immediate response
+                        // This eliminates any async overhead that causes lag
+                        viewModel.fastSliderSeek(to: newValue)
+                    }
+                ), 
+                in: 0...max(viewModel.duration, 1),
+                onEditingChanged: { isEditing in
+                    // Handle drag start/end for proper state management
+                    if !isEditing {
+                        // Only handle drag end - start is handled by fastSliderSeek
+                        Task {
+                            await viewModel.stopSliderDrag()
+                        }
+                    }
+                }
+            )
+            .accentColor(.white)
+            .allowsHitTesting(true) // CRITICAL: Always allow interaction
+        }
     }
     
     @ViewBuilder

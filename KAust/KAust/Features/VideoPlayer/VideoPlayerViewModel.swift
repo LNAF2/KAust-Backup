@@ -1002,13 +1002,45 @@ final class VideoPlayerViewModel: ObservableObject {
     func skipForward() async {
         guard let player = _player else { return }
         let newTime = CMTimeGetSeconds(player.currentTime()) + skipInterval
-        await seek(to: newTime)
+        
+        // CRITICAL: Update UI state immediately like slider does
+        currentTime = newTime
+        scrubPosition = newTime
+        updateTimeDisplay()
+        
+        // Seek video in background (non-blocking)
+        Task.detached { [weak self] in
+            await player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+        }
+        
+        // Show controls appropriately based on play state
+        if isPlaying {
+            showControls() // Will fade if playing
+        } else {
+            showControlsWithoutFade() // Won't fade if paused
+        }
     }
     
     func skipBackward() async {
         guard let player = _player else { return }
         let newTime = max(0, CMTimeGetSeconds(player.currentTime()) - skipInterval)
-        await seek(to: newTime)
+        
+        // CRITICAL: Update UI state immediately like slider does
+        currentTime = newTime
+        scrubPosition = newTime
+        updateTimeDisplay()
+        
+        // Seek video in background (non-blocking)
+        Task.detached { [weak self] in
+            await player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
+        }
+        
+        // Show controls appropriately based on play state
+        if isPlaying {
+            showControls() // Will fade if playing
+        } else {
+            showControlsWithoutFade() // Won't fade if paused
+        }
     }
     
     func showControls() {
