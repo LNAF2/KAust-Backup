@@ -682,8 +682,11 @@ struct CustomVideoPlayerView: View {
             
             // Custom controls overlay - ALWAYS in the same container
             // Hide custom controls when AirPlay is active, let native controls take over
-            if viewModel.areControlsVisible && !viewModel.isAirPlayActive {
+            // CRITICAL: Always show controls during scrubbing, even if they would normally be hidden
+            if (viewModel.areControlsVisible || viewModel.isScrubbing) && !viewModel.isAirPlayActive {
                 customControlsOverlay()
+                    .allowsHitTesting(true) // CRITICAL: Always allow interaction
+                    .opacity(1.0) // Always full opacity when shown
             }
             
             // Show AirPlay indicator when streaming
@@ -735,13 +738,32 @@ struct CustomVideoPlayerView: View {
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(.white)
                     
-                    Slider(value: Binding(
-                        get: { viewModel.currentTime },
-                        set: { newValue in
-                            Task { await viewModel.seek(to: newValue) }
+                    Slider(
+                        value: Binding(
+                            get: { 
+                                // Use scrub position during dragging for immediate visual feedback
+                                // Otherwise use current time for normal playback tracking
+                                viewModel.isScrubbing ? viewModel.scrubPosition : viewModel.currentTime 
+                            },
+                            set: { newValue in
+                                // CRITICAL: Use fast synchronous seeking for immediate response
+                                // This eliminates any async overhead that causes lag
+                                viewModel.fastSliderSeek(to: newValue)
+                            }
+                        ), 
+                        in: 0...max(viewModel.duration, 1),
+                        onEditingChanged: { isEditing in
+                            // Handle drag start/end for proper state management
+                            if !isEditing {
+                                // Only handle drag end - start is handled by fastSliderSeek
+                                Task {
+                                    await viewModel.stopSliderDrag()
+                                }
+                            }
                         }
-                    ), in: 0...max(viewModel.duration, 1))
+                    )
                     .accentColor(.white)
+                    .allowsHitTesting(true) // CRITICAL: Always allow interaction
                     
                     Text(viewModel.formattedTimeRemaining)
                         .font(.system(.body, design: .monospaced))
@@ -822,12 +844,18 @@ struct CustomVideoPlayerView: View {
                 state = value.translation
             }
             .onChanged { _ in
+                // Only allow video dragging if slider is not being used
+                guard !viewModel.isSliderDragging else { return }
+                
                 // PERFORMANCE: Enter ultra-performance mode on first drag movement
                 Task {
                     await viewModel.startDragging()
                 }
             }
             .onEnded { value in
+                // Only process video drag end if slider is not being used
+                guard !viewModel.isSliderDragging else { return }
+                
                 // PERFORMANCE: Exit ultra-performance mode when drag ends
                 Task {
                     await viewModel.stopDragging()

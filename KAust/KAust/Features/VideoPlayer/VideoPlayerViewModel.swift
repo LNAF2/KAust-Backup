@@ -28,9 +28,16 @@ final class VideoPlayerViewModel: ObservableObject {
     @Published var formattedDuration: String = "00:00"
     @Published var formattedTimeRemaining: String = "-00:00"
     
+    // MARK: - Scrub Bar State for Visual Feedback
+    @Published var scrubPosition: Double = 0 // Visual position during scrubbing
+    @Published var isScrubbing: Bool = false // Track active scrubbing state
+    
     // MARK: - Performance Isolation for Smooth Video Playback
     @Published private(set) var isInPerformanceMode = false
     @Published private(set) var isDragging = false
+    @Published private(set) var isSliderDragging = false
+    private var sliderDragTimer: Timer?
+    private var sliderWatchdogTimer: Timer? // Safety timer to recover from stuck states
     
     // MARK: - Constants
     private let skipInterval: Double = 10.0
@@ -79,6 +86,167 @@ final class VideoPlayerViewModel: ObservableObject {
         
         // Exit ultra-performance mode and return to normal performance mode
         await exitUltraPerformanceMode()
+    }
+
+    /// Enter ultra-performance mode during slider dragging with lightweight entry
+    func startSliderDrag() async {
+        guard !isSliderDragging else { return }
+        
+        print("🎚️ SLIDER: Starting slider drag - lightweight performance mode")
+        isSliderDragging = true
+        isScrubbing = true // Visual feedback state
+        
+        // CRITICAL: Prevent controls from fading during scrub
+        cancelControlsFadeTimer()
+        areControlsVisible = true
+        
+        // LIGHTWEIGHT: Don't enter full ultra-performance mode immediately
+        // This avoids the initial jerkiness - let the first few seeks happen normally
+        // Full performance mode will be activated after a short delay if needed
+        
+        // Start watchdog timer to automatically recover from stuck states
+        sliderWatchdogTimer?.invalidate()
+        sliderWatchdogTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                print("🚨 SLIDER: Watchdog timeout - forcing recovery from stuck slider")
+                await self?.forceExitSliderDrag()
+            }
+        }
+        
+        // OPTIONAL: Enter full performance mode after a brief delay if scrubbing continues
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            Task { @MainActor [weak self] in
+                // Only enter full performance mode if still scrubbing
+                if self?.isSliderDragging == true {
+                    print("🎚️ SLIDER: Entering full performance mode after brief delay")
+                    await self?.enterUltraPerformanceMode()
+                }
+            }
+        }
+    }
+
+    /// Exit ultra-performance mode when slider dragging ends
+    func stopSliderDrag() async {
+        guard isSliderDragging else { 
+            print("🎚️ SLIDER: Already stopped - no action needed")
+            return 
+        }
+        
+        print("🎚️ SLIDER: Ending slider drag")
+        isSliderDragging = false
+        isScrubbing = false // Clear visual feedback state
+        
+        // Clean up timers immediately and defensively
+        sliderDragTimer?.invalidate()
+        sliderDragTimer = nil
+        sliderWatchdogTimer?.invalidate()
+        sliderWatchdogTimer = nil
+        
+        // Exit ultra-performance mode if we entered it (defensive check)
+        if isInPerformanceMode {
+            await exitUltraPerformanceMode()
+        }
+        
+        // CRITICAL: Restore appropriate control behavior after scrubbing
+        if isPlaying {
+            showControls() // Will start fade timer
+        } else {
+            showControlsWithoutFade() // Keep visible if paused
+        }
+    }
+
+    /// Force exit slider drag mode if it gets stuck (emergency recovery)
+    func forceExitSliderDrag() async {
+        print("🚨 SLIDER: Force exiting stuck slider drag mode")
+        
+        // Force reset all slider state
+        isSliderDragging = false
+        isScrubbing = false // Clear visual state
+        sliderDragTimer?.invalidate()
+        sliderDragTimer = nil
+        sliderWatchdogTimer?.invalidate()
+        sliderWatchdogTimer = nil
+        
+        // Force exit ultra-performance mode
+        await exitUltraPerformanceMode()
+        
+        // Force restore time observer
+        await restoreTimeObserver()
+        
+        // Restore controls
+        if isPlaying {
+            showControls()
+        } else {
+            showControlsWithoutFade()
+        }
+        
+        print("✅ SLIDER: Force exit completed - slider should be responsive again")
+    }
+
+    /// Optimized seeking for slider interactions with immediate non-blocking video response
+    func sliderSeek(to time: Double) async {
+        // Update visual position immediately for responsive feedback
+        scrubPosition = time
+        
+        // CRITICAL: Non-blocking video seek for immediate response
+        // Don't await this - let it happen in background while UI stays responsive
+        Task.detached { [weak self] in
+            guard let player = await self?._player else { return }
+            await player.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+        }
+        
+        // Update current time immediately for UI consistency
+        currentTime = time
+        updateTimeDisplay()
+        
+        // Enter ultra-performance mode if not already active (but don't block on it)
+        if !isSliderDragging {
+            Task {
+                await startSliderDrag()
+            }
+        }
+        
+        // CRITICAL: Reset timer for exit detection
+        sliderDragTimer?.invalidate()
+        sliderDragTimer = nil
+        
+        // Reset the timer - exit slider mode after user stops interacting
+        sliderDragTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                print("⏰ SLIDER: Timer fired - stopping slider drag")
+                await self?.stopSliderDrag()
+            }
+        }
+    }
+    
+    /// Fast seeking method for continuous drag operations - optimized for real-time response
+    func fastSliderSeek(to time: Double) {
+        // IMMEDIATE visual update - no async overhead
+        scrubPosition = time
+        currentTime = time
+        updateTimeDisplay()
+        
+        // Fire-and-forget seeking - don't block UI thread
+        Task.detached { [weak self] in
+            guard let player = await self?._player else { return }
+            await player.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+        }
+        
+        // Lightweight performance mode entry
+        if !isSliderDragging {
+            isSliderDragging = true
+            isScrubbing = true
+            cancelControlsFadeTimer()
+            areControlsVisible = true
+        }
+        
+        // Reset exit timer
+        sliderDragTimer?.invalidate()
+        sliderDragTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.stopSliderDrag()
+            }
+        }
     }
 
     /// Ultra-performance mode for maximum smoothness during drag operations
@@ -679,7 +847,13 @@ final class VideoPlayerViewModel: ObservableObject {
 
         controlsFadeTimer?.invalidate()
         controlsFadeTimer = nil
-
+        
+        // Clean up slider timers
+        sliderDragTimer?.invalidate()
+        sliderDragTimer = nil
+        sliderWatchdogTimer?.invalidate()
+        sliderWatchdogTimer = nil
+        
         _player?.replaceCurrentItem(with: nil)
         _player = nil
         playerItem = nil
@@ -693,6 +867,9 @@ final class VideoPlayerViewModel: ObservableObject {
         // overlayOffset = .zero  <-- REMOVED TO PREVENT JUMPING BACK TO CENTER
         currentTime = 0
         duration = 0
+        scrubPosition = 0 // Reset scrub position
+        isScrubbing = false // Reset scrubbing state
+        isSliderDragging = false // Reset slider drag state
         formattedCurrentTime = "00:00"
         formattedDuration = "00:00"
         formattedTimeRemaining = "-00:00"
@@ -859,7 +1036,9 @@ final class VideoPlayerViewModel: ObservableObject {
     
     func seek(to time: Double) async {
         await _player?.seek(to: CMTime(seconds: time, preferredTimescale: 600))
-        // Show controls appropriately based on play state
+        // Show controls appropriately based on play state (but skip during slider drag for performance)
+        guard !isSliderDragging else { return }
+        
         if isPlaying {
             showControls() // Will fade if playing
         } else {
@@ -880,6 +1059,12 @@ final class VideoPlayerViewModel: ObservableObject {
                     self.duration = item.duration.seconds
                 }
                 self.currentTime = time.seconds
+                
+                // Sync scrub position when not actively scrubbing
+                if !self.isScrubbing {
+                    self.scrubPosition = time.seconds
+                }
+                
                 self.updateTimeDisplay()
             }
         }
@@ -909,6 +1094,11 @@ final class VideoPlayerViewModel: ObservableObject {
                     self.duration = item.duration.seconds
                 }
                 self.currentTime = time.seconds
+                
+                // Sync scrub position when not actively scrubbing
+                if !self.isScrubbing {
+                    self.scrubPosition = time.seconds
+                }
                 
                 // Throttled time display updates during performance mode
                 if !self.isInPerformanceMode || Int(time.seconds) % 2 == 0 {
@@ -940,18 +1130,18 @@ final class VideoPlayerViewModel: ObservableObject {
     private func startControlsFadeTimer() {
         controlsFadeTimer?.invalidate()
         
-        // Only start fade timer if video is playing
-        guard isPlaying else {
-            print("⏰ Skipping controls fade timer - video is paused")
+        // Only start fade timer if video is playing AND not scrubbing
+        guard isPlaying && !isScrubbing else {
+            print("⏰ Skipping controls fade timer - video paused or scrubbing active")
             return
         }
         
         controlsFadeTimer = Timer.scheduledTimer(withTimeInterval: controlsFadeDelay, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self = self else { return }
-                // Double-check that video is still playing before fading controls
-                guard self.isPlaying else {
-                    print("⏰ Cancelled controls fade - video was paused")
+                // Double-check that video is still playing and not scrubbing before fading controls
+                guard self.isPlaying && !self.isScrubbing else {
+                    print("⏰ Cancelled controls fade - video paused or scrubbing")
                     return
                 }
                 withAnimation(.easeInOut(duration: 0.3)) {
@@ -990,7 +1180,13 @@ final class VideoPlayerViewModel: ObservableObject {
         NotificationCenter.default.removeObserver(self)
         controlsFadeTimer?.invalidate()
         controlsFadeTimer = nil
-
+        
+        // Clean up slider timers
+        sliderDragTimer?.invalidate()
+        sliderDragTimer = nil
+        sliderWatchdogTimer?.invalidate()
+        sliderWatchdogTimer = nil
+        
         _player?.replaceCurrentItem(with: nil)
         _player = nil
         playerItem = nil
@@ -1197,23 +1393,19 @@ final class VideoPlayerViewModel: ObservableObject {
     func play(song: Song) async {
         print("🎵 VideoPlayerViewModel.play - Attempting to play: '\(song.title)'")
         
-        // CRITICAL: Enter performance mode before starting video playback
-        await enterPerformanceMode()
-
-        // 1. Reset everything to a clean state
+        // 1. Reset everything to a clean state FIRST
         reset()
         
         // 2. CENTER the video when playing a new song - users expect it to be visible
         overlayOffset = .zero
         print("📺 New video starting - CENTERED at origin for visibility")
 
-        // 4. Find the video file, with migration fallback
+        // 3. Find the video file, with migration fallback
         let videoURL = await findVideoURL(for: song)
 
         guard let url = videoURL else {
             print("❌ VideoPlayerViewModel.play - CRITICAL FAILURE: No video URL found for song: \(song.title)")
             NotificationCenter.default.post(name: .playbackFailed, object: song)
-            await exitPerformanceMode() // Exit performance mode on failure
             return
         }
         
@@ -1224,7 +1416,7 @@ final class VideoPlayerViewModel: ObservableObject {
             await updateSongFilePath(songId: song.id, newPath: url.path)
         }
         
-        // 3. Setup the new player and wait for it to be ready
+        // 4. Setup the new player and wait for it to be ready
         let newPlayerItem = AVPlayerItem(url: url)
         self.playerItem = newPlayerItem
         self._player = AVPlayer(playerItem: newPlayerItem)
@@ -1233,26 +1425,37 @@ final class VideoPlayerViewModel: ObservableObject {
         setupVolumeObserver()
         applyCurrentVolumeSettings()
         
-        // 4. Wait for player to be ready to play, then show UI immediately
+        // 5. Wait for player to be ready to play, then show UI immediately
         await waitForPlayerReady(player: self._player!, playerItem: newPlayerItem)
         
-        // 5. NOW set state - player is ready, video will appear immediately
+        // 6. NOW set state - player is ready, video will appear immediately
         self.currentVideo = song
         self.isPlaying = true
         self.isMinimized = true
         
-        // 6. Start playback and setup with optimized observers (only if not in performance mode)
+        // Initialize scrub position
+        self.scrubPosition = 0
+        
+        // 7. Start playback and setup observers (normal mode first for smooth startup)
         self._player?.play()
-        if !isInPerformanceMode {
-            await setupOptimizedTimeObserver()
-        }
+        setupTimeObserver() // Use normal time observer initially
         setupAirPlayMonitoring()
         showControls()
         
-        // 7. PERFORMANCE: Defer song play recording until after performance mode ends
+        // 8. CRITICAL: Enter performance mode AFTER everything is set up and playing smoothly
+        // This prevents the jerky startup by allowing normal initialization first
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                print("🚀 DELAYED PERFORMANCE: Entering performance mode after smooth startup")
+                await self.enterPerformanceMode()
+            }
+        }
+        
+        // 9. PERFORMANCE: Defer song play recording until after performance mode ends
         await recordSongPlay(song: song)
         
-        print("✅ VideoPlayerViewModel.play - Playback started for: '\(song.title)' with performance optimizations")
+        print("✅ VideoPlayerViewModel.play - Playback started for: '\(song.title)' with smooth startup")
     }
 
     func stop() {
