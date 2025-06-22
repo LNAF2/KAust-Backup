@@ -876,19 +876,17 @@ struct CustomVideoPlayerView: View {
                 // Only allow video dragging if slider is not being used
                 guard !viewModel.isSliderDragging else { return }
                 
-                // PERFORMANCE: Enter ultra-performance mode on first drag movement
-                Task {
-                    await viewModel.startDragging()
-                }
+                // CRITICAL FIX: Synchronous drag start for immediate response
+                // Remove async Task that was causing drag hesitation
+                viewModel.startDragging()
             }
             .onEnded { value in
                 // Only process video drag end if slider is not being used
                 guard !viewModel.isSliderDragging else { return }
                 
-                // PERFORMANCE: Exit ultra-performance mode when drag ends
-                Task {
-                    await viewModel.stopDragging()
-                }
+                // CRITICAL FIX: Synchronous drag end for immediate response
+                // Remove async Task that was causing delay
+                viewModel.stopDragging()
                 
                 // Commit final position - update both local and viewModel
                 basePosition = CGSize(

@@ -66,6 +66,7 @@
 				Core/Services/KioskModeService.swift,
 				Core/Services/MediaMetadataService.swift,
 				Core/Services/UserPreferencesServiceProtocol.swift,
+				Core/ViewModels/SettingsViewModel.swift,
 				Features/Authentication/PINEntryView.swift,
 				Features/PlayList/ViewModels/PlaylistViewModel.swift,
 				Features/PlayList/Views/PlaylistEmptyState.swift,

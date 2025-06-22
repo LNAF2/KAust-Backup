@@ -67,25 +67,26 @@ final class VideoPlayerViewModel: ObservableObject {
     // MARK: - Drag State Management
 
     /// Enter ultra-performance mode during video dragging for maximum smoothness
-    func startDragging() async {
+    func startDragging() {
         guard !isDragging else { return }
         
         print("🎯 DRAG: Starting drag - entering ultra-performance mode")
         isDragging = true
         
-        // Enter ultra-performance mode - even more aggressive than normal performance mode
-        await enterUltraPerformanceMode()
+        // CRITICAL FIX: Synchronous performance mode entry - no async overhead
+        // Remove async call that was causing drag hesitation
+        enterUltraPerformanceModeSync()
     }
 
     /// Exit ultra-performance mode when dragging ends
-    func stopDragging() async {
+    func stopDragging() {
         guard isDragging else { return }
         
         print("🎯 DRAG: Ending drag - exiting ultra-performance mode")
         isDragging = false
         
-        // Exit ultra-performance mode and return to normal performance mode
-        await exitUltraPerformanceMode()
+        // CRITICAL FIX: Synchronous performance mode exit - no async overhead
+        exitUltraPerformanceModeSync()
     }
 
     /// Enter ultra-performance mode during slider dragging with lightweight entry
@@ -183,16 +184,17 @@ final class VideoPlayerViewModel: ObservableObject {
         print("✅ SLIDER: Force exit completed - slider should be responsive again")
     }
 
-    /// Optimized seeking for slider interactions with immediate non-blocking video response
+    /// Optimized seeking for slider interactions with immediate response
     func sliderSeek(to time: Double) async {
         // Update visual position immediately for responsive feedback
         scrubPosition = time
         
-        // CRITICAL: Non-blocking video seek for immediate response
-        // Don't await this - let it happen in background while UI stays responsive
-        Task.detached { [weak self] in
-            guard let player = await self?._player else { return }
-            await player.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+        // CRITICAL FIX: Fire-and-forget seeking for instant UI response
+        // Remove Task.detached overhead while still handling async properly
+        if let player = _player {
+            Task {
+                await player.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+            }
         }
         
         // Update current time immediately for UI consistency
@@ -226,13 +228,16 @@ final class VideoPlayerViewModel: ObservableObject {
         currentTime = time
         updateTimeDisplay()
         
-        // Fire-and-forget seeking - don't block UI thread
-        Task.detached { [weak self] in
-            guard let player = await self?._player else { return }
-            await player.seek(to: CMTime(seconds: time, preferredTimescale: 600))
+        // CRITICAL FIX: Fire-and-forget seeking for instant UI response
+        // Remove Task.detached overhead while still handling async properly
+        if let player = _player {
+            let cmTime = CMTime(seconds: time, preferredTimescale: 600)
+            Task {
+                await player.seek(to: cmTime)
+            }
         }
         
-        // Lightweight performance mode entry
+        // Lightweight performance mode entry - no async overhead
         if !isSliderDragging {
             isSliderDragging = true
             isScrubbing = true
@@ -1008,8 +1013,9 @@ final class VideoPlayerViewModel: ObservableObject {
         scrubPosition = newTime
         updateTimeDisplay()
         
-        // Seek video in background (non-blocking)
-        Task.detached { [weak self] in
+        // CRITICAL FIX: Fire-and-forget seeking for instant UI response
+        // Remove Task.detached overhead while still handling async properly
+        Task {
             await player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
         }
         
@@ -1030,8 +1036,9 @@ final class VideoPlayerViewModel: ObservableObject {
         scrubPosition = newTime
         updateTimeDisplay()
         
-        // Seek video in background (non-blocking)
-        Task.detached { [weak self] in
+        // CRITICAL FIX: Fire-and-forget seeking for instant UI response
+        // Remove Task.detached overhead while still handling async properly
+        Task {
             await player.seek(to: CMTime(seconds: newTime, preferredTimescale: 600))
         }
         
@@ -1515,5 +1522,40 @@ final class VideoPlayerViewModel: ObservableObject {
         stop()
         // Notify the ContentView to play the next song from playlist
         NotificationCenter.default.post(name: .playNextSongFromPlaylist, object: nil)
+    }
+
+    // MARK: - Synchronous Performance Mode Methods
+
+    /// Synchronous ultra-performance mode entry for immediate drag response
+    private func enterUltraPerformanceModeSync() {
+        print("🚀 ULTRA-PERFORMANCE: Entering ultra-performance mode SYNC for immediate drag response")
+        
+        // Suspend time observer immediately - no async overhead
+        if let timeObserver = self.timeObserver {
+            _player?.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
+        }
+        
+        // Notify all components to enter ultra-quiet mode
+        NotificationCenter.default.post(name: .init("VideoUltraPerformanceModeEnabled"), object: nil)
+        
+        print("✅ ULTRA-PERFORMANCE: Maximum performance mode active - drag should be butter smooth")
+    }
+
+    /// Synchronous ultra-performance mode exit for immediate response
+    private func exitUltraPerformanceModeSync() {
+        print("🔄 ULTRA-PERFORMANCE: Exiting ultra-performance mode SYNC")
+        
+        // Restore time observer if needed
+        if timeObserver == nil && currentVideo != nil {
+            Task {
+                await setupOptimizedTimeObserver()
+            }
+        }
+        
+        // Notify all components to exit ultra-quiet mode
+        NotificationCenter.default.post(name: .init("VideoUltraPerformanceModeDisabled"), object: nil)
+        
+        print("✅ ULTRA-PERFORMANCE: Returned to normal operation")
     }
 } 
