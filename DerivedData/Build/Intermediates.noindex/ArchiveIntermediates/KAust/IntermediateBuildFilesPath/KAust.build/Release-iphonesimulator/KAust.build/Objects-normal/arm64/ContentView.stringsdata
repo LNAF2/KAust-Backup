@@ -1,0 +1,96 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/ContentView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "DOWNLOAD RESULTS",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 48
+        }
+      },
+      {
+        "comment": "",
+        "key": "DONE",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 56
+        }
+      },
+      {
+        "comment": "",
+        "key": "0 songs were successfully downloaded",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 79
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld songs were successfully downloaded",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 89
+        }
+      },
+      {
+        "comment": "",
+        "key": "Successful",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 71
+        }
+      },
+      {
+        "comment": "",
+        "key": "0 songs failed to download",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 113
+        }
+      },
+      {
+        "comment": "",
+        "key": "Failed",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 105
+        }
+      },
+      {
+        "comment": "",
+        "key": "0 duplicate songs were downloaded",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 143
+        }
+      },
+      {
+        "comment": "",
+        "key": "Duplicates",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 135
+        }
+      },
+      {
+        "comment": "",
+        "key": "Reason: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 317
+        }
+      },
+      {
+        "comment": "",
+        "key": "Already in library",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 374
+        }
+      }
+    ]
+  },
+  "version": 1
+}

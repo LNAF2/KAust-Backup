@@ -1,0 +1,152 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/DownloadProgressWindow.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "DOWNLOAD PROGRESS",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 66
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 108
+        }
+      },
+      {
+        "comment": "",
+        "key": "Complete",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 113
+        }
+      },
+      {
+        "comment": "",
+        "key": "Batch %lld of %lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 122
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld / %lld files",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 128
+        }
+      },
+      {
+        "comment": "",
+        "key": "Current File",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 156
+        }
+      },
+      {
+        "comment": "",
+        "key": "File %lld of %lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 181
+        }
+      },
+      {
+        "comment": "",
+        "key": "No file currently processing",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 195
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 202
+        }
+      },
+      {
+        "comment": "",
+        "key": "Statistics",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 226
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pause",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 277
+        }
+      },
+      {
+        "comment": "",
+        "key": "Resume",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 297
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 316
+        }
+      },
+      {
+        "comment": "",
+        "key": "Result",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 335
+        }
+      },
+      {
+        "comment": "",
+        "key": "Close",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 357
+        }
+      },
+      {
+        "comment": "",
+        "key": "Elapsed: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 372
+        }
+      },
+      {
+        "comment": "",
+        "key": "Estimated remaining: %@",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 379
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 407
+        }
+      }
+    ]
+  },
+  "version": 1
+}

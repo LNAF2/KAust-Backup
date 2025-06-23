@@ -19,7 +19,7 @@ class SonglistViewModel: ObservableObject {
             // Debounce search to improve performance
             searchDebounceTask?.cancel()
             searchDebounceTask = Task { @MainActor in
-                try await Task.sleep(nanoseconds: 300_000_000) // 300ms delay
+                try await Task.sleep(nanoseconds: UInt64(currentSearchDelay * 1_000_000)) // Use dynamic delay
                 updateDisplaySongs()
             }
         }
@@ -32,6 +32,11 @@ class SonglistViewModel: ObservableObject {
     // MARK: - Performance Mode Tracking
     @Published private(set) var isInPerformanceMode = false
     private var suspendedObservers = false
+    
+    // MARK: - Scroll Performance Optimization
+    private var currentSearchDelay: Double = 300.0 // Default 300ms
+    private let normalSearchDelay: Double = 300.0
+    private let scrollOptimizedDelay: Double = 100.0 // Reduced delay during scroll
 
     private let persistenceController = PersistenceController.shared
     private var cancellables = Set<AnyCancellable>()
@@ -58,6 +63,9 @@ class SonglistViewModel: ObservableObject {
     private func setupObservers() {
         // PERFORMANCE: Setup performance mode observers first
         setupPerformanceModeObserver()
+        
+        // SCROLL OPTIMIZATION: Setup scroll-aware observers
+        setupScrollOptimizationObservers()
         
         // PERFORMANCE: Suspend Core Data observers during video playback for smooth performance
         NotificationCenter.default.addObserver(
@@ -159,6 +167,54 @@ class SonglistViewModel: ObservableObject {
                 } else {
                     self?.isInPerformanceMode = false
                 }
+            }
+        }
+    }
+    
+    /// Setup scroll optimization observers to reduce operations during active scrolling
+    private func setupScrollOptimizationObservers() {
+        // Listen for active scrolling to reduce CPU usage
+        NotificationCenter.default.addObserver(
+            forName: .init("ActiveScrollingStarted"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("⚡ SCROLL: SongListViewModel reducing operations during active scrolling")
+            Task { @MainActor in
+                // Suspend search operations during active scroll
+                self?.searchDebounceTask?.cancel()
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .init("ActiveScrollingStopped"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("✅ SCROLL: SongListViewModel resuming normal operations after scrolling")
+            // Normal operations resume automatically
+        }
+        
+        // Listen for scroll optimization mode
+        NotificationCenter.default.addObserver(
+            forName: .init("ScrollOptimizationEnabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🚀 SCROLL: SongListViewModel entering scroll optimization mode")
+            Task { @MainActor in
+                self?.setScrollOptimizedSearchDelay()
+            }
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: .init("ScrollOptimizationDisabled"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            print("🔄 SCROLL: SongListViewModel exiting scroll optimization mode")
+            Task { @MainActor in
+                self?.restoreNormalSearchDelay()
             }
         }
     }
@@ -267,10 +323,13 @@ class SonglistViewModel: ObservableObject {
         
         var scoredSongs: [(song: Song, score: Double)] = []
         var suggestionSet: Set<String> = []
-        let maxResults = 100 // Limit results for performance
+        
+        // SCROLL OPTIMIZATION: Reduce results and complexity during scroll optimization
+        let maxResults = currentSearchDelay < normalSearchDelay ? 50 : 100 // Fewer results during scroll
+        let useSimpleSearch = currentSearchDelay < normalSearchDelay // Use simpler search during scroll
         
         // Process songs in chunks to avoid blocking
-        let chunkSize = 100
+        let chunkSize = useSimpleSearch ? 50 : 100 // Smaller chunks during scroll
         let songChunks = allSongs.chunked(into: chunkSize)
         
         for chunk in songChunks {
@@ -298,8 +357,8 @@ class SonglistViewModel: ObservableObject {
                     if title.hasPrefix(word) { score += 25 }
                 }
                 
-                // 4. Only do expensive fuzzy matching if we don't have enough results yet
-                if score < 50 && scoredSongs.count < maxResults && normalizedQuery.count > 2 {
+                // 4. SCROLL OPTIMIZATION: Skip expensive fuzzy matching during scroll optimization
+                if !useSimpleSearch && score < 50 && scoredSongs.count < maxResults && normalizedQuery.count > 2 {
                     score += calculateLimitedFuzzyScore(song: song, query: normalizedQuery)
                 }
                 
@@ -313,17 +372,21 @@ class SonglistViewModel: ObservableObject {
                 }
             }
             
-            // Yield control periodically to avoid blocking
-            await Task.yield()
+            // SCROLL OPTIMIZATION: More frequent yields during scroll optimization
+            let yieldInterval: Int = useSimpleSearch ? 25 : 50
+            if songChunks.firstIndex(of: chunk)?.isMultiple(of: yieldInterval) == true {
+                await Task.yield()
+            }
         }
         
         // Sort by score and limit results
         scoredSongs.sort { $0.score > $1.score }
         let topSongs = Array(scoredSongs.prefix(maxResults))
         
-        let suggestions = Array(suggestionSet.prefix(5)).map { SearchSuggestion(text: $0, type: .completion) }
+        let suggestionLimit = useSimpleSearch ? 3 : 5 // Fewer suggestions during scroll
+        let suggestions = Array(suggestionSet.prefix(suggestionLimit)).map { SearchSuggestion(text: $0, type: .completion) }
         
-        print("🎯 Found \(topSongs.count) matches (limited from \(scoredSongs.count) total)")
+        print("🎯 Found \(topSongs.count) matches (limited from \(scoredSongs.count) total) - search mode: \(useSimpleSearch ? "simple" : "full")")
         
         return (songs: topSongs.map { $0.song }, suggestions: suggestions)
     }
@@ -703,6 +766,25 @@ class SonglistViewModel: ObservableObject {
         
         // Refresh the song list
         await loadSongs()
+    }
+    
+    // MARK: - Scroll Performance Optimization Methods
+    
+    /// Enable scroll-optimized search delay for faster scrolling
+    func setScrollOptimizedSearchDelay() {
+        print("⚡ SEARCH: Enabling scroll-optimized search (reduced debounce)")
+        currentSearchDelay = scrollOptimizedDelay
+    }
+    
+    /// Restore normal search delay
+    func restoreNormalSearchDelay() {
+        print("🔄 SEARCH: Restoring normal search delay")
+        currentSearchDelay = normalSearchDelay
+    }
+    
+    /// Get current search delay for debugging
+    var currentSearchDelayMs: Int {
+        Int(currentSearchDelay)
     }
 }
 

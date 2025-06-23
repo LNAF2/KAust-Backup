@@ -1,0 +1,32 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/TitlePanelView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "REAL",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 32
+        }
+      },
+      {
+        "comment": "",
+        "key": "K",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "ARAOKE",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 47
+        }
+      }
+    ]
+  },
+  "version": 1
+}

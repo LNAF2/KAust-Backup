@@ -1,0 +1,704 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Processing Results",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 1696
+        }
+      },
+      {
+        "comment": "",
+        "key": "Processing Summary",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 1662
+        }
+      },
+      {
+        "comment": "",
+        "key": "Successfully Processed (%lld)",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 1669
+        }
+      },
+      {
+        "comment": "",
+        "key": "Duplicate Files (%lld)",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 1679
+        }
+      },
+      {
+        "comment": "",
+        "key": "Failed Files (%lld)",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 1689
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 1700
+        }
+      },
+      {
+        "comment": "",
+        "key": "Successful",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1716
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 1714
+        }
+      },
+      {
+        "comment": "",
+        "key": "Failed",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1723
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 1721
+        }
+      },
+      {
+        "comment": "",
+        "key": "Duplicates",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1730
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 23,
+          "startingLine": 1728
+        }
+      },
+      {
+        "comment": "",
+        "key": "Total Time",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1737
+        }
+      },
+      {
+        "comment": "",
+        "key": "File already exists in database",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1779
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1784
+        }
+      },
+      {
+        "comment": "",
+        "key": "Duration: %@ • Size: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 1789
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 1966
+        }
+      },
+      {
+        "comment": "",
+        "key": "Warning!",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 1998
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete Songs Played History?",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 2019
+        }
+      },
+      {
+        "comment": "",
+        "key": "⚠️ Factory Reset Warning",
+        "location": {
+          "startingColumn": 13,
+          "startingLine": 2035
+        }
+      },
+      {
+        "comment": "",
+        "key": "SETTINGS",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 1918
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 1976
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 2001
+        }
+      },
+      {
+        "comment": "",
+        "key": "Continue",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 2005
+        }
+      },
+      {
+        "comment": "",
+        "key": "This will delete all songs from the SONG LIST.\n\n• Files copied to app storage will be deleted\n• Files from folder access will be preserved in their original location\n• Only metadata and bookmarks will be removed",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 2013
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 2022
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete All",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 2025
+        }
+      },
+      {
+        "comment": "",
+        "key": "This will permanently delete all songs played history records. This action cannot be undone.",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 2032
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 2038
+        }
+      },
+      {
+        "comment": "",
+        "key": "RESET APP",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 2041
+        }
+      },
+      {
+        "comment": "",
+        "key": "⚠️ THIS WILL COMPLETELY RESET THE APP TO ITS INITIAL STATE\n\n• All songs and playlists will be deleted\n• All media files will be removed\n• All play history will be cleared\n• All app settings will reset\n• You will remain logged in\n\nThis action CANNOT be undone!",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 2048
+        }
+      },
+      {
+        "comment": "",
+        "key": "RESET",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 2065
+        }
+      },
+      {
+        "comment": "",
+        "key": "Settings access is restricted. Use Admin Access to manage all settings.",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 2137
+        }
+      },
+      {
+        "comment": "",
+        "key": "🔒 Kiosk Mode Active",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 2131
+        }
+      },
+      {
+        "comment": "",
+        "key": "Storage",
+        "location": {
+          "startingColumn": 25,
+          "startingLine": 2195
+        }
+      },
+      {
+        "comment": "",
+        "key": "🔐 Current Role: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 2201
+        }
+      },
+      {
+        "comment": "",
+        "key": "🔒 Kiosk Mode: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 2204
+        }
+      },
+      {
+        "comment": "",
+        "key": "🎯 Access Level:",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 2207
+        }
+      },
+      {
+        "comment": "",
+        "key": "  • Airplay: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 2210
+        }
+      },
+      {
+        "comment": "",
+        "key": "  • Admin Settings: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 2213
+        }
+      },
+      {
+        "comment": "",
+        "key": "  • Owner Settings: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 2216
+        }
+      },
+      {
+        "comment": "",
+        "key": "  • Kiosk Mode: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 2219
+        }
+      },
+      {
+        "comment": "",
+        "key": "  • Programmer Mgmt: %@",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 2222
+        }
+      },
+      {
+        "comment": "",
+        "key": "Download Complete!",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 2278
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld successful, %lld failed",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 2285
+        }
+      },
+      {
+        "comment": "",
+        "key": "Processing Cancelled",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 2297
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld processed before cancellation",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 2304
+        }
+      },
+      {
+        "comment": "",
+        "key": "All files processed successfully!",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 2316
+        }
+      },
+      {
+        "comment": "",
+        "key": "Processing was cancelled",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 2317
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show Report",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 2332
+        }
+      },
+      {
+        "comment": "",
+        "key": "Dismiss",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 2358
+        }
+      },
+      {
+        "comment": "",
+        "key": "Connect to Apple TV",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 2390
+        }
+      },
+      {
+        "comment": "",
+        "key": "Stream to AirPlay devices",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 2395
+        }
+      },
+      {
+        "comment": "",
+        "key": "Audio is muted",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 2795
+        }
+      },
+      {
+        "comment": "",
+        "key": "App audio volume control",
+        "location": {
+          "startingColumn": 69,
+          "startingLine": 2795
+        }
+      },
+      {
+        "comment": "",
+        "key": "Master Volume",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 2784
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 2790
+        }
+      },
+      {
+        "comment": "",
+        "key": "Overall Progress",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 2892
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%% Complete",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 2910
+        }
+      },
+      {
+        "comment": "",
+        "key": "~%@ remaining",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 2917
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%% of current batch",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 2934
+        }
+      },
+      {
+        "comment": "",
+        "key": "Pause",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 2958
+        }
+      },
+      {
+        "comment": "",
+        "key": "Resume",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 2965
+        }
+      },
+      {
+        "comment": "",
+        "key": "Restart",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 2974
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 75,
+          "startingLine": 2982
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear",
+        "location": {
+          "startingColumn": 86,
+          "startingLine": 2982
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 3076
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 3247
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 3354
+        }
+      },
+      {
+        "comment": "",
+        "key": "Processing: %@",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 3364
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld/%lld files",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 3371
+        }
+      },
+      {
+        "comment": "",
+        "key": "~%@ left",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 3376
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 3446
+        }
+      },
+      {
+        "comment": "",
+        "key": "Processing MP4 Files",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 3473
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 3496
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld of %lld",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 3500
+        }
+      },
+      {
+        "comment": "",
+        "key": "~%@ left",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 3505
+        }
+      },
+      {
+        "comment": "",
+        "key": "Currently Processing:",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 3516
+        }
+      },
+      {
+        "comment": "",
+        "key": "Batch %lld/%lld",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 3532
+        }
+      },
+      {
+        "comment": "",
+        "key": "⏸ Pause",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 3570
+        }
+      },
+      {
+        "comment": "",
+        "key": "✕ Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 3576
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 3622
+        }
+      },
+      {
+        "comment": "",
+        "key": "Processed %lld files",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 3711
+        }
+      },
+      {
+        "comment": "",
+        "key": "Download Complete!",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 3676
+        }
+      },
+      {
+        "comment": "",
+        "key": "Show Details",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 3717
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 3722
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 3754
+        }
+      }
+    ]
+  },
+  "version": 1
+}

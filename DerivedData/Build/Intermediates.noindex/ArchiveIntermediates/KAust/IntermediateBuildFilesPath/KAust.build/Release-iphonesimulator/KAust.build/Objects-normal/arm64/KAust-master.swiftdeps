@@ -1,0 +1,76 @@
+version: "Apple Swift version 6.1.2 (swiftlang-6.1.2.1.2 clang-1700.0.13.5)"
+options: "6bf0f019849d477d61d2349b09adf729e2bd256a9f1269d653c7ffa4168ea79a"
+build_start_time: [1750644984, 417744000]
+build_end_time: [1750645007, 338329000]
+inputs:
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/FilterGenreMappingEntity+CoreDataClass.swift"
+  : [1750644984, 201248757]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/FilterGenreMappingEntity+CoreDataProperties.swift"
+  : [1750644984, 202334519]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/GenreEntity+CoreDataClass.swift"
+  : [1750644984, 212302344]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/GenreEntity+CoreDataProperties.swift"
+  : [1750644984, 213004811]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/KAustModel+CoreDataModel.swift"
+  : [1750644984, 190339629]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/PlayedSongEntity+CoreDataClass.swift"
+  : [1750644984, 195808318]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/PlayedSongEntity+CoreDataProperties.swift"
+  : [1750644984, 196962832]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/PlaylistEntity+CoreDataClass.swift"
+  : [1750644984, 205014759]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/PlaylistEntity+CoreDataProperties.swift"
+  : [1750644984, 206938490]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/SongEntity+CoreDataClass.swift"
+  : [1750644984, 216627270]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/SongEntity+CoreDataProperties.swift"
+  : [1750644984, 218866463]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/UserEntity+CoreDataClass.swift"
+  : [1750644984, 208289214]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/UserEntity+CoreDataProperties.swift"
+  : [1750644984, 211035621]
+  ? "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/GeneratedAssetSymbols.swift"
+  : [1750644983, 496789936]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/ContentView.swift": [1750639451, 310290105]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Data/PersistenceController.swift": [1750384533, 482055217]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Models/AppSong.swift": [1750246044, 351253042]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Models/Song.swift": [1749889384, 910589641]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Models/User.swift": [1750390998, 381866407]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/AuthenticationService.swift": [1750476932, 457568761]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/AuthenticationServiceProtocol.swift": [1750338180, 263337565]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/DataProviderService.swift": [1750384496, 672196039]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/DataProviderServiceProtocol.swift": [1750384441, 831918897]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/KioskModeService.swift": [1750477085, 477385283]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/MediaMetadataService.swift": [1750391761, 736101652]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/UserPreferencesServiceProtocol.swift": [1750386805, 686492335]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/ViewModels/SettingsViewModel.swift": [1750592725, 480284591]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/Authentication/PINEntryView.swift": [1750338125, 192747933]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/PlayList/ViewModels/PlaylistViewModel.swift": [1749895066, 66456224]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/PlayList/Views/PlaylistEmptyState.swift": [1750224660, 240147115]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/PlayList/Views/PlaylistItemView.swift": [1749957303, 872915136]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/PlayList/Views/PlaylistView.swift": [1750427416, 868860590]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/Settings/KioskModeSettingsView.swift": [1750391065, 857078549]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/SongList/ViewModels/SonglistViewModel.swift": [1750209179, 53000063]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/SongList/Views/SonglistEmptyState.swift": [1750304556, 94232640]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/SongList/Views/SonglistItemView.swift": [1750114266, 818787867]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/SongList/Views/SonglistView.swift": [1750308626, 48502297]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoDragGestureView.swift": [1750638679, 487752355]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoPlayerContainerView.swift": [1750644894, 438712113]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoPlayerOverlayView.swift": [1749732850, 83395421]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoPlayerViewModel.swift": [1750641695, 216169253]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoProgressBarView.swift": [1750636951, 160090171]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/KAustApp.swift": [1750391011, 589657400]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Shared/Constants.swift": [1750302592, 985720959]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Shared/Theme.swift": [1750226061, 620813323]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/ControlsPanelView.swift": [1749992894, 123775405]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/CustomButton.swift": [1749176675, 902978900]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/CustomTestField.swift": [1749176675, 890248520]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/DoneButton.swift": [1749181985, 751333661]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/DownloadProgressWindow.swift": [1750323553, 103679091]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/EmptyPanelView.swift": [1750247449, 382124651]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/PanelView.swift": [1749176675, 909393965]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SettingsAccessPanelView.swift": [1749992903, 685501691]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SettingsView.swift": [1750598991, 618487008]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SongsPlayedTableView.swift": [1750555347, 511298575]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SongsPlayedTableViewModel.swift": [1750555347, 511390033]
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/TitlePanelView.swift": [1750247241, 277556483]

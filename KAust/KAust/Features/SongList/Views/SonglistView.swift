@@ -17,6 +17,12 @@ struct SongListView: View {
     @State private var songToDelete: Song?
     @State private var showDeleteConfirmation = false
     @State private var isLoading = false
+    
+    // MARK: - Scroll Performance State
+    @State private var isScrolling = false
+    @State private var scrollPosition: CGFloat = 0
+    @State private var lastScrollTime = Date()
+    
     private let cornerRadius: CGFloat = 8
     private let panelGap: CGFloat = 8
 
@@ -41,7 +47,7 @@ struct SongListView: View {
                             if viewModel.showingSuggestions {
                                 searchSuggestionsView
                             }
-                            songListView
+                            optimizedSongListView
                         }
                     }
                     .padding(.horizontal, panelGap)
@@ -96,6 +102,9 @@ struct SongListView: View {
                 print("  - Swipe to delete enabled: \(swipeToDeleteEnabled)")
                 print("  - Number of songs: \(viewModel.displaySongs.count)")
                 
+                // Enable scroll performance mode
+                enableScrollPerformanceMode()
+                
                 // Use only native SwiftUI focus - no competing FocusManager
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                     isSearchFocused = true
@@ -104,6 +113,9 @@ struct SongListView: View {
             .onDisappear {
                 // Simple focus dismissal - no competing systems
                 isSearchFocused = false
+                
+                // Disable scroll performance mode
+                disableScrollPerformanceMode()
             }
     }
 
@@ -234,7 +246,9 @@ struct SongListView: View {
         .padding(.bottom, 8)
     }
     
-    private var songListView: some View {
+    // MARK: - OPTIMIZED SCROLL VIEW FOR MAXIMUM PERFORMANCE
+    
+    private var optimizedSongListView: some View {
         Group {
             if viewModel.displaySongs.isEmpty && viewModel.searchText.isEmpty {
                 // No songs at all - show empty state
@@ -264,60 +278,122 @@ struct SongListView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color.clear)
             } else {
-                // Use List with native swipe actions to maintain scrolling functionality
-                List(viewModel.displaySongs) { song in
-                    songListItemRow(for: song)
-                        .listRowInsets(EdgeInsets())
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                        .if(swipeToDeleteEnabled) { view in
-                            view.swipeActions(edge: .trailing) {
-                                Button("Delete", role: .destructive) {
-                                    print("\n🔴 DEBUG: Native swipe delete action triggered")
-                                    print("  - Song: '\(song.cleanTitle)' by '\(song.cleanArtist)'")
-                                    songToDelete = song
-                                    showDeleteConfirmation = true
-                                }
+                // OPTIMIZED SCROLL VIEW - Maximum performance - FIXED: Now in correct branch with songs
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: true) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(viewModel.displaySongs) { song in
+                                optimizedSongRow(for: song)
+                                    .id(song.id)
                             }
                         }
+                        .background(
+                            GeometryReader { geometry in
+                                Color.clear
+                                    .onAppear {
+                                        scrollPosition = geometry.frame(in: .global).minY
+                                    }
+                                    .onChange(of: geometry.frame(in: .global).minY) { _, newValue in
+                                        // ULTRA-FAST scroll tracking
+                                        let now = Date()
+                                        if now.timeIntervalSince(lastScrollTime) > 0.016 { // 60 FPS throttle
+                                            scrollPosition = newValue
+                                            lastScrollTime = now
+                                            
+                                            // Enter/exit scroll performance mode based on movement
+                                            let scrollSpeed = abs(newValue - scrollPosition)
+                                            if scrollSpeed > 10 && !isScrolling {
+                                                startScrollOptimization()
+                                            } else if scrollSpeed < 1 && isScrolling {
+                                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                                    if !isScrolling { return }
+                                                    stopScrollOptimization()
+                                                }
+                                            }
+                                        }
+                                    }
+                            }
+                        )
+                    }
+                    .scrollDisabled(false)
+                    .scrollContentBackground(.hidden)
+                    .background(Color.clear)
                 }
-                .listStyle(.plain)
-                .background(Color.clear)
-                .scrollContentBackground(.hidden)
             }
         }
     }
     
-    // MARK: - Song List Item Row
+    // MARK: - OPTIMIZED SONG ROW - Minimal overhead
     
     @ViewBuilder
-    private func songListItemRow(for song: Song) -> some View {
+    private func optimizedSongRow(for song: Song) -> some View {
         SongListItemView(
             song: song, 
             isInPlaylist: playlistViewModel.playlistItems.contains { $0.id == song.id },
             isCurrentlyPlaying: videoPlayerViewModel.currentVideo?.id == song.id
         )
         .contentShape(Rectangle())
+        .background(Color.clear) // Explicit clear background for performance
         .onTapGesture {
-            print("👆 DEBUG: Song item tapped")
-            print("  - Song: '\(song.cleanTitle)'")
-            print("  - Is in playlist: \(playlistViewModel.playlistItems.contains { $0.id == song.id })")
-            print("  - Is currently playing: \(videoPlayerViewModel.currentVideo?.id == song.id)")
-            
+            // INSTANT feedback - no print statements during scroll
             if isInPlaylist(song) {
-                if videoPlayerViewModel.currentVideo?.id == song.id {
-                    print("  - Song is currently playing, providing haptic feedback")
-                } else {
-                    print("  - Song already in playlist, providing haptic feedback")
-                }
                 let impactFeedback = UIImpactFeedbackGenerator(style: .light)
                 impactFeedback.impactOccurred()
             } else {
-                print("  - Adding to playlist")
                 playlistViewModel.addToPlaylist(song)
                 viewModel.showingSuggestions = false
             }
         }
+        .if(swipeToDeleteEnabled) { view in
+            view.swipeActions(edge: .trailing) {
+                Button("Delete", role: .destructive) {
+                    songToDelete = song
+                    showDeleteConfirmation = true
+                }
+            }
+        }
+    }
+    
+    // MARK: - SCROLL PERFORMANCE OPTIMIZATION
+    
+    private func enableScrollPerformanceMode() {
+        print("🚀 SCROLL: Enabling scroll performance mode")
+        
+        // Reduce search debounce for responsive search during scroll
+        viewModel.setScrollOptimizedSearchDelay()
+        
+        // Notify other systems to reduce CPU usage
+        NotificationCenter.default.post(name: .init("ScrollOptimizationEnabled"), object: nil)
+    }
+    
+    private func disableScrollPerformanceMode() {
+        print("🔄 SCROLL: Disabling scroll performance mode")
+        
+        // Restore normal search debounce
+        viewModel.restoreNormalSearchDelay()
+        
+        // Notify other systems to restore normal operation
+        NotificationCenter.default.post(name: .init("ScrollOptimizationDisabled"), object: nil)
+    }
+    
+    private func startScrollOptimization() {
+        guard !isScrolling else { return }
+        
+        print("⚡ SCROLL: Starting scroll optimization")
+        isScrolling = true
+        
+        // Suspend non-essential operations during active scrolling
+        NotificationCenter.default.post(name: .init("ActiveScrollingStarted"), object: nil)
+    }
+    
+    private func stopScrollOptimization() {
+        guard isScrolling else { return }
+        
+        print("✅ SCROLL: Stopping scroll optimization")
+        isScrolling = false
+        
+        // Restore normal operations
+        NotificationCenter.default.post(name: .init("ActiveScrollingStopped"), object: nil)
     }
     
     // MARK: - Helper Functions

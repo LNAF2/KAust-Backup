@@ -1,0 +1,128 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/Settings/KioskModeSettingsView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 260
+        }
+      },
+      {
+        "comment": "",
+        "key": "Kiosk Mode Active",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 43
+        }
+      },
+      {
+        "comment": "",
+        "key": "Limited settings access",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 47
+        }
+      },
+      {
+        "comment": "",
+        "key": "ACTIVE",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 59
+        }
+      },
+      {
+        "comment": "",
+        "key": "Admin Access",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 79
+        }
+      },
+      {
+        "comment": "",
+        "key": "Kiosk Mode",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 119
+        }
+      },
+      {
+        "comment": "",
+        "key": "Set Up Kiosk Mode PIN",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 148
+        }
+      },
+      {
+        "comment": "",
+        "key": "Required to enable Kiosk Mode",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 152
+        }
+      },
+      {
+        "comment": "",
+        "key": "",
+        "location": {
+          "startingColumn": 32,
+          "startingLine": 188
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enable Kiosk Mode",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 177
+        }
+      },
+      {
+        "comment": "",
+        "key": "Restrict settings access",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 181
+        }
+      },
+      {
+        "comment": "",
+        "key": "Change PIN",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 215
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 261
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 359
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 360
+        }
+      }
+    ]
+  },
+  "version": 1
+}

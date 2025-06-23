@@ -1,0 +1,32 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoPlayerContainerView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "%@ / %@",
+        "location": {
+          "startingColumn": 38,
+          "startingLine": 140
+        }
+      },
+      {
+        "comment": "",
+        "key": "%@ / %@",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 311
+        }
+      },
+      {
+        "comment": "",
+        "key": "Streaming to AirPlay",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 410
+        }
+      }
+    ]
+  },
+  "version": 1
+}

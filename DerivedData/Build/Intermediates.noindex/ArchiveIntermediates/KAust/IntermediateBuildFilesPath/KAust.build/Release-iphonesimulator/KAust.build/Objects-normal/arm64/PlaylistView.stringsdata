@@ -1,0 +1,88 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/PlayList/Views/PlaylistView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 39
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 40
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld Songs",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 515
+        }
+      },
+      {
+        "comment": "",
+        "key": "PLAY LIST",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 454
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap ↑ to center video if off-screen",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 475
+        }
+      },
+      {
+        "comment": "",
+        "key": "Selection disabled while video playing",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 479
+        }
+      },
+      {
+        "comment": "",
+        "key": "Song selection disabled in edit mode",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 485
+        }
+      },
+      {
+        "comment": "",
+        "key": "Tap ⊖ to delete • Swipe left for quick delete",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 488
+        }
+      },
+      {
+        "comment": "",
+        "key": "DONE",
+        "location": {
+          "startingColumn": 34,
+          "startingLine": 504
+        }
+      },
+      {
+        "comment": "",
+        "key": "EDIT",
+        "location": {
+          "startingColumn": 43,
+          "startingLine": 504
+        }
+      }
+    ]
+  },
+  "version": 1
+}

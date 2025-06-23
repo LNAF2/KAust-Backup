@@ -1,0 +1,81 @@
+{
+  "buildCommand" : {
+    "command" : "build",
+    "skipDependencies" : false,
+    "style" : "buildOnly"
+  },
+  "configuredTargets" : [
+    {
+      "guid" : "50f0af795360fa63359671c14e19746282aeff87f55fdecb28587e08c15b5254"
+    }
+  ],
+  "containerPath" : "/Users/erlingbreaden/Desktop/KAust/KAust/KAust.xcodeproj",
+  "continueBuildingAfterErrors" : false,
+  "dependencyScope" : "workspace",
+  "enableIndexBuildArena" : false,
+  "hideShellScriptEnvironment" : false,
+  "parameters" : {
+    "action" : "install",
+    "activeArchitecture" : "arm64",
+    "activeRunDestination" : {
+      "disableOnlyActiveArch" : false,
+      "platform" : "iphonesimulator",
+      "sdk" : "iphonesimulator18.5",
+      "sdkVariant" : "iphonesimulator",
+      "supportedArchitectures" : [
+        "arm64",
+        "x86_64"
+      ],
+      "targetArchitecture" : "arm64"
+    },
+    "arenaInfo" : {
+      "buildIntermediatesPath" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex",
+      "buildProductsPath" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Products",
+      "derivedDataPath" : "/Users/erlingbreaden/Desktop/KAust/DerivedData",
+      "indexDataStoreFolderPath" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Index.noindex/DataStore",
+      "indexEnableDataStore" : true,
+      "indexPCHPath" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Index.noindex/PrecompiledHeaders",
+      "pchPath" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/PrecompiledHeaders"
+    },
+    "configurationName" : "Release",
+    "overrides" : {
+      "commandLine" : {
+        "table" : {
+
+        }
+      },
+      "synthesized" : {
+        "table" : {
+          "ACTION" : "install",
+          "ASSET_PACK_FOLDER_PATH" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/InstallationBuildProductsLocation/OnDemandResources",
+          "ASSETCATALOG_COMPILER_FLATTENED_APP_ICON_PATH" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/BuildProductsPath/ProductIcon.png",
+          "COLOR_DIAGNOSTICS" : "YES",
+          "DEPLOYMENT_LOCATION" : "YES",
+          "DEPLOYMENT_POSTPROCESSING" : "YES",
+          "diagnostic_message_length" : "108",
+          "DSTROOT" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/InstallationBuildProductsLocation",
+          "EMBED_ASSET_PACKS_IN_PRODUCT_BUNDLE" : "NO",
+          "ENABLE_PREVIEWS" : "NO",
+          "ENABLE_SIGNATURE_AGGREGATION" : "YES",
+          "ENABLE_XOJIT_PREVIEWS" : "YES",
+          "INDEX_ENABLE_DATA_STORE" : "NO",
+          "MESSAGES_APPLICATION_EXTENSION_SUPPORT_FOLDER_PATH" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/BuildProductsPath/MessagesApplicationExtensionSupport",
+          "MESSAGES_APPLICATION_SUPPORT_FOLDER_PATH" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/BuildProductsPath/MessagesApplicationSupport",
+          "OBJROOT" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath",
+          "ONLY_ACTIVE_ARCH" : "YES",
+          "SHARED_PRECOMPS_DIR" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/PrecompiledHeaders",
+          "SIGNATURE_METADATA_FOLDER_PATH" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/BuildProductsPath/Signatures",
+          "SWIFT_STDLIB_TOOL_UNSIGNED_DESTINATION_DIR" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/BuildProductsPath/SwiftSupport",
+          "SYMROOT" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/BuildProductsPath",
+          "WATCHKIT_2_SUPPORT_FOLDER_PATH" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/BuildProductsPath/WatchKitSupport2"
+        }
+      }
+    }
+  },
+  "schemeCommand" : "archive",
+  "showNonLoggedProgress" : true,
+  "useDryRun" : false,
+  "useImplicitDependencies" : true,
+  "useLegacyBuildLocations" : false,
+  "useParallelTargets" : true
+}

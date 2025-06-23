@@ -415,6 +415,7 @@ struct ContentView: View {
             let columnWidth = (totalWidth - totalPadding) / 2
             
             ZStack {
+                // BACKGROUND UI - Always visible
                 HStack(spacing: centerGap) {
                     leftColumn(totalHeight: totalHeight, columnWidth: columnWidth)
                     rightColumn(totalHeight: totalHeight, columnWidth: columnWidth)
@@ -424,10 +425,17 @@ struct ContentView: View {
                 .allowsHitTesting(!showingDownloadProgressWindow)  // Block ALL touches during download
                 .opacity(showingDownloadProgressWindow ? 0.3 : 1.0)  // Gray out during download
                 
-                if videoPlayerViewModel.currentVideo != nil {
-                    CustomVideoPlayerView(viewModel: videoPlayerViewModel)
+                // DRAGGABLE VIDEO OVERLAY - Only when minimized, positioned over UI
+                if videoPlayerViewModel.currentVideo != nil && videoPlayerViewModel.isMinimized {
+                    VideoPlayerContainerView(viewModel: videoPlayerViewModel)
+                        .allowsHitTesting(!showingDownloadProgressWindow)  // Block video player touches during download
+                }
+                
+                // FULLSCREEN VIDEO - Only when maximized, covers everything
+                if videoPlayerViewModel.currentVideo != nil && !videoPlayerViewModel.isMinimized {
+                    VideoPlayerContainerView(viewModel: videoPlayerViewModel)
                         .ignoresSafeArea()
-                        .allowsHitTesting(!showingDownloadProgressWindow)  // Block video player touches too
+                        .allowsHitTesting(!showingDownloadProgressWindow)  // Block video player touches during download
                 }
             }
             .background(AppTheme.appBackground.ignoresSafeArea())
@@ -569,6 +577,11 @@ struct ContentView: View {
                     playlistViewModel.playSong(song)
                 }
             )
+            .onTapGesture {
+                // Center video when playlist area is tapped
+                NotificationCenter.default.post(name: .centerVideoPlayer, object: nil)
+                print("🎯 Playlist tapped - centering video")
+            }
             .frame(maxHeight: CGFloat.infinity)
             .clipShape(RoundedRectangle(cornerRadius: 8))
             .overlay(
@@ -593,327 +606,4 @@ struct ContentView_Previews: PreviewProvider {
     }
 }
 
-// MARK: - Custom Video Player View
-struct CustomVideoPlayerView: View {
-    @ObservedObject var viewModel: VideoPlayerViewModel
-    @GestureState private var dragOffset = CGSize.zero
-    @State private var basePosition = CGSize.zero
-    
-    // Constants following app patterns
-    private let cornerRadius: CGFloat = AppConstants.Layout.panelCornerRadius
-    private let minWidth: CGFloat = 640  // Doubled from 320
-    private let maxWidth: CGFloat = 960  // Doubled from 480
-    private let aspectRatio: CGFloat = 16.0 / 9.0
-    
-    var body: some View {
-        if viewModel.currentVideo != nil {
-            GeometryReader { geometry in
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        
-                        // SINGLE video player container - NO DUPLICATES
-                        videoPlayerContainer(geometry)
-                            .frame(
-                                width: viewModel.isMinimized ? calculateMinimizedWidth(geometry) : geometry.size.width,
-                                height: viewModel.isMinimized ? calculateMinimizedHeight(geometry) : geometry.size.height
-                            )
-                            .cornerRadius(viewModel.isMinimized ? cornerRadius : 0)
-                            .offset(viewModel.isMinimized ? CGSize(width: basePosition.width + dragOffset.width, height: basePosition.height + dragOffset.height) : .zero)
-                            .gesture(
-                                viewModel.isMinimized ? dragGesture(in: geometry) : nil
-                            )
-                            
-                        
-                        Spacer()
-                    }
-                    Spacer()
-                }
-                .background(viewModel.isMinimized ? Color.clear : Color.black)
-            }
-            .onAppear {
-                // Initialize local position from viewModel
-                basePosition = viewModel.overlayOffset
-            }
-            .onChange(of: viewModel.overlayOffset) { _, newOffset in
-                // Always sync local position with viewModel (especially when centering)
-                basePosition = newOffset
-                print("🔄 Synced basePosition to: \(newOffset)")
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func videoPlayerContainer(_ geometry: GeometryProxy) -> some View {
-        ZStack {
-            // ONLY ONE VideoPlayer instance - immediate load
-            if let player = viewModel.player {
-                VideoPlayer(player: player)
-                    .disabled(!viewModel.isAirPlayActive) // Enable during AirPlay, disabled otherwise
-                    .background(Color.black) // Ensure consistent background
-            }
-            
-            // Only add our gesture overlay when NOT in AirPlay mode
-            if !viewModel.isAirPlayActive {
-                Rectangle()
-                    .fill(Color.clear)
-                    .contentShape(Rectangle())
-                    .onTapGesture(count: 1) {
-                        if dragOffset == .zero {
-                            print("👆 SINGLE TAP detected - showing controls")
-                            // Show controls appropriately based on play state
-                            if viewModel.isPlaying {
-                                viewModel.showControls() // Will fade if playing
-                            } else {
-                                viewModel.showControlsWithoutFade() // Won't fade if paused
-                            }
-                        }
-                    }
 
-            }
-            
-
-            // Custom controls overlay - ALWAYS in the same container
-            // Hide custom controls when AirPlay is active, let native controls take over
-            // CRITICAL: Always show controls during scrubbing, even if they would normally be hidden
-            if (viewModel.areControlsVisible || viewModel.isScrubbing) && !viewModel.isAirPlayActive {
-                customControlsOverlay()
-                    .allowsHitTesting(true) // CRITICAL: Always allow interaction
-                    .opacity(1.0) // Always full opacity when shown
-            }
-            
-            // Show AirPlay indicator when streaming
-            if viewModel.isAirPlayActive {
-                airPlayIndicator()
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func customControlsOverlay() -> some View {
-        VStack {
-            Spacer()
-            
-            // Conditional ordering: Big screen (fullscreen) = slider first, Small screen (minimized) = controls first
-            if viewModel.isMinimized {
-                // Small screen: Main controls first, then slider
-                mainControlRow()
-                progressBarRow()
-            } else {
-                // Big screen: Slider first, then main controls
-                progressBarRow()
-                mainControlRow()
-            }
-        }
-        .padding(.horizontal, 20)
-        .padding(.top, 20)
-        .padding(.bottom, viewModel.isMinimized ? 0 : 70) // Flush bottom for small screen, 50 points up for big screen
-        .background(Color.black.opacity(0.1))
-        .allowsHitTesting(true) // CRITICAL: Ensure controls are always tappable
-    }
-    
-    @ViewBuilder
-    private func mainControlRow() -> some View {
-        // Main control row: time, play controls, action buttons
-        HStack {
-            // Combined time display on left
-            Text("\(viewModel.formattedCurrentTime) / \(viewModel.formattedTimeRemaining.replacingOccurrences(of: "-", with: ""))")
-                .font(.system(.body, design: .monospaced))
-                .foregroundColor(.white)
-            
-            Spacer()
-            
-            // Center play controls with consistent spacing
-            HStack(spacing: 30) {
-                Button(action: { 
-                    Task { await viewModel.skipBackward() }
-                }) {
-                    Image(systemName: "gobackward.10")
-                        .foregroundColor(.white)
-                        .font(.title2)
-                }
-                .buttonStyle(VideoControlButtonStyle())
-                
-                Button(action: { 
-                    viewModel.togglePlayPause()
-                }) {
-                    Image(systemName: viewModel.isPlaying ? "pause.fill" : "play.fill")
-                        .foregroundColor(.white)
-                        .font(.title)
-                }
-                .buttonStyle(VideoControlButtonStyle())
-                
-                Button(action: { 
-                    Task { await viewModel.skipForward() }
-                }) {
-                    Image(systemName: "goforward.10")
-                        .foregroundColor(.white)
-                        .font(.title2)
-                }
-                .buttonStyle(VideoControlButtonStyle())
-            }
-            
-            Spacer()
-            
-            // Right-aligned action buttons with same spacing as play controls
-            HStack(spacing: 30) {
-                Button(action: { 
-                    viewModel.deleteSong()
-                }) {
-                    Image(systemName: "trash")
-                        .foregroundColor(.white)
-                        .font(.title2)
-                }
-                .buttonStyle(VideoControlButtonStyle())
-                
-                Button(action: { 
-                    viewModel.playNextSong()
-                }) {
-                    Image(systemName: "forward.end.fill")
-                        .foregroundColor(.white)
-                        .font(.title2)
-                }
-                .buttonStyle(VideoControlButtonStyle())
-                
-                Button(action: { 
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                    impactFeedback.impactOccurred()
-                    viewModel.toggleSize()
-                }) {
-                    Image(systemName: "arrow.up.left.and.arrow.down.right")
-                        .foregroundColor(.white)
-                        .font(.title2)
-                }
-                .buttonStyle(VideoControlButtonStyle())
-            }
-        }
-    }
-    
-    @ViewBuilder
-    private func progressBarRow() -> some View {
-        // Progress bar with conditional positioning
-        HStack(spacing: 10) {
-            Slider(
-                value: Binding(
-                    get: { 
-                        // Use scrub position during dragging for immediate visual feedback
-                        // Otherwise use current time for normal playback tracking
-                        viewModel.isScrubbing ? viewModel.scrubPosition : viewModel.currentTime 
-                    },
-                    set: { newValue in
-                        // CRITICAL: Use fast synchronous seeking for immediate response
-                        // This eliminates any async overhead that causes lag
-                        viewModel.fastSliderSeek(to: newValue)
-                    }
-                ), 
-                in: 0...max(viewModel.duration, 1),
-                onEditingChanged: { isEditing in
-                    // Handle drag start/end for proper state management
-                    if !isEditing {
-                        // Only handle drag end - start is handled by fastSliderSeek
-                        Task {
-                            await viewModel.stopSliderDrag()
-                        }
-                    }
-                }
-            )
-            .accentColor(.white)
-            .allowsHitTesting(true) // CRITICAL: Always allow interaction
-        }
-    }
-    
-    @ViewBuilder
-    private func airPlayIndicator() -> some View {
-        VStack {
-            Spacer()
-            
-            HStack(spacing: 12) {
-                Image(systemName: "airplayvideo")
-                    .foregroundColor(.white)
-                    .font(.title2)
-                
-                Text("Streaming to AirPlay")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                // Delete button in AirPlay mode
-                Button(action: { 
-                    viewModel.deleteSong()
-                }) {
-                    Image(systemName: "trash")
-                        .foregroundColor(.white)
-                        .font(.title2)
-                }
-                
-                // Next button in AirPlay mode
-                Button(action: { 
-                    viewModel.playNextSong()
-                }) {
-                    Image(systemName: "forward.end.fill")
-                        .foregroundColor(.white)
-                        .font(.title2)
-                }
-            }
-            .padding(20)
-            .background(Color.black.opacity(0.7))
-            .cornerRadius(12)
-            .padding(.bottom, 40)
-            .padding(.horizontal, 20)
-        }
-    }
-    
-    // ZERO @Published access during drag - pure smooth performance
-    private func dragGesture(in geometry: GeometryProxy) -> some Gesture {
-        DragGesture()
-            .updating($dragOffset) { value, state, _ in
-                // Pure local state - zero @Published property access
-                state = value.translation
-            }
-            .onChanged { _ in
-                // Only allow video dragging if slider is not being used
-                guard !viewModel.isSliderDragging else { return }
-                
-                // CRITICAL FIX: Synchronous drag start for immediate response
-                // Remove async Task that was causing drag hesitation
-                viewModel.startDragging()
-            }
-            .onEnded { value in
-                // Only process video drag end if slider is not being used
-                guard !viewModel.isSliderDragging else { return }
-                
-                // CRITICAL FIX: Synchronous drag end for immediate response
-                // Remove async Task that was causing delay
-                viewModel.stopDragging()
-                
-                // Commit final position - update both local and viewModel
-                basePosition = CGSize(
-                    width: basePosition.width + value.translation.width,
-                    height: basePosition.height + value.translation.height
-                )
-                viewModel.overlayOffset = basePosition
-            }
-    }
-    
-    // Helper methods
-    private func calculateMinimizedWidth(_ geometry: GeometryProxy) -> CGFloat {
-        let preferredWidth = geometry.size.width * 0.5  // Doubled from 0.25 to 0.5
-        return max(minWidth, min(maxWidth, preferredWidth))
-    }
-    
-    private func calculateMinimizedHeight(_ geometry: GeometryProxy) -> CGFloat {
-        return calculateMinimizedWidth(geometry) / aspectRatio
-    }
-}
-
-// MARK: - Custom button style to prevent gesture interference
-struct VideoControlButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
-            .opacity(configuration.isPressed ? 0.8 : 1.0)
-            .allowsHitTesting(true)
-    }
-}

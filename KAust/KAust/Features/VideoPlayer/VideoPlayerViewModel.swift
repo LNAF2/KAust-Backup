@@ -11,6 +11,7 @@ extension Notification.Name {
     static let playbackFailed = Notification.Name("playbackFailed")
     static let requestFolderPicker = Notification.Name("requestFolderPicker")
     static let playNextSongFromPlaylist = Notification.Name("playNextSongFromPlaylist")
+    static let centerVideoPlayer = Notification.Name("centerVideoPlayer")
 }
 
 @MainActor
@@ -26,7 +27,8 @@ final class VideoPlayerViewModel: ObservableObject {
     @Published var duration: Double = 0
     @Published var formattedCurrentTime: String = "00:00"
     @Published var formattedDuration: String = "00:00"
-    @Published var formattedTimeRemaining: String = "-00:00"
+    @Published var formattedTimeRemaining: String = "00:00"
+    @Published var formattedScrubTime: String = "00:00" // Single time display during scrubbing
     
     // MARK: - Scrub Bar State for Visual Feedback
     @Published var scrubPosition: Double = 0 // Visual position during scrubbing
@@ -143,10 +145,8 @@ final class VideoPlayerViewModel: ObservableObject {
         sliderWatchdogTimer?.invalidate()
         sliderWatchdogTimer = nil
         
-        // Exit ultra-performance mode if we entered it (defensive check)
-        if isInPerformanceMode {
-            await exitUltraPerformanceMode()
-        }
+        // CRITICAL: Use sync ultra-performance mode exit for immediate response
+        exitUltraPerformanceModeSync()
         
         // CRITICAL: Restore appropriate control behavior after scrubbing
         if isPlaying {
@@ -237,12 +237,14 @@ final class VideoPlayerViewModel: ObservableObject {
             }
         }
         
-        // Lightweight performance mode entry - no async overhead
+        // CRITICAL: Use sync ultra-performance mode entry for maximum responsiveness
         if !isSliderDragging {
             isSliderDragging = true
             isScrubbing = true
             cancelControlsFadeTimer()
             areControlsVisible = true
+            // IMMEDIATE sync performance mode - no async overhead
+            enterUltraPerformanceModeSync()
         }
         
         // Reset exit timer
@@ -274,8 +276,9 @@ final class VideoPlayerViewModel: ObservableObject {
         
         // Return to normal performance mode (restore minimal observers)
         if isInPerformanceMode {
-            // Stay in normal performance mode but restore essential functions
+            // Stay in normal performance mode but restore essential functions (time observer)
             print("🔄 ULTRA-PERFORMANCE: Returning to normal performance mode")
+            await restoreTimeObserver()  // Restore time observer for UI updates
         } else {
             // Exit all performance modes
             await restoreTimeObserver()
@@ -304,8 +307,8 @@ final class VideoPlayerViewModel: ObservableObject {
         // 1. Suspend all Core Data observers globally
         await suspendCoreDataObservers()
         
-        // 2. Suspend time observer completely during performance mode
-        await suspendTimeObserver()
+        // 2. Keep time observer running during normal performance mode (suspend only during ultra-performance)
+        // Time updates are essential for UI display
         
         // 3. Notify UI components to reduce unnecessary updates
         NotificationCenter.default.post(name: .init("VideoPerformanceModeEnabled"), object: nil)
@@ -329,8 +332,7 @@ final class VideoPlayerViewModel: ObservableObject {
         print("🔄 PERFORMANCE: Exiting high-performance mode")
         isInPerformanceMode = false
         
-        // 1. Restore time observer first
-        await restoreTimeObserver()
+        // 1. Time observer was kept running during normal performance mode (no need to restore)
         
         // 2. Restore Core Data observers
         await restoreCoreDataObservers()
@@ -994,7 +996,9 @@ final class VideoPlayerViewModel: ObservableObject {
     }
     
     func centerVideo() {
-        overlayOffset = .zero
+        withAnimation(.easeInOut(duration: 0.3)) {
+            overlayOffset = .zero
+        }
         // Show controls appropriately based on play state
         if isPlaying {
             showControls() // Will fade if playing
@@ -1090,8 +1094,8 @@ final class VideoPlayerViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self = self, let item = self.playerItem else { return }
                 
-                // Skip frequent updates during performance mode
-                guard !self.isInPerformanceMode else { return }
+                // Suspend time observer during drag operations for smooth performance
+                guard !self.isDragging && !self.isSliderDragging else { return }
                 
                 // This is more reliable than observing the status
                 if item.duration.isValid && !item.duration.isIndefinite {
@@ -1128,6 +1132,9 @@ final class VideoPlayerViewModel: ObservableObject {
             Task { @MainActor [weak self] in
                 guard let self = self, let item = self.playerItem else { return }
                 
+                // Suspend time observer during drag operations for smooth performance
+                guard !self.isDragging && !self.isSliderDragging else { return }
+                
                 // Only update essential properties during performance mode
                 if item.duration.isValid && !item.duration.isIndefinite {
                     self.duration = item.duration.seconds
@@ -1139,10 +1146,8 @@ final class VideoPlayerViewModel: ObservableObject {
                     self.scrubPosition = time.seconds
                 }
                 
-                // Throttled time display updates during performance mode
-                if !self.isInPerformanceMode || Int(time.seconds) % 2 == 0 {
-                    self.updateTimeDisplay()
-                }
+                // Always update time display during normal performance mode
+                self.updateTimeDisplay()
             }
         }
         
@@ -1194,11 +1199,14 @@ final class VideoPlayerViewModel: ObservableObject {
     
     private func updateTimeDisplay() {
         formattedCurrentTime = formatTime(currentTime)
+        
+        // Calculate time remaining (decreasing)
+        let remainingTime = max(0, duration - currentTime)
+        formattedTimeRemaining = formatTime(remainingTime)
         formattedDuration = formatTime(duration)
         
-        // Calculate time remaining
-        let remainingTime = max(0, duration - currentTime)
-        formattedTimeRemaining = "-" + formatTime(remainingTime)
+        // Update scrub time for during drag operations
+        formattedScrubTime = formatTime(isScrubbing ? scrubPosition : currentTime)
     }
     
     private func formatTime(_ time: Double) -> String {
@@ -1481,17 +1489,22 @@ final class VideoPlayerViewModel: ObservableObject {
         setupAirPlayMonitoring()
         showControls()
         
-        // 8. CRITICAL: Enter performance mode AFTER everything is set up and playing smoothly
-        // This prevents the jerky startup by allowing normal initialization first
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+        // 8. Setup center video observer
+        NotificationCenter.default.addObserver(
+            forName: .centerVideoPlayer,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
             Task { @MainActor [weak self] in
-                guard let self = self else { return }
-                print("🚀 DELAYED PERFORMANCE: Entering performance mode after smooth startup")
-                await self.enterPerformanceMode()
+                self?.centerVideo()
             }
         }
         
-        // 9. PERFORMANCE: Defer song play recording until after performance mode ends
+        // 9. IMMEDIATE PERFORMANCE: Enter performance mode immediately for butter-smooth playback
+        print("🚀 IMMEDIATE PERFORMANCE: Entering performance mode right away")
+        await enterPerformanceMode()
+        
+        // 10. PERFORMANCE: Defer song play recording until after performance mode ends
         await recordSongPlay(song: song)
         
         print("✅ VideoPlayerViewModel.play - Playback started for: '\(song.title)' with smooth startup")
@@ -1517,6 +1530,11 @@ final class VideoPlayerViewModel: ObservableObject {
         }
     }
     
+    func deleteCurrentSong() async {
+        print("🗑️ VideoPlayerViewModel - Delete current song requested for: '\(currentVideo?.title ?? "Unknown")'")
+        deleteSong()
+    }
+    
     func playNextSong() {
         print("⏭️ VideoPlayerViewModel - Next song requested")
         stop()
@@ -1530,10 +1548,11 @@ final class VideoPlayerViewModel: ObservableObject {
     private func enterUltraPerformanceModeSync() {
         print("🚀 ULTRA-PERFORMANCE: Entering ultra-performance mode SYNC for immediate drag response")
         
-        // Suspend time observer immediately - no async overhead
+        // CRITICAL: Completely suspend time observer immediately - ZERO tolerance for any updates during drag
         if let timeObserver = self.timeObserver {
             _player?.removeTimeObserver(timeObserver)
             self.timeObserver = nil
+            print("🚀 ULTRA-PERFORMANCE: Time observer COMPLETELY REMOVED for butter-smooth drag")
         }
         
         // Notify all components to enter ultra-quiet mode

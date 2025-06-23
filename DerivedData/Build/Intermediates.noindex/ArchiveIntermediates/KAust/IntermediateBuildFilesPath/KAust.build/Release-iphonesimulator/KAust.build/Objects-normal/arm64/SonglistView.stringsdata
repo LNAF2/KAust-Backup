@@ -1,0 +1,96 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/SongList/Views/SonglistView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Delete Song?",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 52
+        }
+      },
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 53
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 59
+        }
+      },
+      {
+        "comment": "",
+        "key": "Swipe left on songs to delete",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 124
+        }
+      },
+      {
+        "comment": "",
+        "key": "SONG LIST",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 113
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld Songs",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 117
+        }
+      },
+      {
+        "comment": "",
+        "key": "Try: artist name, song title, or \"artist song\"",
+        "location": {
+          "startingColumn": 27,
+          "startingLine": 141
+        }
+      },
+      {
+        "comment": "",
+        "key": "No songs found",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 249
+        }
+      },
+      {
+        "comment": "",
+        "key": "Try a different search term",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 253
+        }
+      },
+      {
+        "comment": "",
+        "key": "Clear Search",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 257
+        }
+      },
+      {
+        "comment": "",
+        "key": "Delete",
+        "location": {
+          "startingColumn": 40,
+          "startingLine": 275
+        }
+      }
+    ]
+  },
+  "version": 1
+}

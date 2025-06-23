@@ -1,0 +1,80 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/Authentication/PINEntryView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Cancel",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 104
+        }
+      },
+      {
+        "comment": "",
+        "key": "Back",
+        "location": {
+          "startingColumn": 28,
+          "startingLine": 181
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld/%lld",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 224
+        }
+      },
+      {
+        "comment": "",
+        "key": "Enter %lld-%lld digits",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 206
+        }
+      },
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 326
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 327
+        }
+      },
+      {
+        "comment": "",
+        "key": "PIN Created Successfully",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 368
+        }
+      },
+      {
+        "comment": "",
+        "key": "You can now activate Kiosk Mode from the settings",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 372
+        }
+      },
+      {
+        "comment": "",
+        "key": "Done",
+        "location": {
+          "startingColumn": 24,
+          "startingLine": 377
+        }
+      }
+    ]
+  },
+  "version": 1
+}

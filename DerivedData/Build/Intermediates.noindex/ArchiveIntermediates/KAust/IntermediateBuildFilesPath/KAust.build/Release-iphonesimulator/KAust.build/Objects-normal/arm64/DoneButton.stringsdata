@@ -1,0 +1,24 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/DoneButton.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "DONE",
+        "location": {
+          "startingColumn": 29,
+          "startingLine": 21
+        }
+      },
+      {
+        "comment": "",
+        "key": "DONE",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 14
+        }
+      }
+    ]
+  },
+  "version": 1
+}

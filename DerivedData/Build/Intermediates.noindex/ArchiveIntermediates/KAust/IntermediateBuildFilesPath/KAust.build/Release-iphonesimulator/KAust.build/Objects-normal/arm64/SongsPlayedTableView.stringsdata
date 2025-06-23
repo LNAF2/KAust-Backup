@@ -1,0 +1,112 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SongsPlayedTableView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Error",
+        "location": {
+          "startingColumn": 16,
+          "startingLine": 31
+        }
+      },
+      {
+        "comment": "",
+        "key": "SONGS PLAYED",
+        "location": {
+          "startingColumn": 30,
+          "startingLine": 28
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 35
+        }
+      },
+      {
+        "comment": "",
+        "key": "SONGS PLAYED",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 70
+        }
+      },
+      {
+        "comment": "",
+        "key": "Print songs played table",
+        "location": {
+          "startingColumn": 33,
+          "startingLine": 65
+        }
+      },
+      {
+        "comment": "",
+        "key": "Print",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 54
+        }
+      },
+      {
+        "comment": "",
+        "key": "Loading played songs...",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 102
+        }
+      },
+      {
+        "comment": "",
+        "key": "No Songs Played",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 115
+        }
+      },
+      {
+        "comment": "",
+        "key": "Songs will appear here when they are played from the playlist",
+        "location": {
+          "startingColumn": 26,
+          "startingLine": 120
+        }
+      },
+      {
+        "comment": "",
+        "key": "DATE",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 155
+        }
+      },
+      {
+        "comment": "",
+        "key": "TIME",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 163
+        }
+      },
+      {
+        "comment": "",
+        "key": "SONG",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 171
+        }
+      },
+      {
+        "comment": "",
+        "key": "ARTIST",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 179
+        }
+      }
+    ]
+  },
+  "version": 1
+}

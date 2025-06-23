@@ -1,0 +1,40 @@
+{
+  "source": "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/ViewModels/SettingsViewModel.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 225
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 321
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 42,
+          "startingLine": 333
+        }
+      },
+      {
+        "comment": "",
+        "key": "OK",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 515
+        }
+      }
+    ]
+  },
+  "version": 1
+}

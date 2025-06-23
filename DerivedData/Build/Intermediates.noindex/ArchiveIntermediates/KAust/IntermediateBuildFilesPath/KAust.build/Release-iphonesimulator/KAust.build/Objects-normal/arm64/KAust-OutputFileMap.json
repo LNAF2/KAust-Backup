@@ -1,0 +1,295 @@
+{
+  "" : {
+    "const-values" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAust-master.swiftconstvalues",
+    "dependencies" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAust-master.d",
+    "diagnostics" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAust-master.dia",
+    "emit-module-dependencies" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAust-master-emit-module.d",
+    "emit-module-diagnostics" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAust-master-emit-module.dia",
+    "swift-dependencies" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAust-master.swiftdeps"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/FilterGenreMappingEntity+CoreDataClass.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/FilterGenreMappingEntity+CoreDataClass.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/FilterGenreMappingEntity+CoreDataClass.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/FilterGenreMappingEntity+CoreDataClass.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/FilterGenreMappingEntity+CoreDataProperties.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/FilterGenreMappingEntity+CoreDataProperties.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/FilterGenreMappingEntity+CoreDataProperties.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/FilterGenreMappingEntity+CoreDataProperties.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/GenreEntity+CoreDataClass.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/GenreEntity+CoreDataClass.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/GenreEntity+CoreDataClass.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/GenreEntity+CoreDataClass.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/GenreEntity+CoreDataProperties.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/GenreEntity+CoreDataProperties.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/GenreEntity+CoreDataProperties.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/GenreEntity+CoreDataProperties.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/KAustModel+CoreDataModel.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAustModel+CoreDataModel.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAustModel+CoreDataModel.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAustModel+CoreDataModel.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/PlayedSongEntity+CoreDataClass.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlayedSongEntity+CoreDataClass.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlayedSongEntity+CoreDataClass.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlayedSongEntity+CoreDataClass.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/PlayedSongEntity+CoreDataProperties.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlayedSongEntity+CoreDataProperties.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlayedSongEntity+CoreDataProperties.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlayedSongEntity+CoreDataProperties.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/PlaylistEntity+CoreDataClass.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistEntity+CoreDataClass.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistEntity+CoreDataClass.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistEntity+CoreDataClass.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/PlaylistEntity+CoreDataProperties.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistEntity+CoreDataProperties.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistEntity+CoreDataProperties.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistEntity+CoreDataProperties.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/SongEntity+CoreDataClass.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongEntity+CoreDataClass.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongEntity+CoreDataClass.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongEntity+CoreDataClass.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/SongEntity+CoreDataProperties.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongEntity+CoreDataProperties.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongEntity+CoreDataProperties.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongEntity+CoreDataProperties.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/UserEntity+CoreDataClass.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/UserEntity+CoreDataClass.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/UserEntity+CoreDataClass.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/UserEntity+CoreDataClass.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/CoreDataGenerated/KAustModel/UserEntity+CoreDataProperties.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/UserEntity+CoreDataProperties.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/UserEntity+CoreDataProperties.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/UserEntity+CoreDataProperties.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/DerivedSources/GeneratedAssetSymbols.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/GeneratedAssetSymbols.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/GeneratedAssetSymbols.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/GeneratedAssetSymbols.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/ContentView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/ContentView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/ContentView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/ContentView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Data/PersistenceController.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PersistenceController.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PersistenceController.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PersistenceController.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Models/AppSong.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/AppSong.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/AppSong.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/AppSong.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Models/Song.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/Song.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/Song.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/Song.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Models/User.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/User.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/User.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/User.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/AuthenticationService.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/AuthenticationService.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/AuthenticationService.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/AuthenticationService.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/AuthenticationServiceProtocol.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/AuthenticationServiceProtocol.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/AuthenticationServiceProtocol.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/AuthenticationServiceProtocol.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/DataProviderService.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DataProviderService.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DataProviderService.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DataProviderService.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/DataProviderServiceProtocol.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DataProviderServiceProtocol.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DataProviderServiceProtocol.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DataProviderServiceProtocol.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/KioskModeService.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KioskModeService.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KioskModeService.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KioskModeService.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/MediaMetadataService.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/MediaMetadataService.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/MediaMetadataService.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/MediaMetadataService.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/Services/UserPreferencesServiceProtocol.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/UserPreferencesServiceProtocol.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/UserPreferencesServiceProtocol.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/UserPreferencesServiceProtocol.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Core/ViewModels/SettingsViewModel.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SettingsViewModel.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SettingsViewModel.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SettingsViewModel.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/Authentication/PINEntryView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PINEntryView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PINEntryView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PINEntryView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/PlayList/ViewModels/PlaylistViewModel.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistViewModel.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistViewModel.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistViewModel.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/PlayList/Views/PlaylistEmptyState.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistEmptyState.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistEmptyState.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistEmptyState.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/PlayList/Views/PlaylistItemView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistItemView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistItemView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistItemView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/PlayList/Views/PlaylistView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PlaylistView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/Settings/KioskModeSettingsView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KioskModeSettingsView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KioskModeSettingsView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KioskModeSettingsView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/SongList/ViewModels/SonglistViewModel.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistViewModel.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistViewModel.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistViewModel.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/SongList/Views/SonglistEmptyState.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistEmptyState.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistEmptyState.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistEmptyState.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/SongList/Views/SonglistItemView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistItemView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistItemView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistItemView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/SongList/Views/SonglistView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SonglistView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoDragGestureView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoDragGestureView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoDragGestureView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoDragGestureView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoPlayerContainerView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoPlayerContainerView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoPlayerContainerView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoPlayerContainerView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoPlayerOverlayView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoPlayerOverlayView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoPlayerOverlayView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoPlayerOverlayView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoPlayerViewModel.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoPlayerViewModel.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoPlayerViewModel.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoPlayerViewModel.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Features/VideoPlayer/VideoProgressBarView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoProgressBarView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoProgressBarView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/VideoProgressBarView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/KAustApp.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAustApp.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAustApp.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/KAustApp.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Shared/Constants.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/Constants.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/Constants.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/Constants.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/Shared/Theme.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/Theme.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/Theme.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/Theme.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/ControlsPanelView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/ControlsPanelView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/ControlsPanelView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/ControlsPanelView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/CustomButton.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/CustomButton.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/CustomButton.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/CustomButton.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/CustomTestField.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/CustomTestField.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/CustomTestField.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/CustomTestField.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/DoneButton.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DoneButton.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DoneButton.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DoneButton.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/DownloadProgressWindow.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DownloadProgressWindow.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DownloadProgressWindow.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/DownloadProgressWindow.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/EmptyPanelView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/EmptyPanelView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/EmptyPanelView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/EmptyPanelView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/PanelView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PanelView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PanelView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/PanelView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SettingsAccessPanelView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SettingsAccessPanelView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SettingsAccessPanelView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SettingsAccessPanelView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SettingsView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SettingsView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SettingsView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SettingsView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SongsPlayedTableView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongsPlayedTableView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongsPlayedTableView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongsPlayedTableView.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/SongsPlayedTableViewModel.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongsPlayedTableViewModel.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongsPlayedTableViewModel.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/SongsPlayedTableViewModel.o"
+  },
+  "/Users/erlingbreaden/Desktop/KAust/KAust/KAust/UI/Views/TitlePanelView.swift" : {
+    "index-unit-output-path" : "/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/TitlePanelView.o",
+    "llvm-bc" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/TitlePanelView.bc",
+    "object" : "/Users/erlingbreaden/Desktop/KAust/DerivedData/Build/Intermediates.noindex/ArchiveIntermediates/KAust/IntermediateBuildFilesPath/KAust.build/Release-iphonesimulator/KAust.build/Objects-normal/arm64/TitlePanelView.o"
+  }
+}
