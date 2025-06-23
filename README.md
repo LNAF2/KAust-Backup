@@ -131,6 +131,6 @@ If the setup doesn't match the expected behavior:
 
 ---
 
-**Last tested:** [Current Date]
-**Commit:** [Your commit hash]
-**Xcode Version:** [Your Xcode version] 
+**Last tested:** December 27, 2024
+**Commit:** ddcbed0
+**Xcode Version:** Latest (iOS 17.0+ compatible) 
