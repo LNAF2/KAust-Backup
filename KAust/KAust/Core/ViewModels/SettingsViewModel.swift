@@ -20,14 +20,28 @@ class SettingsViewModel: ObservableObject {
     @Published var showingDeleteSongsPlayedAlert = false
     @Published var showingFactoryResetAlert = false
     
-    @AppStorage("swipeToDeleteEnabled") var swipeToDeleteEnabled = false  // Use @AppStorage for automatic persistence
+    // MODULAR SERVICES: Use centralized UserPreferencesService instead of direct UserDefaults
+    private var userPreferencesService: any UserPreferencesServiceProtocol
     
-    // Volume control properties
-    @Published var masterVolume: Float = 1.0
-    @Published var isMuted: Bool = false
+    // Volume control properties - now backed by UserPreferencesService
+    var masterVolume: Float {
+        get { userPreferencesService.volume }
+        set { userPreferencesService.volume = newValue }
+    }
     
-    // Shared access to swipe-to-delete setting
-    static var shared: SettingsViewModel = SettingsViewModel()
+    var isMuted: Bool {
+        get { userPreferencesService.isMuted }
+        set { userPreferencesService.isMuted = newValue }
+    }
+    
+    // Swipe-to-delete setting - now backed by UserPreferencesService
+    var swipeToDeleteEnabled: Bool {
+        get { userPreferencesService.swipeToDeleteEnabled }
+        set { userPreferencesService.swipeToDeleteEnabled = newValue }
+    }
+    
+    // Shared access to swipe-to-delete setting (for compatibility with existing usage)
+    static var shared: SettingsViewModel = SettingsViewModel(userPreferencesService: UserPreferencesService())
     
     // File picker service
     @Published var filePickerService: EnhancedFilePickerService
@@ -73,18 +87,15 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
-    init() {
-        // Initialize services with default configuration
-        // The service will be reconfigured dynamically based on file count
+    init(userPreferencesService: any UserPreferencesServiceProtocol) {
+        // Initialize services with dependency injection
+        self.userPreferencesService = userPreferencesService
         self.filePickerService = EnhancedFilePickerService()
-        
-        // Load volume settings from UserDefaults
-        loadVolumeSettings()
         
         // SETUP REACTIVE MONITORING FOR UI STATE
         setupProgressMonitoring()
         
-        print("🎛️ SettingsViewModel initialized - Volume: \(Int(masterVolume * 100))%, Muted: \(isMuted)")
+        print("🎛️ Enhanced SettingsViewModel initialized with UserPreferencesService - Volume: \(Int(masterVolume * 100))%, Muted: \(isMuted), SwipeDelete: \(swipeToDeleteEnabled)")
     }
     
     private func setupProgressMonitoring() {
@@ -244,13 +255,13 @@ class SettingsViewModel: ObservableObject {
         }
         
         do {
-            // Save bookmark for persistent access
+            // Save bookmark for persistent access using UserPreferencesService
             let bookmark = try folderURL.bookmarkData(
                 options: .suitableForBookmarkFile,
                 includingResourceValuesForKeys: nil,
                 relativeTo: nil
             )
-            UserDefaults.standard.set(bookmark, forKey: "mp4FolderBookmark")
+            userPreferencesService.setMP4FolderBookmark(bookmark)
             
             // Find MP4 files in the folder
             let mp4Files = await scanForMP4Files(in: folderURL)
@@ -338,56 +349,19 @@ class SettingsViewModel: ObservableObject {
     }
     
     func resetSettings() {
-        swipeToDeleteEnabled = false
+        userPreferencesService.resetToDefaults()
         filePickerService.clearResults()
         
-        // Reset volume settings to defaults
-        resetVolumeSettings()
-        
-        print("🔄 Settings reset completed - Volume: 100%, Mute: OFF")
+        print("🔄 Settings reset completed using UserPreferencesService")
     }
     
-    // MARK: - Volume Control Actions
-    
-    /// Load volume settings from UserDefaults
-    private func loadVolumeSettings() {
-        let userDefaults = UserDefaults.standard
-        
-        // Load volume with default of 1.0 (100%)
-        if userDefaults.object(forKey: "user_preferences_volume") == nil {
-            userDefaults.set(1.0, forKey: "user_preferences_volume")
-        }
-        masterVolume = userDefaults.float(forKey: "user_preferences_volume")
-        
-        // Load mute state with default of false (OFF)
-        isMuted = userDefaults.bool(forKey: "user_preferences_is_muted")
-        
-        // Apply current settings to system
-        applyVolumeToSystem()
-    }
-    
-    /// Reset volume settings to defaults
-    private func resetVolumeSettings() {
-        let userDefaults = UserDefaults.standard
-        userDefaults.set(1.0, forKey: "user_preferences_volume")
-        userDefaults.set(false, forKey: "user_preferences_is_muted")
-        
-        masterVolume = 1.0
-        isMuted = false
-        
-        applyVolumeToSystem()
-    }
+    // MARK: - Volume Control Actions (Delegated to UserPreferencesService)
     
     /// Update master volume
     func setMasterVolume(_ volume: Float) {
         let clampedVolume = max(0.0, min(1.0, volume))
         
-        // Save to UserDefaults
-        UserDefaults.standard.set(clampedVolume, forKey: "user_preferences_volume")
-        masterVolume = clampedVolume
-        
-        // Apply to system if not muted
-        applyVolumeToSystem()
+        userPreferencesService.volume = clampedVolume
         
         print("🔊 Master volume set to: \(Int(clampedVolume * 100))%")
     }
@@ -396,48 +370,17 @@ class SettingsViewModel: ObservableObject {
     func toggleMute() {
         isMuted.toggle()
         
-        // Save to UserDefaults
-        UserDefaults.standard.set(isMuted, forKey: "user_preferences_is_muted")
-        
-        // Apply to system
-        applyVolumeToSystem()
-        
         print("🔇 Mute toggled: \(isMuted ? "ON" : "OFF")")
-    }
-    
-    /// Apply volume settings to the system
-    private func applyVolumeToSystem() {
-        print("🎛️ SETTINGS: Applying volume to system - Volume: \(Int(masterVolume * 100))%, Muted: \(isMuted)")
-        
-        // CRITICAL: Post notification for VideoPlayerViewModel to apply volume
-        // This preserves the exact video control functionality
-        NotificationCenter.default.post(
-            name: NSNotification.Name("ApplyAppVolume"),
-            object: nil,
-            userInfo: ["volume": masterVolume, "isMuted": isMuted]
-        )
-        
-        print("🎛️ SETTINGS: Volume notification sent successfully")
     }
     
     /// Get volume icon name based on current state
     var volumeIconName: String {
-        if isMuted {
-            return "speaker.slash.fill"
-        } else if masterVolume == 0.0 {
-            return "speaker.fill"
-        } else if masterVolume < 0.33 {
-            return "speaker.wave.1.fill"
-        } else if masterVolume < 0.66 {
-            return "speaker.wave.2.fill"
-        } else {
-            return "speaker.wave.3.fill"
-        }
+        userPreferencesService.volumeIconName
     }
     
     /// Get volume percentage for display
     var volumePercentage: Int {
-        return Int(masterVolume * 100)
+        userPreferencesService.volumePercentage
     }
     
     // MARK: - File Processing Controls
@@ -496,8 +439,8 @@ class SettingsViewModel: ObservableObject {
             // Step 1: Perform Core Data and file system cleanup
             try await PersistenceController.shared.factoryReset()
             
-            // Step 2: Clean up UserDefaults (preserve essential authentication)
-            await cleanupUserDefaults()
+            // Step 2: Clean up UserDefaults using UserPreferencesService (preserve authentication)
+            await cleanupUserDefaultsWithService()
             
             // Step 3: Force UI refresh
             await MainActor.run {
@@ -521,38 +464,13 @@ class SettingsViewModel: ObservableObject {
         }
     }
     
-    private func cleanupUserDefaults() async {
-        print("🧹 Cleaning up UserDefaults...")
+    private func cleanupUserDefaultsWithService() async {
+        print("🧹 Cleaning up UserDefaults using UserPreferencesService...")
         
-        let userDefaults = UserDefaults.standard
-        let preservedKeys = [
-            // Preserve authentication data to keep user logged in
-            "is_authenticated",
-            "user_id", 
-            "username",
-            "user_role",
-            "display_name",
-            "login_date",
-            "login_method"
-        ]
+        // Use the centralized service for cleanup
+        userPreferencesService.cleanupForFactoryReset(preserveAuthentication: true)
         
-        // Get all current keys
-        let allKeys = Set(userDefaults.dictionaryRepresentation().keys)
-        
-        // Remove all keys except preserved ones
-        for key in allKeys {
-            if !preservedKeys.contains(key) {
-                userDefaults.removeObject(forKey: key)
-                print("  🗑️ Removed UserDefaults key: \(key)")
-            }
-        }
-        
-        // Reset app-specific settings to defaults
-        await MainActor.run {
-            swipeToDeleteEnabled = false
-        }
-        
-        print("  ✅ UserDefaults cleanup completed")
+        print("✅ UserDefaults cleanup completed using UserPreferencesService")
     }
     
     func confirmDeleteSongsPlayedTable() async {

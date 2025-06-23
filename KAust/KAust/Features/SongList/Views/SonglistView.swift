@@ -12,8 +12,8 @@ struct SongListView: View {
     @ObservedObject var playlistViewModel: PlaylistViewModel
     @EnvironmentObject var videoPlayerViewModel: VideoPlayerViewModel
     @EnvironmentObject var focusManager: FocusManager
+    @EnvironmentObject var userPreferences: UserPreferencesService
     @FocusState private var isSearchFocused: Bool
-    @AppStorage("swipeToDeleteEnabled") private var swipeToDeleteEnabled = false
     @State private var songToDelete: Song?
     @State private var showDeleteConfirmation = false
     @State private var isLoading = false
@@ -99,7 +99,7 @@ struct SongListView: View {
             }
             .onAppear {
                 print("👁️ DEBUG: SongListView appeared")
-                print("  - Swipe to delete enabled: \(swipeToDeleteEnabled)")
+                print("  - Swipe to delete enabled: \(userPreferences.swipeToDeleteEnabled)")
                 print("  - Number of songs: \(viewModel.displaySongs.count)")
                 
                 // Enable scroll performance mode
@@ -132,7 +132,7 @@ struct SongListView: View {
             }
             
             // Show swipe-to-delete status
-            if swipeToDeleteEnabled {
+            if userPreferences.swipeToDeleteEnabled {
                 Text("Swipe left on songs to delete")
                     .font(.caption)
                     .foregroundColor(AppTheme.leftPanelAccent.opacity(0.7))
@@ -344,7 +344,7 @@ struct SongListView: View {
                 viewModel.showingSuggestions = false
             }
         }
-        .if(swipeToDeleteEnabled) { view in
+        .if(userPreferences.swipeToDeleteEnabled) { view in
             view.swipeActions(edge: .trailing) {
                 Button("Delete", role: .destructive) {
                     songToDelete = song

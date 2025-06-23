@@ -17,13 +17,17 @@ struct KAustApp: App {
     @StateObject private var focusManager = FocusManager()
     @StateObject private var authenticationService = AuthenticationService()
     @StateObject private var kioskModeService: KioskModeService
+    @StateObject private var userPreferencesService: UserPreferencesService
     let persistenceController = PersistenceController.shared
     
     init() {
         let authService = AuthenticationService()
         let kiosk = KioskModeService(authService: authService)
+        let preferencesService = UserPreferencesService()
+        
         self._authenticationService = StateObject(wrappedValue: authService)
         self._kioskModeService = StateObject(wrappedValue: kiosk)
+        self._userPreferencesService = StateObject(wrappedValue: preferencesService)
     }
 
     var body: some Scene {
@@ -36,11 +40,13 @@ struct KAustApp: App {
                     .environmentObject(focusManager)
                     .environmentObject(authenticationService)
                     .environmentObject(kioskModeService)
+                    .environmentObject(userPreferencesService)
             } else {
                 // Beautiful new purple login screen with large title!
                 BeautifulLoginView(isSignedIn: $isSignedIn, currentUserRole: $currentUserRole)
                     .environmentObject(focusManager)
                     .environmentObject(authenticationService)
+                    .environmentObject(userPreferencesService)
             }
         }
         .backgroundTask(.appRefresh("keyboard-cleanup")) {
@@ -129,6 +135,7 @@ struct BeautifulLoginView: View {
     // Focus management for automatic cursor movement
     @EnvironmentObject var focusManager: FocusManager
     @EnvironmentObject var authenticationService: AuthenticationService
+    @EnvironmentObject var userPreferencesService: UserPreferencesService
     @FocusState private var isFieldFocused: Bool
     
     // Valid credentials

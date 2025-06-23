@@ -3839,7 +3839,7 @@ struct SettingsView_Previews: PreviewProvider {
         let mockRoleManager = UserRoleManager(role: .admin)
         
         SettingsView(kioskModeService: mockKioskService)
-            .environmentObject(SettingsViewModel())
+            .environmentObject(SettingsViewModel(userPreferencesService: UserPreferencesService()))
             .environmentObject(mockRoleManager)
     }
 }

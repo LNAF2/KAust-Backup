@@ -19,7 +19,7 @@ class SonglistViewModel: ObservableObject {
             // Debounce search to improve performance
             searchDebounceTask?.cancel()
             searchDebounceTask = Task { @MainActor in
-                try await Task.sleep(nanoseconds: UInt64(currentSearchDelay * 1_000_000)) // Use dynamic delay
+                try await Task.sleep(nanoseconds: UInt64(performanceOptimizationService.getCurrentSearchDelay() * 1_000_000)) // Use dynamic delay from service
                 updateDisplaySongs()
             }
         }
@@ -28,21 +28,20 @@ class SonglistViewModel: ObservableObject {
     @Published var isSearching = false
     @Published var showingSuggestions = false
     @Published var error: Error?
-    
-    // MARK: - Performance Mode Tracking
-    @Published private(set) var isInPerformanceMode = false
-    private var suspendedObservers = false
-    
-    // MARK: - Scroll Performance Optimization
-    private var currentSearchDelay: Double = 300.0 // Default 300ms
-    private let normalSearchDelay: Double = 300.0
-    private let scrollOptimizedDelay: Double = 100.0 // Reduced delay during scroll
 
-    private let persistenceController = PersistenceController.shared
+
     private var cancellables = Set<AnyCancellable>()
     private var allSongs: [Song] = [] // Keep original list for searching
     private let searchSubject = PassthroughSubject<String, Never>()
     private var searchDebounceTask: Task<Void, Error>?
+    
+    // MARK: - Modular Services
+    private let fuzzySearchService: FuzzySearchServiceProtocol = FuzzySearchService()
+    private let performanceOptimizationService: any PerformanceOptimizationServiceProtocol = PerformanceOptimizationService()
+    private let notificationService: NotificationServiceProtocol = NotificationService()
+    
+    // TEMPORARY: Repository functionality will be modularized later when file can be added to project
+    private let persistenceController = PersistenceController.shared
     
     // Computed property for display
     var displayCount: Int {
@@ -50,6 +49,9 @@ class SonglistViewModel: ObservableObject {
     }
 
     init() {
+        // Start modular performance optimization service
+        performanceOptimizationService.startObserving()
+        
         setupObservers()
         Task {
             await loadSongs()
@@ -58,53 +60,59 @@ class SonglistViewModel: ObservableObject {
     
     deinit {
         searchDebounceTask?.cancel()
+        notificationService.removeObserver(self)
+        // Note: PerformanceOptimizationService and NotificationService handle their own cleanup in deinit
     }
     
     private func setupObservers() {
-        // PERFORMANCE: Setup performance mode observers first
-        setupPerformanceModeObserver()
+        print("📡 SongListViewModel: Setting up observers using NotificationService")
         
-        // SCROLL OPTIMIZATION: Setup scroll-aware observers
-        setupScrollOptimizationObservers()
+        // MODULAR NOTIFICATIONS: Using NotificationService for all notification patterns
         
-        // PERFORMANCE: Suspend Core Data observers during video playback for smooth performance
-        NotificationCenter.default.addObserver(
-            forName: .init("SuspendCoreDataObservers"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("⏸️ PERFORMANCE: OLD SongListViewModel suspending Core Data observers for smooth video")
-            Task { @MainActor in
-                self?.suspendedObservers = true
-                self?.cancellables.removeAll() // Suspend all reactive observers
+        // 1. Core Data Observer Suspension/Restoration
+        notificationService.addCoreDataObserver(
+            self,
+            onSuspend: { viewModel in
+                print("⏸️ PERFORMANCE: SongListViewModel suspending Core Data observers for smooth video")
+                viewModel.cancellables.removeAll() // Suspend all reactive observers
+            },
+            onRestore: { viewModel in
+                print("▶️ PERFORMANCE: SongListViewModel restoring Core Data observers")
+                viewModel.setupObservers() // Restore observers
             }
-        }
+        )
         
-        NotificationCenter.default.addObserver(
-            forName: .init("RestoreCoreDataObservers"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("▶️ PERFORMANCE: OLD SongListViewModel restoring Core Data observers")
-            Task { @MainActor in
-                self?.suspendedObservers = false
-                self?.setupObservers() // Restore observers
+        // 2. Scroll Optimization Observer
+        notificationService.addScrollOptimizationObserver(
+            self,
+            onScrollStart: { viewModel in
+                print("⚡ SCROLL: SongListViewModel cancelling search during active scrolling")
+                viewModel.searchDebounceTask?.cancel()
+            },
+            onScrollStop: { _ in
+                print("✅ SCROLL: SongListViewModel resuming normal operations after scrolling")
+                // Normal operations resume automatically
             }
-        }
+        )
         
+        // 3. Debounced Core Data Observer (using new service)
+        setupCoreDataObserver()
+    }
+    
+    /// Core Data observer setup using NotificationService
+    private func setupCoreDataObserver() {
         // Don't setup observers if they are currently suspended
-        guard !suspendedObservers else {
+        guard !performanceOptimizationService.areObserversSuspended else {
             print("⏸️ PERFORMANCE: Skipping Core Data observer setup - currently suspended")
             return
         }
         
-        // PERFORMANCE: Debounced Core Data observer to prevent excessive refreshes
-        NotificationCenter.default.publisher(for: .NSManagedObjectContextDidSave)
-            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+        // Use NotificationService for debounced Core Data observation
+        notificationService.debouncedPublisher(for: .managedObjectContextDidSave, delay: 0.5)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                // Skip processing during performance mode
-                guard !(self?.isInPerformanceMode ?? false) else {
+                // Skip processing during performance mode (using modular service)
+                guard !(self?.performanceOptimizationService.isInPerformanceMode ?? false) else {
                     print("⏸️ PERFORMANCE: Skipping Core Data update during video playback")
                     return
                 }
@@ -115,109 +123,11 @@ class SonglistViewModel: ObservableObject {
                 }
             }
             .store(in: &cancellables)
+        
+        print("📡 SongListViewModel: Core Data observer setup complete using NotificationService")
     }
-    
-    /// Setup performance mode observer to track video playback state
-    private func setupPerformanceModeObserver() {
-        NotificationCenter.default.addObserver(
-            forName: .init("VideoPerformanceModeEnabled"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("🚀 PERFORMANCE: OLD SongListViewModel entering performance mode")
-            Task { @MainActor in
-                self?.isInPerformanceMode = true
-            }
-        }
-        
-        NotificationCenter.default.addObserver(
-            forName: .init("VideoPerformanceModeDisabled"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("🔄 PERFORMANCE: OLD SongListViewModel exiting performance mode")
-            Task { @MainActor in
-                self?.isInPerformanceMode = false
-            }
-        }
-        
-        // ULTRA-PERFORMANCE: Additional observers for drag operations
-        NotificationCenter.default.addObserver(
-            forName: .init("VideoUltraPerformanceModeEnabled"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("🎯 ULTRA-PERFORMANCE: OLD SongListViewModel entering ultra-performance mode")
-            Task { @MainActor in
-                self?.isInPerformanceMode = true
-            }
-        }
-        
-        NotificationCenter.default.addObserver(
-            forName: .init("VideoUltraPerformanceModeDisabled"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("🎯 ULTRA-PERFORMANCE: OLD SongListViewModel exiting ultra-performance mode")
-            Task { @MainActor in
-                // Stay in normal performance mode if video is still playing
-                if self?.getCurrentVideo() != nil {
-                    print("🎯 ULTRA-PERFORMANCE: Maintaining normal performance mode - video still playing")
-                    // Keep performance mode active
-                } else {
-                    self?.isInPerformanceMode = false
-                }
-            }
-        }
-    }
-    
-    /// Setup scroll optimization observers to reduce operations during active scrolling
-    private func setupScrollOptimizationObservers() {
-        // Listen for active scrolling to reduce CPU usage
-        NotificationCenter.default.addObserver(
-            forName: .init("ActiveScrollingStarted"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("⚡ SCROLL: SongListViewModel reducing operations during active scrolling")
-            Task { @MainActor in
-                // Suspend search operations during active scroll
-                self?.searchDebounceTask?.cancel()
-            }
-        }
-        
-        NotificationCenter.default.addObserver(
-            forName: .init("ActiveScrollingStopped"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("✅ SCROLL: SongListViewModel resuming normal operations after scrolling")
-            // Normal operations resume automatically
-        }
-        
-        // Listen for scroll optimization mode
-        NotificationCenter.default.addObserver(
-            forName: .init("ScrollOptimizationEnabled"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("🚀 SCROLL: SongListViewModel entering scroll optimization mode")
-            Task { @MainActor in
-                self?.setScrollOptimizedSearchDelay()
-            }
-        }
-        
-        NotificationCenter.default.addObserver(
-            forName: .init("ScrollOptimizationDisabled"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            print("🔄 SCROLL: SongListViewModel exiting scroll optimization mode")
-            Task { @MainActor in
-                self?.restoreNormalSearchDelay()
-            }
-        }
-    }
+
+
     
     /// Get current video from VideoPlayerViewModel (helper method)
     private func getCurrentVideo() -> Song? {
@@ -226,6 +136,8 @@ class SonglistViewModel: ObservableObject {
         return nil
     }
     
+    // COMMENTED OUT: Utility methods now handled by modular SongRepositoryService
+    /*
     private func formatDuration(_ seconds: Double) -> String {
         let totalSeconds = Int(seconds)
         let minutes = totalSeconds / 60
@@ -280,8 +192,9 @@ class SonglistViewModel: ObservableObject {
             self.songs = []
         }
     }
+    */
     
-    // MARK: - Fuzzy Search Implementation
+    // MARK: - Fuzzy Search Implementation (Using Modular Service)
     
     private func performFuzzySearch(_ searchText: String) {
         guard !searchText.isEmpty else {
@@ -293,13 +206,22 @@ class SonglistViewModel: ObservableObject {
         }
         
         isSearching = true
-        print("🔍 Performing optimized search for: '\(searchText)'")
+        print("🔍 Performing optimized search for: '\(searchText)' using FuzzySearchService")
         
-        // Perform search in background to avoid UI blocking
+        // Use modular fuzzy search service
         Task.detached { [weak self] in
             guard let self = self else { return }
             
-            let searchResults = await self.optimizedFuzzySearch(query: searchText)
+            // Use simple mode during scroll optimization (capture delay values from service)
+            let useSimpleMode = await MainActor.run {
+                self.performanceOptimizationService.getCurrentSearchDelay() < 300.0 // Simple mode if delay is reduced
+            }
+            let songsToSearch = await MainActor.run { self.allSongs }
+            let searchResults = await self.fuzzySearchService.performSearch(
+                query: searchText,
+                in: songsToSearch,
+                useSimpleMode: useSimpleMode
+            )
             
             await MainActor.run { [weak self] in
                 // Check if this is still the current search
@@ -315,218 +237,15 @@ class SonglistViewModel: ObservableObject {
         }
     }
     
-    private func optimizedFuzzySearch(query: String) async -> (songs: [Song], suggestions: [SearchSuggestion]) {
-        let normalizedQuery = query.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let queryWords = normalizedQuery.components(separatedBy: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)).filter { !$0.isEmpty }
-        
-        print("🔍 DEBUG: Searching through \(allSongs.count) songs for query: '\(normalizedQuery)'")
-        
-        var scoredSongs: [(song: Song, score: Double)] = []
-        var suggestionSet: Set<String> = []
-        
-        // SCROLL OPTIMIZATION: Reduce results and complexity during scroll optimization
-        let maxResults = currentSearchDelay < normalSearchDelay ? 50 : 100 // Fewer results during scroll
-        let useSimpleSearch = currentSearchDelay < normalSearchDelay // Use simpler search during scroll
-        
-        // Process songs in chunks to avoid blocking
-        let chunkSize = useSimpleSearch ? 50 : 100 // Smaller chunks during scroll
-        let songChunks = allSongs.chunked(into: chunkSize)
-        
-        for chunk in songChunks {
-            // Fast path: Simple contains search first
-            for song in chunk {
-                let artist = song.cleanArtist.lowercased()
-                let title = song.cleanTitle.lowercased()
-                
-                var score: Double = 0
-                
-                // 1. Exact matches (fastest)
-                if artist.contains(normalizedQuery) || title.contains(normalizedQuery) {
-                    score += 100
-                }
-                
-                // 2. Word matches (fast)
-                for word in queryWords {
-                    if artist.contains(word) { score += 50 }
-                    if title.contains(word) { score += 50 }
-                }
-                
-                // 3. Prefix matches (fast)
-                for word in queryWords {
-                    if artist.hasPrefix(word) { score += 25 }
-                    if title.hasPrefix(word) { score += 25 }
-                }
-                
-                // 4. SCROLL OPTIMIZATION: Skip expensive fuzzy matching during scroll optimization
-                if !useSimpleSearch && score < 50 && scoredSongs.count < maxResults && normalizedQuery.count > 2 {
-                    score += calculateLimitedFuzzyScore(song: song, query: normalizedQuery)
-                }
-                
-                if score > 0 {
-                    scoredSongs.append((song: song, score: score))
-                    
-                    // Generate suggestions (limit to top matches)
-                    if score > 50 {
-                        addSuggestions(for: song, query: normalizedQuery, to: &suggestionSet)
-                    }
-                }
-            }
-            
-            // SCROLL OPTIMIZATION: More frequent yields during scroll optimization
-            let yieldInterval: Int = useSimpleSearch ? 25 : 50
-            if songChunks.firstIndex(of: chunk)?.isMultiple(of: yieldInterval) == true {
-                await Task.yield()
-            }
-        }
-        
-        // Sort by score and limit results
-        scoredSongs.sort { $0.score > $1.score }
-        let topSongs = Array(scoredSongs.prefix(maxResults))
-        
-        let suggestionLimit = useSimpleSearch ? 3 : 5 // Fewer suggestions during scroll
-        let suggestions = Array(suggestionSet.prefix(suggestionLimit)).map { SearchSuggestion(text: $0, type: .completion) }
-        
-        print("🎯 Found \(topSongs.count) matches (limited from \(scoredSongs.count) total) - search mode: \(useSimpleSearch ? "simple" : "full")")
-        
-        return (songs: topSongs.map { $0.song }, suggestions: suggestions)
-    }
+
     
-    private func calculateLimitedFuzzyScore(song: Song, query: String) -> Double {
-        let artist = song.cleanArtist.lowercased()
-        let title = song.cleanTitle.lowercased()
-        
-        // Only calculate fuzzy score for shorter strings to save time
-        let maxLength = 30
-        let truncatedArtist = String(artist.prefix(maxLength))
-        let truncatedTitle = String(title.prefix(maxLength))
-        
-        let artistDistance = levenshteinDistance(truncatedArtist, query)
-        let titleDistance = levenshteinDistance(truncatedTitle, query)
-        
-        let artistScore = max(0, Double(truncatedArtist.count - artistDistance) / Double(max(truncatedArtist.count, 1))) * 20
-        let titleScore = max(0, Double(truncatedTitle.count - titleDistance) / Double(max(truncatedTitle.count, 1))) * 20
-        
-        return max(artistScore, titleScore)
-    }
+
     
-    private func calculateFuzzyScore(song: Song, query: String, queryWords: [String]) -> Double {
-        let artist = song.artist.lowercased()
-        let title = song.title.lowercased()
-        let fullText = "\(artist) \(title)"
-        
-        var totalScore: Double = 0
-        
-        // 1. Exact matches (highest priority)
-        if artist.contains(query) || title.contains(query) {
-            totalScore += 100
-        }
-        
-        // 2. Word-by-word matching
-        for word in queryWords {
-            if artist.contains(word) {
-                totalScore += 50
-            }
-            if title.contains(word) {
-                totalScore += 50
-            }
-        }
-        
-        // 3. Fuzzy matching with Levenshtein distance
-        let artistDistance = levenshteinDistance(artist, query)
-        let titleDistance = levenshteinDistance(title, query)
-        let fullTextDistance = levenshteinDistance(fullText, query)
-        
-        // Convert distance to score (lower distance = higher score)
-        let maxLength = max(artist.count, title.count, fullText.count)
-        if maxLength > 0 {
-            let artistFuzzyScore = max(0, Double(maxLength - artistDistance) / Double(maxLength)) * 30
-            let titleFuzzyScore = max(0, Double(maxLength - titleDistance) / Double(maxLength)) * 30
-            let fullTextFuzzyScore = max(0, Double(maxLength - fullTextDistance) / Double(maxLength)) * 20
-            
-            totalScore += max(artistFuzzyScore, titleFuzzyScore, fullTextFuzzyScore)
-        }
-        
-        // 4. Starts with bonus
-        if artist.hasPrefix(query) || title.hasPrefix(query) {
-            totalScore += 25
-        }
-        
-        // 5. Word starts with bonus
-        for word in queryWords {
-            if artist.hasPrefix(word) || title.hasPrefix(word) {
-                totalScore += 15
-            }
-        }
-        
-        // 6. Acronym matching (e.g., "ac" matches "Alan Jackson")
-        if matchesAcronym(query: query, text: artist) || matchesAcronym(query: query, text: title) {
-            totalScore += 20
-        }
-        
-        return totalScore
-    }
+
     
-    private func addSuggestions(for song: Song, query: String, to suggestionSet: inout Set<String>) {
-        let artist = song.artist.lowercased()
-        let title = song.title.lowercased()
-        
-        // Add artist name if it partially matches
-        if artist.contains(query) && artist != query {
-            suggestionSet.insert(song.artist)
-        }
-        
-        // Add song title if it partially matches
-        if title.contains(query) && title != query {
-            suggestionSet.insert(song.title)
-        }
-        
-        // Add combined suggestion
-        if artist.contains(query) || title.contains(query) {
-            suggestionSet.insert("\(song.artist) - \(song.title)")
-        }
-    }
+
     
-    private func matchesAcronym(query: String, text: String) -> Bool {
-        let words = text.components(separatedBy: CharacterSet.whitespacesAndNewlines.union(.punctuationCharacters)).filter { !$0.isEmpty }
-        let acronym = words.compactMap { $0.first?.lowercased() }.joined()
-        return acronym.hasPrefix(query.lowercased())
-    }
-    
-    // MARK: - Levenshtein Distance Algorithm
-    
-    private func levenshteinDistance(_ s1: String, _ s2: String) -> Int {
-        let s1Array = Array(s1)
-        let s2Array = Array(s2)
-        let s1Count = s1Array.count
-        let s2Count = s2Array.count
-        
-        if s1Count == 0 { return s2Count }
-        if s2Count == 0 { return s1Count }
-        
-        var matrix = Array(repeating: Array(repeating: 0, count: s2Count + 1), count: s1Count + 1)
-        
-        // Initialize first row and column
-        for i in 0...s1Count {
-            matrix[i][0] = i
-        }
-        for j in 0...s2Count {
-            matrix[0][j] = j
-        }
-        
-        // Fill the matrix
-        for i in 1...s1Count {
-            for j in 1...s2Count {
-                let cost = s1Array[i-1] == s2Array[j-1] ? 0 : 1
-                matrix[i][j] = min(
-                    matrix[i-1][j] + 1,      // deletion
-                    matrix[i][j-1] + 1,      // insertion
-                    matrix[i-1][j-1] + cost  // substitution
-                )
-            }
-        }
-        
-        return matrix[s1Count][s2Count]
-    }
+
     
     // MARK: - Public Search Methods
     
@@ -606,6 +325,8 @@ class SonglistViewModel: ObservableObject {
         }
     }
     
+
+    
     /// Load all songs from Core Data
     func loadSongs() async {
         print("🔄 Loading songs from Core Data...")
@@ -649,6 +370,53 @@ class SonglistViewModel: ObservableObject {
             }
         }
     }
+    
+    // COMMENTED OUT: Replaced by modular SongRepositoryService
+    /*
+    /// Load all songs from Core Data (OLD IMPLEMENTATION)
+    func loadSongsOLD() async {
+        print("🔄 Loading songs from Core Data...")
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+        
+        // Sort by title
+        request.sortDescriptors = [NSSortDescriptor(key: "title", ascending: true)]
+        
+        do {
+            // PERFORMANCE: Load in background to prevent UI blocking
+            let songEntities = try await withCheckedThrowingContinuation { continuation in
+                Task.detached {
+                    do {
+                        let entities = try context.fetch(request)
+                        continuation.resume(returning: entities)
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
+                }
+            }
+            
+            print("📝 Found \(songEntities.count) songs in Core Data")
+            
+            // PERFORMANCE: Reduce logging for large datasets
+            let loadedSongs = songEntities.compactMap { Song(from: $0) }
+            print("✅ Converted to \(loadedSongs.count) Song objects")
+            
+            // Update the UI on the main thread
+            await MainActor.run {
+                self.songs = loadedSongs
+                self.allSongs = loadedSongs  // CRITICAL: Update allSongs for fuzzy search!
+                self.updateDisplaySongs()
+                self.error = nil
+                print("🎵 Updated UI with \(self.displaySongs.count) songs")
+            }
+        } catch {
+            print("❌ Error loading songs: \(error)")
+            await MainActor.run {
+                self.error = error
+            }
+        }
+    }
+    */
     
     /// Update display songs based on search text using fuzzy search
     private func updateDisplaySongs() {
@@ -768,47 +536,97 @@ class SonglistViewModel: ObservableObject {
         await loadSongs()
     }
     
-    // MARK: - Scroll Performance Optimization Methods
-    
-    /// Enable scroll-optimized search delay for faster scrolling
-    func setScrollOptimizedSearchDelay() {
-        print("⚡ SEARCH: Enabling scroll-optimized search (reduced debounce)")
-        currentSearchDelay = scrollOptimizedDelay
-    }
-    
-    /// Restore normal search delay
-    func restoreNormalSearchDelay() {
-        print("🔄 SEARCH: Restoring normal search delay")
-        currentSearchDelay = normalSearchDelay
-    }
-    
-    /// Get current search delay for debugging
-    var currentSearchDelayMs: Int {
-        Int(currentSearchDelay)
-    }
-}
-
-// MARK: - Search Suggestion Model
-
-struct SearchSuggestion: Identifiable, Hashable {
-    let id = UUID()
-    let text: String
-    let type: SuggestionType
-    
-    enum SuggestionType {
-        case completion
-        case artist
-        case song
-        case combined
-    }
-}
-
-// MARK: - Array Extension for Chunking
-
-extension Array {
-    func chunked(into size: Int) -> [[Element]] {
-        return stride(from: 0, to: count, by: size).map {
-            Array(self[$0..<Swift.min($0 + size, count)])
+    // COMMENTED OUT: Replaced by modular SongRepositoryService
+    /*
+    /// Import a song from a file path (OLD IMPLEMENTATION)
+    func importSongOLD(title: String, artist: String?, filePath: String) async throws {
+        print("\n📝 DEBUG: Attempting to import song")
+        print("  - Title: \(title)")
+        print("  - Artist: \(artist ?? "Unknown")")
+        print("  - File path: \(filePath)")
+        
+        // First verify the file exists and is accessible
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: filePath) else {
+            print("❌ DEBUG: File does not exist at path: \(filePath)")
+            throw NSError(domain: "SongList", 
+                         code: -1, 
+                         userInfo: [NSLocalizedDescriptionKey: "MP4 file not found at specified location"])
         }
+        
+        // Try to access the file
+        guard let _ = try? Data(contentsOf: URL(fileURLWithPath: filePath), options: .alwaysMapped) else {
+            print("❌ DEBUG: File exists but is not accessible: \(filePath)")
+            throw NSError(domain: "SongList", 
+                         code: -2, 
+                         userInfo: [NSLocalizedDescriptionKey: "MP4 file exists but cannot be accessed"])
+        }
+        
+        // Check for duplicates
+        if await songExists(title: title, artist: artist, filePath: filePath) {
+            print("⚠️ DEBUG: Song already exists in database")
+            throw NSError(domain: "SongList", 
+                         code: -3, 
+                         userInfo: [NSLocalizedDescriptionKey: "Song already exists in library"])
+        }
+        
+        // Get the app's Documents/Media directory path for comparison
+        let documentsDirectory = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
+        let mediaPath = mediaDirectory.path
+        
+        print("📁 DEBUG: Checking file location")
+        print("  - Media directory: \(mediaPath)")
+        print("  - File path: \(filePath)")
+        
+        let context = persistenceController.container.viewContext
+        let song = SongEntity(context: context)
+        
+        song.id = UUID()
+        song.title = title
+        song.artist = artist
+        song.filePath = filePath
+        song.dateAdded = Date()
+        
+        // If this is an internal file (in app's Media directory), verify it exists
+        if filePath.hasPrefix(mediaPath) {
+            print("📂 DEBUG: Internal file detected")
+            if !fileManager.fileExists(atPath: filePath) {
+                print("❌ DEBUG: Internal file missing at: \(filePath)")
+                context.delete(song)
+                throw NSError(domain: "SongList", 
+                            code: -4, 
+                            userInfo: [NSLocalizedDescriptionKey: "Internal MP4 file is missing"])
+            }
+        }
+        
+        try context.save()
+        print("✅ DEBUG: Successfully imported song: \(title)")
+        
+        // Refresh the song list
+        await loadSongs()
+    }
+    */
+    
+    // MARK: - Scroll Performance Optimization Methods (Using Modular Service)
+
+    
+    /// Get current search delay for debugging (using modular service)
+    var currentSearchDelayMs: Int {
+        performanceOptimizationService.currentSearchDelayMs
+    }
+    
+    // MARK: - Performance Optimization Methods (Delegated to Service)
+    
+    /// Enable scroll-optimized search delay for faster scrolling (delegated to service)
+    func setScrollOptimizedSearchDelay() {
+        performanceOptimizationService.setScrollOptimizedSearchDelay()
+    }
+    
+    /// Restore normal search delay (delegated to service)
+    func restoreNormalSearchDelay() {
+        performanceOptimizationService.restoreNormalSearchDelay()
     }
 }
+
+

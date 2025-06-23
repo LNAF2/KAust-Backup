@@ -164,10 +164,13 @@ struct VideoDragGestureView: View {
     private func startDragPerformanceMode() {
         guard !isInDragPerformanceMode else { return }
         
-        print("🚀 VIDEO DRAG: Entering ultra-performance mode")
+        print("🚀 VIDEO DRAG: Entering ultra-performance mode via ViewModel")
         isDragging = true
         isInDragPerformanceMode = true
         dragStartTime = Date()
+        
+        // CRITICAL: Use ViewModel's optimized sync drag performance methods
+        viewModel.startDragging()
         
         // Block progress bar interactions
         NotificationCenter.default.post(name: .init("BlockProgressBar"), object: nil)
@@ -175,21 +178,18 @@ struct VideoDragGestureView: View {
         // Hide controls during drag (but keep video/audio playing)
         hideControlsDuringDrag()
         
-        // Suspend non-essential operations
-        suspendNonEssentialOperations()
-        
-        // Allocate maximum resources for smooth dragging
-        allocateMaximumDragResources()
-        
-        print("✅ VIDEO DRAG: Ultra-performance mode active")
+        print("✅ VIDEO DRAG: Ultra-performance mode active via ViewModel")
     }
     
     private func stopDragPerformanceMode() async {
         guard isInDragPerformanceMode else { return }
         
-        print("🔄 VIDEO DRAG: Exiting ultra-performance mode")
+        print("🔄 VIDEO DRAG: Exiting ultra-performance mode via ViewModel")
         isDragging = false
         isInDragPerformanceMode = false
+        
+        // CRITICAL: Use ViewModel's optimized sync drag performance methods
+        viewModel.stopDragging()
         
         // Restore progress bar interactions
         NotificationCenter.default.post(name: .init("AllowProgressBar"), object: nil)
@@ -197,13 +197,7 @@ struct VideoDragGestureView: View {
         // Restore controls with 5-second fade
         restoreControlsAfterDrag()
         
-        // Restore normal operations
-        await restoreNormalOperations()
-        
-        // Release drag resources
-        releaseDragResources()
-        
-        print("✅ VIDEO DRAG: Normal mode restored")
+        print("✅ VIDEO DRAG: Normal mode restored via ViewModel")
     }
     
     // MARK: - Control Management
@@ -232,32 +226,7 @@ struct VideoDragGestureView: View {
     }
     
     // MARK: - Resource Management
-    
-    private func suspendNonEssentialOperations() {
-        // Suspend Core Data operations
-        NotificationCenter.default.post(name: .init("SuspendCoreDataObservers"), object: nil)
-        
-        // Keep time observers running (video continues playing)
-        print("⏸️ VIDEO DRAG: Non-essential operations suspended")
-    }
-    
-    private func restoreNormalOperations() async {
-        // Restore Core Data operations
-        NotificationCenter.default.post(name: .init("RestoreCoreDataObservers"), object: nil)
-        
-        print("▶️ VIDEO DRAG: Normal operations restored")
-    }
-    
-    private func allocateMaximumDragResources() {
-        // Set highest priority for drag operations
-        Task.detached(priority: .userInitiated) {
-            print("⚡ VIDEO DRAG: Maximum resources allocated for smooth dragging")
-        }
-    }
-    
-    private func releaseDragResources() {
-        print("♻️ VIDEO DRAG: Drag resources released")
-    }
+    // NOTE: Resource management now handled by ViewModel's sync ultra-performance methods
     
     // MARK: - Bounds Management
     

@@ -506,8 +506,11 @@ struct VideoPlayerContainerView: View {
     private func startDragPerformanceMode() {
         guard !isDragging else { return }
         
-        print("🚀 VIDEO DRAG: Entering ultra-performance mode")
+        print("🚀 VIDEO DRAG: Entering ultra-performance mode via ViewModel")
         isDragging = true
+        
+        // CRITICAL: Use ViewModel's optimized drag performance methods
+        viewModel.startDragging()
         
         // Block progress bar interactions
         NotificationCenter.default.post(name: .init("BlockProgressBar"), object: nil)
@@ -515,14 +518,17 @@ struct VideoPlayerContainerView: View {
         // Hide controls during drag
         viewModel.areControlsVisible = false
         
-        print("✅ VIDEO DRAG: Ultra-performance mode active")
+        print("✅ VIDEO DRAG: Ultra-performance mode active via ViewModel")
     }
     
     private func stopDragPerformanceMode() {
         guard isDragging else { return }
         
-        print("🔄 VIDEO DRAG: Exiting ultra-performance mode")
+        print("🔄 VIDEO DRAG: Exiting ultra-performance mode via ViewModel")
         isDragging = false
+        
+        // CRITICAL: Use ViewModel's optimized drag performance methods
+        viewModel.stopDragging()
         
         // Restore progress bar interactions
         NotificationCenter.default.post(name: .init("AllowProgressBar"), object: nil)
@@ -537,7 +543,7 @@ struct VideoPlayerContainerView: View {
             }
         }
         
-        print("✅ VIDEO DRAG: Normal mode restored")
+        print("✅ VIDEO DRAG: Normal mode restored via ViewModel")
     }
     
     // MARK: - Helper Methods

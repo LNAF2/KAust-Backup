@@ -203,54 +203,13 @@ final class DataProviderService: DataProviderServiceProtocol {
     }
     
     func deleteSong(_ song: SongEntity) async throws {
+        // REFACTORED: Using shared file deletion logic
         let context = persistenceController.container.viewContext
         
-        guard let filePath = song.filePath else {
-            // No file path, just delete the Core Data entity
-            context.delete(song)
-            try context.save()
-            return
-        }
+        // Use shared method to handle file deletion logic (handles nil filePath internally)
+        try deleteSongFiles(for: song)
         
-        // Get the app's Documents/Media directory path for comparison
-        let documentsDirectory = try fileManager.url(
-            for: .documentDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
-        let mediaPath = mediaDirectory.path
-        let fileName = URL(fileURLWithPath: filePath).lastPathComponent
-        
-        // Check if the file is in our app's Media directory (internal file)
-        if filePath.hasPrefix(mediaPath) {
-            print("📁 Deleting internal file: \(fileName)")
-            
-            // Delete associated MP4 file if it exists
-            if fileManager.fileExists(atPath: filePath) {
-                try fileManager.removeItem(atPath: filePath)
-                print("✅ Deleted MP4 file: \(fileName)")
-            }
-            
-            // Delete associated LRC file if exists
-            if let lrcPath = song.lrcFilePath, fileManager.fileExists(atPath: lrcPath) {
-                try fileManager.removeItem(atPath: lrcPath)
-                print("✅ Deleted LRC file: \(URL(fileURLWithPath: lrcPath).lastPathComponent)")
-            }
-        } else {
-            print("🔒 Deleting external file reference: \(fileName)")
-            print("🗑️ Preserving external file, deleting only metadata")
-            
-            // For external files, clean up any associated bookmark
-            let bookmarkKey = "fileBookmark_\(fileName)"
-            if UserDefaults.standard.data(forKey: bookmarkKey) != nil {
-                UserDefaults.standard.removeObject(forKey: bookmarkKey)
-                print("🧹 Cleaned up bookmark for external file: \(fileName)")
-            }
-        }
-        
-        // Always delete the Core Data entity
+        // Delete the Core Data entity
         context.delete(song)
         try context.save()
     }
@@ -430,111 +389,198 @@ final class DataProviderService: DataProviderServiceProtocol {
     /// Performs a complete factory reset of all app data
     /// - Warning: This will delete ALL data except the current user's authentication
     func performFactoryReset() async throws {
+        // REFACTORED: Breaking down the large method into smaller, focused methods
         print("\n🏭 Starting Factory Reset - Complete app data cleanup")
         
-        let context = persistenceController.container.viewContext
-        
         do {
-            // Step 1: Delete all playlists
-            print("🗑️ Step 1: Deleting all playlists...")
-            let playlistRequest: NSFetchRequest<PlaylistEntity> = PlaylistEntity.fetchRequest()
-            let batchDeletePlaylists = NSBatchDeleteRequest(fetchRequest: playlistRequest as! NSFetchRequest<NSFetchRequestResult>)
-            try context.execute(batchDeletePlaylists)
-            print("  ✅ Deleted all playlists")
+            try await deleteAllPlaylists()
+            try await deleteAllPlayHistory()
+            try await deleteAllFilterMappings()
+            try await deleteAllSongsAndFiles()
+            try await deleteAllGenres()
+            try await deleteNonCurrentUsers()
+            try await cleanupMediaDirectory()
             
-            // Step 2: Delete all played song history
-            print("🗑️ Step 2: Deleting all played song history...")
-            let playedSongsRequest: NSFetchRequest<PlayedSongEntity> = PlayedSongEntity.fetchRequest()
-            let batchDeletePlayedSongs = NSBatchDeleteRequest(fetchRequest: playedSongsRequest as! NSFetchRequest<NSFetchRequestResult>)
-            try context.execute(batchDeletePlayedSongs)
-            print("  ✅ Deleted all played song history")
-            
-            // Step 3: Delete all filter genre mappings
-            print("🗑️ Step 3: Deleting all filter genre mappings...")
-            let filterMappingRequest: NSFetchRequest<FilterGenreMappingEntity> = FilterGenreMappingEntity.fetchRequest()
-            let batchDeleteFilterMappings = NSBatchDeleteRequest(fetchRequest: filterMappingRequest as! NSFetchRequest<NSFetchRequestResult>)
-            try context.execute(batchDeleteFilterMappings)
-            print("  ✅ Deleted all filter genre mappings")
-            
-            // Step 4: Delete all songs (includes file cleanup)
-            print("🗑️ Step 4: Deleting all songs and associated files...")
-            let songsRequest: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
-            let songs = try context.fetch(songsRequest)
-            
-            // Clean up files first (internal files only - external files are preserved)
-            let documentsDirectory = try fileManager.url(
-                for: .documentDirectory,
-                in: .userDomainMask,
-                appropriateFor: nil,
-                create: true
-            )
-            let mediaDirectory = documentsDirectory.appendingPathComponent("Media")
-            let mediaPath = mediaDirectory.path
-            
-            var internalFilesDeleted = 0
-            for song in songs {
-                if let filePath = song.filePath, filePath.hasPrefix(mediaPath) {
-                    if fileManager.fileExists(atPath: filePath) {
-                        try fileManager.removeItem(atPath: filePath)
-                        internalFilesDeleted += 1
-                    }
-                    // Delete LRC file if exists
-                    if let lrcPath = song.lrcFilePath, fileManager.fileExists(atPath: lrcPath) {
-                        try fileManager.removeItem(atPath: lrcPath)
-                    }
-                }
-            }
-            
-            // Batch delete all songs from Core Data
-            let batchDeleteSongs = NSBatchDeleteRequest(fetchRequest: songsRequest as! NSFetchRequest<NSFetchRequestResult>)
-            try context.execute(batchDeleteSongs)
-            print("  ✅ Deleted all songs from database and \(internalFilesDeleted) internal files")
-            
-            // Step 5: Delete all genres
-            print("🗑️ Step 5: Deleting all genres...")
-            let genresRequest: NSFetchRequest<GenreEntity> = GenreEntity.fetchRequest()
-            let batchDeleteGenres = NSBatchDeleteRequest(fetchRequest: genresRequest as! NSFetchRequest<NSFetchRequestResult>)
-            try context.execute(batchDeleteGenres)
-            print("  ✅ Deleted all genres")
-            
-            // Step 6: Delete all users EXCEPT the current authenticated user
-            print("🗑️ Step 6: Deleting all users except current user...")
-            let currentUserID = getCurrentAuthenticatedUserID()
-            let usersRequest: NSFetchRequest<UserEntity> = UserEntity.fetchRequest()
-            if let currentUserID = currentUserID {
-                // Keep the current user, delete all others
-                usersRequest.predicate = NSPredicate(format: "appleUserID != %@", currentUserID)
-            }
-            let users = try context.fetch(usersRequest)
-            for user in users {
-                context.delete(user)
-            }
-            print("  ✅ Deleted \(users.count) other users (preserved current user)")
-            
-            // Step 7: Clean up entire Media directory if it exists
-            print("🗑️ Step 7: Cleaning up Media directory...")
-            if fileManager.fileExists(atPath: mediaPath) {
-                try fileManager.removeItem(at: mediaDirectory)
-                try fileManager.createDirectory(at: mediaDirectory, withIntermediateDirectories: true)
-                print("  ✅ Cleaned up Media directory")
-            }
-            
-            // Step 8: Save context changes
+            let context = persistenceController.container.viewContext
             try context.save()
             print("  ✅ Saved all database changes")
             
-            print("\n🎉 FACTORY RESET COMPLETED SUCCESSFULLY:")
-            print("  - All songs and media files deleted")
-            print("  - All playlists deleted")
-            print("  - All played song history deleted")
-            print("  - All genres and filter mappings deleted")
-            print("  - All other users deleted (current user preserved)")
-            print("  - Media directory cleaned")
-            print("  - App restored to initial state")
+            printFactoryResetCompletionMessage()
             
         } catch {
             print("❌ Factory reset failed: \(error)")
             throw DataProviderError.coreDataError
+        }
+    }
+    
+    // MARK: - Factory Reset Helper Methods
+    
+    /// Delete all playlists from the database
+    private func deleteAllPlaylists() async throws {
+        print("🗑️ Step 1: Deleting all playlists...")
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<PlaylistEntity> = PlaylistEntity.fetchRequest()
+        let batchDelete = NSBatchDeleteRequest(fetchRequest: request as! NSFetchRequest<NSFetchRequestResult>)
+        try context.execute(batchDelete)
+        print("  ✅ Deleted all playlists")
+    }
+    
+    /// Delete all played song history from the database
+    private func deleteAllPlayHistory() async throws {
+        print("🗑️ Step 2: Deleting all played song history...")
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<PlayedSongEntity> = PlayedSongEntity.fetchRequest()
+        let batchDelete = NSBatchDeleteRequest(fetchRequest: request as! NSFetchRequest<NSFetchRequestResult>)
+        try context.execute(batchDelete)
+        print("  ✅ Deleted all played song history")
+    }
+    
+    /// Delete all filter genre mappings from the database
+    private func deleteAllFilterMappings() async throws {
+        print("🗑️ Step 3: Deleting all filter genre mappings...")
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<FilterGenreMappingEntity> = FilterGenreMappingEntity.fetchRequest()
+        let batchDelete = NSBatchDeleteRequest(fetchRequest: request as! NSFetchRequest<NSFetchRequestResult>)
+        try context.execute(batchDelete)
+        print("  ✅ Deleted all filter genre mappings")
+    }
+    
+    /// Delete all songs and their associated files
+    private func deleteAllSongsAndFiles() async throws {
+        print("🗑️ Step 4: Deleting all songs and associated files...")
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<SongEntity> = SongEntity.fetchRequest()
+        let songs = try context.fetch(request)
+        
+        // Clean up internal files first
+        let internalFilesDeleted = try cleanupSongFiles(songs)
+        
+        // Batch delete all songs from Core Data
+        let batchDelete = NSBatchDeleteRequest(fetchRequest: request as! NSFetchRequest<NSFetchRequestResult>)
+        try context.execute(batchDelete)
+        print("  ✅ Deleted all songs from database and \(internalFilesDeleted) internal files")
+    }
+    
+    /// Delete all genres from the database
+    private func deleteAllGenres() async throws {
+        print("🗑️ Step 5: Deleting all genres...")
+        let context = persistenceController.container.viewContext
+        let request: NSFetchRequest<GenreEntity> = GenreEntity.fetchRequest()
+        let batchDelete = NSBatchDeleteRequest(fetchRequest: request as! NSFetchRequest<NSFetchRequestResult>)
+        try context.execute(batchDelete)
+        print("  ✅ Deleted all genres")
+    }
+    
+    /// Delete all users except the current authenticated user
+    private func deleteNonCurrentUsers() async throws {
+        print("🗑️ Step 6: Deleting all users except current user...")
+        let context = persistenceController.container.viewContext
+        let currentUserID = getCurrentAuthenticatedUserID()
+        let request: NSFetchRequest<UserEntity> = UserEntity.fetchRequest()
+        
+        if let currentUserID = currentUserID {
+            // Keep the current user, delete all others
+            request.predicate = NSPredicate(format: "appleUserID != %@", currentUserID)
+        }
+        
+        let users = try context.fetch(request)
+        for user in users {
+            context.delete(user)
+        }
+        print("  ✅ Deleted \(users.count) other users (preserved current user)")
+    }
+    
+    /// Clean up the entire Media directory
+    private func cleanupMediaDirectory() async throws {
+        print("🗑️ Step 7: Cleaning up Media directory...")
+        let mediaDirectory = try getMediaDirectory()
+        let mediaPath = mediaDirectory.path
+        
+        if fileManager.fileExists(atPath: mediaPath) {
+            try fileManager.removeItem(at: mediaDirectory)
+            try fileManager.createDirectory(at: mediaDirectory, withIntermediateDirectories: true)
+            print("  ✅ Cleaned up Media directory")
+        }
+    }
+    
+    /// Clean up song files and return the count of deleted internal files
+    private func cleanupSongFiles(_ songs: [SongEntity]) throws -> Int {
+        let mediaDirectory = try getMediaDirectory()
+        let mediaPath = mediaDirectory.path
+        var internalFilesDeleted = 0
+        
+        for song in songs {
+            if let filePath = song.filePath, filePath.hasPrefix(mediaPath) {
+                if fileManager.fileExists(atPath: filePath) {
+                    try fileManager.removeItem(atPath: filePath)
+                    internalFilesDeleted += 1
+                }
+                // Delete LRC file if exists
+                if let lrcPath = song.lrcFilePath, fileManager.fileExists(atPath: lrcPath) {
+                    try fileManager.removeItem(atPath: lrcPath)
+                }
+            }
+        }
+        
+        return internalFilesDeleted
+    }
+    
+    /// Get the app's Media directory URL
+    private func getMediaDirectory() throws -> URL {
+        let documentsDirectory = try fileManager.url(
+            for: .documentDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        return documentsDirectory.appendingPathComponent("Media")
+    }
+    
+    /// Print factory reset completion message
+    private func printFactoryResetCompletionMessage() {
+        print("\n🎉 FACTORY RESET COMPLETED SUCCESSFULLY:")
+        print("  - All songs and media files deleted")
+        print("  - All playlists deleted")
+        print("  - All played song history deleted")
+        print("  - All genres and filter mappings deleted")
+        print("  - All other users deleted (current user preserved)")
+        print("  - Media directory cleaned")
+        print("  - App restored to initial state")
+    }
+    
+    /// Delete files associated with a single song (shared logic)
+    private func deleteSongFiles(for song: SongEntity) throws {
+        guard let filePath = song.filePath else { return }
+        
+        let mediaDirectory = try getMediaDirectory()
+        let mediaPath = mediaDirectory.path
+        let fileName = URL(fileURLWithPath: filePath).lastPathComponent
+        
+        // Check if the file is in our app's Media directory (internal file)
+        if filePath.hasPrefix(mediaPath) {
+            print("📁 Deleting internal file: \(fileName)")
+            
+            // Delete associated MP4 file if it exists
+            if fileManager.fileExists(atPath: filePath) {
+                try fileManager.removeItem(atPath: filePath)
+                print("✅ Deleted MP4 file: \(fileName)")
+            }
+            
+            // Delete associated LRC file if exists
+            if let lrcPath = song.lrcFilePath, fileManager.fileExists(atPath: lrcPath) {
+                try fileManager.removeItem(atPath: lrcPath)
+                print("✅ Deleted LRC file: \(URL(fileURLWithPath: lrcPath).lastPathComponent)")
+            }
+        } else {
+            print("🔒 Deleting external file reference: \(fileName)")
+            print("🗑️ Preserving external file, deleting only metadata")
+            
+            // For external files, clean up any associated bookmark
+            let bookmarkKey = "fileBookmark_\(fileName)"
+            if UserDefaults.standard.data(forKey: bookmarkKey) != nil {
+                UserDefaults.standard.removeObject(forKey: bookmarkKey)
+                print("🧹 Cleaned up bookmark for external file: \(fileName)")
+            }
         }
     }
     

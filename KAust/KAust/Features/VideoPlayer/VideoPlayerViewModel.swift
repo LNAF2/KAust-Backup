@@ -78,6 +78,9 @@ final class VideoPlayerViewModel: ObservableObject {
         // CRITICAL FIX: Synchronous performance mode entry - no async overhead
         // Remove async call that was causing drag hesitation
         enterUltraPerformanceModeSync()
+        
+        // Coordinate with modular PerformanceOptimizationService
+        NotificationCenter.default.post(name: .init("VideoUltraPerformanceModeEnabled"), object: nil)
     }
 
     /// Exit ultra-performance mode when dragging ends
@@ -89,6 +92,9 @@ final class VideoPlayerViewModel: ObservableObject {
         
         // CRITICAL FIX: Synchronous performance mode exit - no async overhead
         exitUltraPerformanceModeSync()
+        
+        // Coordinate with modular PerformanceOptimizationService
+        NotificationCenter.default.post(name: .init("VideoUltraPerformanceModeDisabled"), object: nil)
     }
 
     /// Enter ultra-performance mode during slider dragging with lightweight entry
@@ -289,6 +295,65 @@ final class VideoPlayerViewModel: ObservableObject {
         NotificationCenter.default.post(name: .init("VideoUltraPerformanceModeDisabled"), object: nil)
         
         print("✅ ULTRA-PERFORMANCE: Returned to normal operation")
+    }
+    
+    /// SYNCHRONOUS ultra-performance mode entry for maximum drag responsiveness
+    /// CRITICAL: No async overhead - immediate response for smooth video dragging
+    private func enterUltraPerformanceModeSync() {
+        print("🚀 SYNC ULTRA-PERFORMANCE: Immediate performance mode entry for smooth drag")
+        
+        // IMMEDIATE: Remove time observer with zero delay
+        if let timeObserver = self.timeObserver {
+            _player?.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
+            print("⏸️ SYNC: Time observer removed immediately")
+        }
+        
+        // IMMEDIATE: Suspend Core Data operations with zero delay
+        NotificationCenter.default.post(name: .init("SuspendCoreDataObservers"), object: nil)
+        print("⏸️ SYNC: Core Data observers suspended immediately")
+        
+        print("✅ SYNC ULTRA-PERFORMANCE: Maximum performance mode active - drag should be butter smooth")
+    }
+    
+    /// SYNCHRONOUS ultra-performance mode exit for immediate responsiveness
+    /// CRITICAL: No async overhead - immediate restoration for smooth transitions
+    private func exitUltraPerformanceModeSync() {
+        print("🔄 SYNC ULTRA-PERFORMANCE: Immediate performance mode exit")
+        
+        // IMMEDIATE: Restore time observer with zero delay
+        // Use simplified time observer setup for immediate response
+        if timeObserver == nil {
+            timeObserver = _player?.addPeriodicTimeObserver(
+                forInterval: CMTime(seconds: 0.5, preferredTimescale: 600),
+                queue: .main
+            ) { [weak self] time in
+                Task { @MainActor [weak self] in
+                    guard let self = self, let item = self.playerItem else { return }
+                    
+                    // Skip updates during ongoing drag operations
+                    guard !self.isDragging && !self.isSliderDragging else { return }
+                    
+                    if item.duration.isValid && !item.duration.isIndefinite {
+                        self.duration = item.duration.seconds
+                    }
+                    self.currentTime = time.seconds
+                    
+                    if !self.isScrubbing {
+                        self.scrubPosition = time.seconds
+                    }
+                    
+                    self.updateTimeDisplay()
+                }
+            }
+            print("▶️ SYNC: Time observer restored immediately")
+        }
+        
+        // IMMEDIATE: Restore Core Data operations with zero delay
+        NotificationCenter.default.post(name: .init("RestoreCoreDataObservers"), object: nil)
+        print("▶️ SYNC: Core Data observers restored immediately")
+        
+        print("✅ SYNC ULTRA-PERFORMANCE: Normal performance restored immediately")
     }
 
     // MARK: - Performance Management Methods
@@ -1542,39 +1607,4 @@ final class VideoPlayerViewModel: ObservableObject {
         NotificationCenter.default.post(name: .playNextSongFromPlaylist, object: nil)
     }
 
-    // MARK: - Synchronous Performance Mode Methods
-
-    /// Synchronous ultra-performance mode entry for immediate drag response
-    private func enterUltraPerformanceModeSync() {
-        print("🚀 ULTRA-PERFORMANCE: Entering ultra-performance mode SYNC for immediate drag response")
-        
-        // CRITICAL: Completely suspend time observer immediately - ZERO tolerance for any updates during drag
-        if let timeObserver = self.timeObserver {
-            _player?.removeTimeObserver(timeObserver)
-            self.timeObserver = nil
-            print("🚀 ULTRA-PERFORMANCE: Time observer COMPLETELY REMOVED for butter-smooth drag")
-        }
-        
-        // Notify all components to enter ultra-quiet mode
-        NotificationCenter.default.post(name: .init("VideoUltraPerformanceModeEnabled"), object: nil)
-        
-        print("✅ ULTRA-PERFORMANCE: Maximum performance mode active - drag should be butter smooth")
-    }
-
-    /// Synchronous ultra-performance mode exit for immediate response
-    private func exitUltraPerformanceModeSync() {
-        print("🔄 ULTRA-PERFORMANCE: Exiting ultra-performance mode SYNC")
-        
-        // Restore time observer if needed
-        if timeObserver == nil && currentVideo != nil {
-            Task {
-                await setupOptimizedTimeObserver()
-            }
-        }
-        
-        // Notify all components to exit ultra-quiet mode
-        NotificationCenter.default.post(name: .init("VideoUltraPerformanceModeDisabled"), object: nil)
-        
-        print("✅ ULTRA-PERFORMANCE: Returned to normal operation")
-    }
 } 
