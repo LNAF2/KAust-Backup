@@ -1,0 +1,397 @@
+import SwiftUI
+import Combine
+import AVFoundation
+import CoreData
+
+/// Enhanced file picker service with crash recovery and chunked processing
+@MainActor
+class EnhancedFilePickerService: ObservableObject {
+    @Published var processingState = BatchProcessingState.idle
+    @Published var batchProgress = BatchProgress(
+        totalFiles: 0, completedFiles: 0, currentBatch: 0, totalBatches: 0, 
+        currentBatchProgress: 0, successfulFiles: 0, failedFiles: 0, 
+        duplicateFiles: 0, estimatedTimeRemaining: nil, currentFileName: nil
+    )
+    @Published var results: [FileProcessingResult] = []
+    @Published var currentError: Error?
+    @Published var canPause = false
+    @Published var canResume = false
+    @Published var showLargeSelectionWarning = false
+    @Published var pendingLargeSelection: [URL] = []
+    
+    // DEDICATED UI STATE FOR PROGRESS VISIBILITY
+    @Published var isProcessingFiles = false
+    @Published var currentProgressPercentage: Double = 0.0
+    @Published var currentFileCount = 0
+    @Published var totalFileCount = 0
+    @Published var currentFileName: String = ""
+    @Published var currentBatch = 0
+    @Published var totalBatches = 0
+    
+    // TIME TRACKING
+    @Published var elapsedTime: TimeInterval = 0
+    @Published var estimatedTimeRemaining: TimeInterval?
+    
+    // NEW: Direct folder access support
+    var processingMode: ProcessingMode = .filePickerCopy
+    var folderSecurityScope: URL?
+    
+    // BATCH SELECTION MODE
+    @Published var isBatchSelectionMode = false
+    @Published var batchSelectionProgress = 0
+    @Published var totalBatchesNeeded = 0
+    @Published var currentBatchCollection: [URL] = []
+    @Published var showBatchInstructions = false
+    
+    // Configuration
+    private let batchSize: Int
+    private let maxConcurrentOperations: Int
+    private let largeSelectionThreshold = 500
+    
+    // Processing state
+    private(set) var allFiles: [URL] = []
+    private var currentBatchIndex = 0
+    private var currentFileIndexInBatch = 0
+    private var shouldPause = false
+    private var shouldCancel = false
+    private var processingStartTime: Date?
+    private var avgProcessingTimePerFile: TimeInterval = 0
+    
+    // Core Data access
+    private let persistenceController = PersistenceController.shared
+    
+    // Background processing queue
+    private let processingQueue = DispatchQueue(label: "com.kaust.fileprocessing", qos: .utility)
+    
+    // Timer for time tracking
+    private var timeTrackingTimer: Timer?
+    
+    // MARK: - Processing Stats
+    
+    /// Returns the current processing statistics
+    var processingStats: (successful: Int, failed: Int, duplicates: Int) {
+        let successful = results.filter { $0.status == .success }.count
+        let failed = results.filter { $0.status == .failed }.count
+        let duplicates = results.filter { $0.status == .duplicate }.count
+        return (successful, failed, duplicates)
+    }
+    
+    init(batchSize: Int = BatchProcessingConfig.defaultBatchSize,
+         maxConcurrentOperations: Int = BatchProcessingConfig.maxConcurrentOperations) {
+        self.batchSize = batchSize
+        self.maxConcurrentOperations = maxConcurrentOperations
+    }
+    
+    convenience init(optimizedFor fileCount: Int) {
+        self.init(
+            batchSize: BatchProcessingConfig.optimalBatchSize(for: fileCount),
+            maxConcurrentOperations: BatchProcessingConfig.optimalConcurrency(for: fileCount)
+        )
+        print("🔧 Initialized optimized file processor: batchSize=\(batchSize), concurrency=\(maxConcurrentOperations) for \(fileCount) files")
+    }
+    
+    deinit {
+        Task { @MainActor in
+            stopTimeTracking()
+        }
+    }
+    
+    // MARK: - Public Interface
+    
+    func handleFileSelection(_ urls: [URL]) {
+        let fileCount = urls.count
+        print("🎯 DEBUG: handleFileSelection called with \(fileCount) files")
+        print("📁 Received \(fileCount) files for automatic batch processing")
+        
+        Task {
+            print("🎯 DEBUG: About to call processFilesWithAutomaticBatching")
+            await processFilesWithAutomaticBatching(urls)
+        }
+    }
+    
+    func confirmLargeSelection() {
+        showLargeSelectionWarning = false
+        if !pendingLargeSelection.isEmpty {
+            Task {
+                await processFiles(pendingLargeSelection)
+            }
+            pendingLargeSelection = []
+        }
+    }
+    
+    func cancelLargeSelection() {
+        showLargeSelectionWarning = false
+        pendingLargeSelection = []
+    }
+    
+    // MARK: - Processing Control
+    
+    /// Clears all processing results and resets the state
+    func clearResults() {
+        results = []
+        currentError = nil
+        processingState = .idle
+        canPause = false
+        canResume = false
+        isProcessingFiles = false
+        currentProgressPercentage = 0.0
+        currentFileCount = 0
+        totalFileCount = 0
+        currentFileName = ""
+        currentBatch = 0
+        totalBatches = 0
+        print("🧹 Cleared all processing results and reset state")
+    }
+    
+    /// Pauses the current processing operation
+    func pauseProcessing() async {
+        guard processingState == .processing else { return }
+        shouldPause = true
+        processingState = .paused
+        canPause = false
+        canResume = true
+        await MainActor.run {
+            stopTimeTracking()
+        }
+        print("⏸️ Processing paused")
+    }
+    
+    /// Resumes a paused processing operation
+    func resumeProcessing() async {
+        guard processingState == .paused else { return }
+        shouldPause = false
+        processingState = .processing
+        canPause = true
+        canResume = false
+        await processFilesWithAutomaticBatching(allFiles)
+        print("▶️ Processing resumed")
+    }
+    
+    /// Cancels the current processing operation
+    func cancelProcessing() async {
+        shouldCancel = true
+        shouldPause = false
+        processingState = .cancelled
+        canPause = false
+        canResume = false
+        await MainActor.run {
+            stopTimeTracking()
+        }
+        isProcessingFiles = false
+        print("🛑 Processing cancelled")
+    }
+    
+    /// Restarts processing with the same files
+    func restartProcessing() async {
+        guard !allFiles.isEmpty else { return }
+        await resetProcessing()
+        await processFiles(allFiles)
+        print("🔄 Processing restarted with same files")
+    }
+    
+    /// Resets processing and clears all files
+    func resetAndClearFiles() async {
+        await resetProcessing()
+        allFiles = []
+        clearResults()
+        print("🧹 Processing reset and files cleared")
+    }
+    
+    // MARK: - Private Implementation
+    
+    private func processFilesWithAutomaticBatching(_ urls: [URL]) async {
+        await processFiles(urls)
+    }
+    
+    private func processFiles(_ urls: [URL]) async {
+        guard !urls.isEmpty else {
+            print("⚠️ No files to process")
+            return
+        }
+        
+        // Store files for potential restart
+        allFiles = urls
+        
+        // Initialize processing state
+        let fileCount = urls.count
+        totalFileCount = fileCount
+        currentBatch = 1
+        totalBatches = Int(ceil(Double(fileCount) / Double(batchSize)))
+        processingStartTime = Date()
+        
+        print("📊 Starting processing of \(fileCount) files in \(totalBatches) batches")
+        print("⚙️ Configuration: batchSize=\(batchSize), concurrency=\(maxConcurrentOperations)")
+        
+        // Update UI state
+        processingState = .processing
+        isProcessingFiles = true
+        canPause = true
+        canResume = false
+        
+        // Start time tracking
+        startTimeTracking()
+        
+        // Process files in batches
+        for batchStart in stride(from: 0, to: urls.count, by: batchSize) {
+            guard !shouldCancel else {
+                print("🛑 Processing cancelled")
+                break
+            }
+            
+            if shouldPause {
+                print("⏸️ Processing paused")
+                return
+            }
+            
+            let batchEnd = min(batchStart + batchSize, urls.count)
+            let batchUrls = Array(urls[batchStart..<batchEnd])
+            
+            print("🔄 Processing batch \(currentBatch) of \(totalBatches) (\(batchUrls.count) files)")
+            
+            // Process batch
+            await withTaskGroup(of: FileProcessingResult.self) { group in
+                for url in batchUrls {
+                    group.addTask {
+                        await self.processFile(url)
+                    }
+                }
+                
+                // Collect results
+                for await result in group {
+                    await MainActor.run {
+                        results.append(result)
+                        currentFileCount += 1
+                        currentProgressPercentage = Double(currentFileCount) / Double(totalFileCount)
+                        
+                        // Update batch progress
+                        batchProgress = BatchProgress(
+                            totalFiles: totalFileCount,
+                            completedFiles: currentFileCount,
+                            currentBatch: currentBatch,
+                            totalBatches: totalBatches,
+                            currentBatchProgress: Double(currentFileCount % batchSize) / Double(batchSize),
+                            successfulFiles: results.filter { $0.status == .success }.count,
+                            failedFiles: results.filter { $0.status == .failed }.count,
+                            duplicateFiles: results.filter { $0.status == .duplicate }.count,
+                            estimatedTimeRemaining: estimatedTimeRemaining,
+                            currentFileName: url.lastPathComponent
+                        )
+                    }
+                }
+            }
+            
+            currentBatch += 1
+            
+            // Small delay between batches to prevent system overload
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 second
+        }
+        
+        // Update final state
+        await MainActor.run {
+            processingState = shouldCancel ? .cancelled : .completed
+            isProcessingFiles = false
+            canPause = false
+            canResume = false
+            stopTimeTracking()
+            
+            print("✅ Processing complete:")
+            print("  - Total files: \(totalFileCount)")
+            print("  - Successful: \(results.filter { $0.status == .success }.count)")
+            print("  - Failed: \(results.filter { $0.status == .failed }.count)")
+            print("  - Duplicates: \(results.filter { $0.status == .duplicate }.count)")
+        }
+    }
+    
+    private func processFile(_ url: URL) async -> FileProcessingResult {
+        let startTime = Date()
+        var metadata: SimpleMetadata?
+        var error: Error?
+        var status: FileProcessingResult.ProcessingStatus = .failed
+        
+        do {
+            // Basic file validation
+            guard url.startAccessingSecurityScopedResource() else {
+                throw FileValidationError.permissionDenied
+            }
+            defer { url.stopAccessingSecurityScopedResource() }
+            
+            // Get file attributes
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            let fileSize = attributes[.size] as? Int64 ?? 0
+            
+            // Validate file size
+            if fileSize < 5_000_000 { // 5MB minimum
+                throw FileValidationError.fileSizeTooSmallForQuality
+            }
+            if fileSize > 200_000_000 { // 200MB maximum
+                throw FileValidationError.fileSizeTooBigForCopy
+            }
+            
+            // Get video metadata
+            let asset = AVAsset(url: url)
+            let duration = try await asset.load(.duration).seconds
+            let tracks = try await asset.load(.tracks)
+            var dimensions: CGSize?
+            
+            if let videoTrack = tracks.first(where: { $0.mediaType == .video }) {
+                dimensions = try await videoTrack.load(.naturalSize)
+            }
+            
+            metadata = SimpleMetadata(
+                duration: duration,
+                fileSize: fileSize,
+                videoDimensions: dimensions
+            )
+            
+            status = .success
+            
+        } catch {
+            status = .failed
+            self.error = error
+        }
+        
+        let processingTime = Date().timeIntervalSince(startTime)
+        
+        return FileProcessingResult(
+            url: url,
+            status: status,
+            metadata: metadata,
+            error: error,
+            processingTime: processingTime
+        )
+    }
+    
+    // MARK: - Time Tracking
+    
+    private func startTimeTracking() {
+        guard timeTrackingTimer == nil else { return }
+        let startTime = Date()
+        timeTrackingTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.elapsedTime = Date().timeIntervalSince(startTime)
+            if let startTime = self.processingStartTime {
+                let progress = Double(self.currentFileCount) / Double(self.totalFileCount)
+                let totalTime = Date().timeIntervalSince(startTime)
+                self.estimatedTimeRemaining = (totalTime / progress) - totalTime
+            }
+        }
+    }
+    
+    private func stopTimeTracking() {
+        Task { @MainActor in
+            timeTrackingTimer?.invalidate()
+            timeTrackingTimer = nil
+        }
+    }
+    
+    private func resetProcessing() async {
+        currentBatchIndex = 0
+        currentFileIndexInBatch = 0
+        shouldPause = false
+        shouldCancel = false
+        processingStartTime = nil
+        avgProcessingTimePerFile = 0
+        clearResults()
+        print("🔄 Processing state reset")
+    }
+}

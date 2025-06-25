@@ -28,6 +28,10 @@ struct Song: Identifiable, Equatable {
         URL(fileURLWithPath: filePath)
     }
     
+    var formattedDuration: String {
+        duration
+    }
+    
     init(id: String, title: String, artist: String, duration: String, filePath: String) {
         self.id = id
         self.title = title

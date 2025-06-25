@@ -9,7 +9,7 @@
 import SwiftUI
 
 struct EmptyPanelView: View {
-    var onSettingsTapped: (() -> Void)? = nil
+    let onSettingsTapped: () -> Void
     
     // MARK: - Properties
     private let panelHeight: CGFloat = AppConstants.Layout.titlePanelHeight
@@ -17,38 +17,40 @@ struct EmptyPanelView: View {
     
     // COG icon properties
     private let iconSize: CGFloat = 24.0
-    private let iconPadding: CGFloat = 8.0  // Match playlist panelGap for alignment
+    private let iconPadding: CGFloat = 8.0
     
     // MARK: - Body
     var body: some View {
-        // Panel with COG icon positioned in top right
-        Rectangle()
-            .fill(AppTheme.rightPanelBackground)
-            .frame(height: panelHeight)
-            .frame(maxWidth: .infinity)
-            .overlay(
-                Rectangle()
-                    .stroke(AppTheme.rightPanelAccent, lineWidth: 1)
-            )
-            .overlay(
-                HStack {
-                    Spacer()
-                    
-                    // COG icon positioned on the right side
-                    if let onSettingsTapped = onSettingsTapped {
-                        Button(action: onSettingsTapped) {
-                            Image(systemName: "gearshape")
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(width: iconSize, height: iconSize)
-                                .foregroundColor(AppTheme.rightPanelAccent)
-                                .symbolRenderingMode(.monochrome)
-                        }
-                        .padding(.trailing, iconPadding)
-                    }
+        ZStack {
+            Rectangle()
+                .fill(AppTheme.rightPanelBackground)
+                .frame(height: panelHeight)
+                .frame(maxWidth: .infinity)
+                .overlay(
+                    Rectangle()
+                        .stroke(AppTheme.rightPanelAccent, lineWidth: 1)
+                )
+            
+            HStack {
+                Spacer()
+                
+                // COG icon positioned on the right side
+                Button(action: {
+                    print("Settings icon tapped")
+                    onSettingsTapped()
+                }) {
+                    Image(systemName: "gearshape")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: iconSize, height: iconSize)
+                        .foregroundColor(AppTheme.rightPanelAccent)
+                        .symbolRenderingMode(.monochrome)
                 }
-                .padding(.horizontal, 8) // Match panelGap from TitlePanelView
-            )
+                .buttonStyle(PlainButtonStyle())
+                .padding(.trailing, iconPadding)
+            }
+            .padding(.horizontal, 8)
+        }
     }
 }
 

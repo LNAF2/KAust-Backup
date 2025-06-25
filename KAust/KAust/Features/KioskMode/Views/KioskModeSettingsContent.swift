@@ -1,15 +1,7 @@
-//
-//  KioskModeSettingsView.swift
-//  KAust
-//
-//  Created by Erling Breaden on 19/6/2025.
-//
-
 import SwiftUI
 
-// MARK: - Kiosk Mode Settings View
-
-struct KioskModeSettingsView: View {
+/// The main content view for Kiosk mode settings
+struct KioskModeSettingsContent: View {
     @ObservedObject var kioskModeService: KioskModeService
     @EnvironmentObject var roleManager: UserRoleManager
     
@@ -21,23 +13,72 @@ struct KioskModeSettingsView: View {
     @State private var isLoading = false
     
     var body: some View {
-        Group {
+        VStack(spacing: 8) {
             if kioskModeService.isKioskModeActive {
-                // Kiosk Mode Active - Show limited options
-                kioskActiveSection
+                KioskModeActiveView(
+                    showingPINVerification: $showingPINVerification,
+                    onDeactivate: deactivateKioskMode
+                )
             } else if roleManager.canAccessKioskModeSettings {
-                // Admin/Dev/Owner - Show full Kiosk Mode management (Client cannot see)
-                kioskManagementSection
+                KioskModeManagementView(
+                    kioskModeService: kioskModeService,
+                    isLoading: $isLoading,
+                    showingPINSetup: $showingPINSetup,
+                    showingPINChange: $showingPINChange,
+                    onToggle: toggleKioskMode
+                )
             }
-            // Clients and other roles see nothing
+        }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK") { showingError = false }
+        } message: {
+            Text(errorMessage)
         }
     }
     
-    // MARK: - Kiosk Mode Active Section
+    private func toggleKioskMode() async {
+        await MainActor.run { isLoading = true }
+        
+        do {
+            if kioskModeService.isKioskModeActive {
+                throw KioskModeError.authenticationRequired
+            } else {
+                try await kioskModeService.activateKioskMode()
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                showingError = true
+            }
+        }
+        
+        await MainActor.run { isLoading = false }
+    }
     
-    private var kioskActiveSection: some View {
+    private func deactivateKioskMode(with pin: String) async {
+        do {
+            try await kioskModeService.deactivateKioskMode(with: pin)
+            await MainActor.run {
+                showingPINVerification = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = error.localizedDescription
+                showingError = true
+                showingPINVerification = false
+            }
+        }
+    }
+}
+
+/// View shown when Kiosk mode is active
+private struct KioskModeActiveView: View {
+    @Binding var showingPINVerification: Bool
+    let onDeactivate: (String) async -> Void
+    
+    var body: some View {
         VStack(spacing: 0) {
-            // Kiosk Mode Status Header
+            // Status Header
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Kiosk Mode Active")
@@ -99,22 +140,25 @@ struct KioskModeSettingsView: View {
             PINEntryView(
                 mode: .verify,
                 onSuccess: { pin in
-                    Task {
-                        await deactivateKioskMode(with: pin)
-                    }
+                    Task { await onDeactivate(pin) }
                 },
-                onCancel: {
-                    showingPINVerification = false
-                }
+                onCancel: { showingPINVerification = false }
             )
         }
     }
+}
+
+/// View shown for managing Kiosk mode settings
+private struct KioskModeManagementView: View {
+    @ObservedObject var kioskModeService: KioskModeService
+    @Binding var isLoading: Bool
+    @Binding var showingPINSetup: Bool
+    @Binding var showingPINChange: Bool
+    let onToggle: () async -> Void
     
-    // MARK: - Kiosk Management Section
-    
-    private var kioskManagementSection: some View {
+    var body: some View {
         VStack(spacing: 0) {
-            // Section Header
+            // Header
             HStack {
                 Text("Kiosk Mode")
                     .font(.headline)
@@ -135,9 +179,8 @@ struct KioskModeSettingsView: View {
             Divider()
                 .background(Color.gray)
             
-            // PIN Management
             if !kioskModeService.isPINSet() {
-                // No PIN set - Show setup option
+                // Setup option
                 Button(action: { showingPINSetup = true }) {
                     HStack {
                         Image(systemName: "plus.circle")
@@ -165,9 +208,9 @@ struct KioskModeSettingsView: View {
                 }
                 .background(Color.black)
             } else {
-                // PIN is set - Show management options
+                // Management options
                 VStack(spacing: 0) {
-                    // Kiosk Mode Toggle
+                    // Toggle
                     HStack {
                         Image(systemName: "lock.shield")
                             .foregroundColor(.blue)
@@ -189,9 +232,7 @@ struct KioskModeSettingsView: View {
                             get: { kioskModeService.isKioskModeActive },
                             set: { isOn in
                                 if isOn {
-                                    Task {
-                                        await toggleKioskMode()
-                                    }
+                                    Task { await onToggle() }
                                 }
                             }
                         ))
@@ -205,7 +246,7 @@ struct KioskModeSettingsView: View {
                     Divider()
                         .background(Color.gray)
                     
-                    // Change PIN Option
+                    // Change PIN
                     Button(action: { showingPINChange = true }) {
                         HStack {
                             Image(systemName: "key.horizontal")
@@ -238,185 +279,16 @@ struct KioskModeSettingsView: View {
         .sheet(isPresented: $showingPINSetup) {
             PINSetupFlowView(
                 kioskModeService: kioskModeService,
-                onComplete: {
-                    showingPINSetup = false
-                },
-                onCancel: {
-                    showingPINSetup = false
-                }
+                onComplete: { showingPINSetup = false },
+                onCancel: { showingPINSetup = false }
             )
         }
         .sheet(isPresented: $showingPINChange) {
             PINChangeFlowView(
                 kioskModeService: kioskModeService,
-                onComplete: {
-                    showingPINChange = false
-                },
-                onCancel: {
-                    showingPINChange = false
-                }
+                onComplete: { showingPINChange = false },
+                onCancel: { showingPINChange = false }
             )
         }
-        .alert("Error", isPresented: $showingError) {
-            Button("OK") {
-                showingError = false
-            }
-        } message: {
-            Text(errorMessage)
-        }
-    }
-    
-    // MARK: - Actions
-    
-    private func toggleKioskMode() async {
-        await MainActor.run {
-            isLoading = true
-        }
-        
-        do {
-            if kioskModeService.isKioskModeActive {
-                // This shouldn't happen from the toggle since we only allow turning ON
-                // But if it does, we'd need PIN verification for deactivation
-                throw KioskModeError.authenticationRequired
-            } else {
-                try await kioskModeService.activateKioskMode()
-            }
-        } catch {
-            await MainActor.run {
-                errorMessage = error.localizedDescription
-                showingError = true
-            }
-        }
-        
-        await MainActor.run {
-            isLoading = false
-        }
-    }
-    
-    private func deactivateKioskMode(with pin: String) async {
-        do {
-            try await kioskModeService.deactivateKioskMode(with: pin)
-            await MainActor.run {
-                showingPINVerification = false
-            }
-        } catch {
-            await MainActor.run {
-                errorMessage = error.localizedDescription
-                showingError = true
-                showingPINVerification = false
-            }
-        }
-    }
-}
-
-// MARK: - PIN Change Flow View
-
-struct PINChangeFlowView: View {
-    @ObservedObject var kioskModeService: KioskModeService
-    let onComplete: () -> Void
-    let onCancel: () -> Void
-    
-    @State private var currentStep: PINChangeStep = .enterCurrent
-    @State private var currentPIN = ""
-    @State private var errorMessage: String?
-    
-    enum PINChangeStep {
-        case enterCurrent
-        case enterNew
-        case success
-    }
-    
-    var body: some View {
-        Group {
-            switch currentStep {
-            case .enterCurrent:
-                PINEntryView(
-                    mode: .verify,
-                    onSuccess: { pin in
-                        currentPIN = pin
-                        Task {
-                            await verifyCurrent(pin)
-                        }
-                    },
-                    onCancel: onCancel
-                )
-                
-            case .enterNew:
-                PINEntryView(
-                    mode: .change(currentPIN: currentPIN),
-                    onSuccess: { newPIN in
-                        Task {
-                            await changeToNewPIN(newPIN)
-                        }
-                    },
-                    onCancel: onCancel
-                )
-                
-            case .success:
-                PINSuccessView(onComplete: onComplete)
-            }
-        }
-        .alert("Error", isPresented: .constant(errorMessage != nil)) {
-            Button("OK") {
-                errorMessage = nil
-            }
-        } message: {
-            if let errorMessage = errorMessage {
-                Text(errorMessage)
-            }
-        }
-    }
-    
-    private func verifyCurrent(_ pin: String) async {
-        do {
-            let isValid = try await kioskModeService.verifyPIN(pin)
-            if isValid {
-                await MainActor.run {
-                    withAnimation {
-                        currentStep = .enterNew
-                    }
-                }
-            } else {
-                await MainActor.run {
-                    errorMessage = "Incorrect PIN"
-                }
-            }
-        } catch {
-            await MainActor.run {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-    
-    private func changeToNewPIN(_ newPIN: String) async {
-        do {
-            try await kioskModeService.changePIN(current: currentPIN, new: newPIN)
-            await MainActor.run {
-                withAnimation {
-                    currentStep = .success
-                }
-            }
-        } catch {
-            await MainActor.run {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-}
-
-// MARK: - Preview
-
-struct KioskModeSettingsView_Previews: PreviewProvider {
-    static var previews: some View {
-        let mockAuthService = MockAuthenticationService()
-        let mockKioskService = KioskModeService(authService: mockAuthService)
-        let mockRoleManager = UserRoleManager(role: .admin)
-        
-        VStack {
-            KioskModeSettingsView(kioskModeService: mockKioskService)
-                .environmentObject(mockRoleManager)
-        }
-        .background(Color.black)
-        .previewDisplayName("Kiosk Mode Settings")
     }
 } 

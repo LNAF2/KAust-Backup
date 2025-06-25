@@ -16,18 +16,17 @@ struct KAustApp: App {
     @State private var currentUserRole: UserRole = .client
     @StateObject private var focusManager = FocusManager()
     @StateObject private var authenticationService = AuthenticationService()
+    @StateObject private var userPreferencesService = UserPreferencesService()
     @StateObject private var kioskModeService: KioskModeService
-    @StateObject private var userPreferencesService: UserPreferencesService
     let persistenceController = PersistenceController.shared
     
     init() {
         let authService = AuthenticationService()
         let kiosk = KioskModeService(authService: authService)
-        let preferencesService = UserPreferencesService()
         
         self._authenticationService = StateObject(wrappedValue: authService)
         self._kioskModeService = StateObject(wrappedValue: kiosk)
-        self._userPreferencesService = StateObject(wrappedValue: preferencesService)
+        self._userPreferencesService = StateObject(wrappedValue: UserPreferencesService())
     }
 
     var body: some Scene {

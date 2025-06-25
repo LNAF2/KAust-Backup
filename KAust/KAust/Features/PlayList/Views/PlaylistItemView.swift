@@ -10,40 +10,58 @@ import SwiftUI
 
 struct PlaylistItemView: View {
     let song: Song
-    private let cornerRadius: CGFloat = 8
-
+    
     var body: some View {
-        ZStack {
-            AppTheme.rightPanelListBackground
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color.white)
-                .overlay(
-                    RoundedRectangle(cornerRadius: cornerRadius)
-                        .stroke(AppTheme.rightPanelAccent.opacity(0.5), lineWidth: 1)
-                )
-            VStack(alignment: .leading, spacing: 2) {
-                Text(song.cleanArtist.uppercased())
-                    .font(.headline)
-                    .fontWeight(.bold)
-                    .foregroundColor(AppTheme.rightPanelAccent)
-                HStack(alignment: .firstTextBaseline) {
-                    Text(song.cleanTitle.uppercased())
-                        .font(.headline)
-                        .fontWeight(.regular)
-                        .foregroundColor(AppTheme.rightPanelAccent.opacity(0.7))
-                    Spacer()
-                    Text(song.duration.uppercased())
-                        .font(.headline)
-                        .fontWeight(.regular)
-                        .foregroundColor(AppTheme.rightPanelAccent)
-                        .alignmentGuide(.firstTextBaseline) { d in d[.firstTextBaseline] }
-                }
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(song.title.uppercased())
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundColor(AppTheme.rightPanelTextPrimary)
+                    .lineLimit(1)
+                
+                Text(song.artist.uppercased())
+                    .font(.system(size: 14))
+                    .foregroundColor(AppTheme.rightPanelTextSecondary)
+                    .lineLimit(1)
             }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 12)
+            
+            Spacer()
+            
+            Text(song.duration)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundColor(AppTheme.rightPanelTextSecondary)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(AppTheme.rightPanelBackground)
+        .cornerRadius(8)
+        .onAppear {
+            print("📱 PlaylistItemView appeared - \(song.title)")
+        }
     }
+}
+
+#Preview {
+    Group {
+        PlaylistItemView(
+            song: Song(
+                id: "1",
+                title: "Test Song",
+                artist: "Test Artist",
+                duration: "3:30",
+                filePath: "/path/to/song.mp4"
+            )
+        )
+        PlaylistItemView(
+            song: Song(
+                id: "2",
+                title: "Another Song With a Very Long Title That Should Be Truncated",
+                artist: "Artist With a Very Long Name That Should Also Be Truncated",
+                duration: "4:15",
+                filePath: "/path/to/song.mp4"
+            )
+        )
+    }
+    .padding()
+    .background(AppTheme.rightPanelBackground)
 }

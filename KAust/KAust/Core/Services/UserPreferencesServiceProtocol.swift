@@ -10,6 +10,7 @@ import Combine
 
 /// Protocol for managing all user preferences across the app
 /// Centralizes UserDefaults access and provides reactive updates for SwiftUI
+@MainActor
 protocol UserPreferencesServiceProtocol {
     
     // MARK: - Audio Preferences

@@ -1,3 +1,10 @@
+/*
+ * TEMPORARILY COMMENTED OUT - DO NOT DELETE
+ * This file contains the file picker functionality that is currently disabled
+ * but may be needed in the future.
+ */
+
+/*
 import SwiftUI
 import UniformTypeIdentifiers
 import AVFoundation
@@ -383,4 +390,5 @@ struct FileResultRow: View {
         formatter.countStyle = .file
         return formatter.string(fromByteCount: size)
     }
-} 
+}
+*/ 

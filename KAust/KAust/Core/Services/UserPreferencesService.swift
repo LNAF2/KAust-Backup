@@ -4,6 +4,7 @@ import Combine
 
 /// Concrete implementation of UserPreferencesServiceProtocol using UserDefaults for persistence
 /// Provides centralized preference management with reactive SwiftUI support
+@MainActor
 final class UserPreferencesService: ObservableObject, UserPreferencesServiceProtocol {
     
     // MARK: - UserDefaults Keys
@@ -309,28 +310,12 @@ final class UserPreferencesService: ObservableObject, UserPreferencesServiceProt
     
     /// Apply volume to the system audio session
     private func applyVolumeToSystem(_ volumeLevel: Float) {
-        // Note: iOS restricts direct system volume control for security reasons
-        // This method sets the AVAudioSession volume for the app's audio content
-        // The actual system volume is controlled by the user via hardware buttons or Control Center
-        
-        do {
-            let audioSession = AVAudioSession.sharedInstance()
-            
-            // Ensure we're in playback category for volume control
-            if audioSession.category != .playback {
-                try audioSession.setCategory(.playback, mode: .moviePlayback, options: [.allowAirPlay, .allowBluetooth])
-            }
-            
-            // For iOS, we primarily control the app's playback volume through AVPlayer
-            // Post notification for VideoPlayerViewModel to apply volume
+        Task { @MainActor in
             NotificationCenter.default.post(
                 name: NSNotification.Name("ApplyAppVolume"),
                 object: nil,
                 userInfo: ["volume": volumeLevel, "isMuted": isMuted]
             )
-            
-        } catch {
-            print("⚠️ Failed to configure audio session for volume control: \(error)")
         }
     }
 }

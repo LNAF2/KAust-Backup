@@ -28,54 +28,47 @@ struct VideoPlayerContainerView: View {
     private let aspectRatio: CGFloat = 16.0 / 9.0
     
     var body: some View {
-        if viewModel.currentVideo != nil {
-            if viewModel.isMinimized {
-                // SMALL DRAGGABLE OVERLAY - No background, positioned over UI
-                GeometryReader { geometry in
-                    videoPlayerContainer(geometry)
-                        .frame(
-                            width: calculateWidth(geometry),
-                            height: calculateHeight(geometry)
-                        )
-                        .cornerRadius(cornerRadius)
-                        .position(
-                            x: geometry.size.width / 2 + viewModel.overlayOffset.width,
-                            y: geometry.size.height / 2 + viewModel.overlayOffset.height
-                        )
-                        .onAppear {
-                            setupNotificationObservers()
-                            // Initialize drag position
-                            basePosition = viewModel.overlayOffset
-                        }
-                        .onChange(of: viewModel.overlayOffset) { _, newOffset in
-                            // Sync local position when viewModel changes (e.g., centering)
-                            basePosition = newOffset
-                        }
+        GeometryReader { geometry in
+            ZStack {
+                // Video layer
+                if let player = viewModel.player {
+                    VideoPlayer(player: player)
+                        .allowsHitTesting(false)
                 }
-            } else {
-                // FULLSCREEN MODE - Black background, centered
-                GeometryReader { geometry in
-                    VStack {
-                        Spacer()
-                        HStack {
-                            Spacer()
-                            
-                            videoPlayerContainer(geometry)
-                                .frame(
-                                    width: geometry.size.width,
-                                    height: geometry.size.height
-                                )
-                            
-                            Spacer()
-                        }
-                        Spacer()
-                    }
-                    .background(Color.black.ignoresSafeArea())
-                    .onAppear {
-                        setupNotificationObservers()
-                    }
+                
+                // Controls layer
+                if viewModel.areControlsVisible {
+                    controlsOverlay(geometry)
+                }
+                
+                // AirPlay indicator
+                if viewModel.isAirPlayActive {
+                    airPlayIndicator()
                 }
             }
+            .frame(width: viewModel.isMinimized ? 320 : nil,
+                   height: viewModel.isMinimized ? 180 : nil)
+            .offset(viewModel.overlayOffset)
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        guard !isDragBlocked && viewModel.isMinimized else { return }
+                        viewModel.overlayOffset = value.translation
+                    }
+                    .onEnded { value in
+                        guard !isDragBlocked && viewModel.isMinimized else { return }
+                        viewModel.overlayOffset = value.translation
+                    }
+            )
+            .onTapGesture {
+                handleControlsTap()
+            }
+        }
+        .onAppear {
+            setupNotificationObservers()
+        }
+        .onDisappear {
+            cleanupNotificationObservers()
         }
     }
     
@@ -455,6 +448,11 @@ struct VideoPlayerContainerView: View {
             isDragBlocked = false
             print("✅ CONTAINER: Video drag unblocked")
         }
+    }
+    
+    private func cleanupNotificationObservers() {
+        // Remove all notification observers
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - Drag Gesture

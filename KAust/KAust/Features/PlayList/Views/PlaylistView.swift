@@ -13,7 +13,7 @@ import CoreData
 
 struct PlaylistView: View {
     @ObservedObject var viewModel: PlaylistViewModel
-    @EnvironmentObject var videoPlayerViewModel: VideoPlayerViewModel
+    @EnvironmentObject private var videoPlayerViewModel: VideoPlayerViewModel
     @State private var isEditing = false
     @State private var cancellables = Set<AnyCancellable>()
     @State private var swipeState: [String: CGFloat] = [:]
@@ -26,23 +26,42 @@ struct PlaylistView: View {
     private let swipeThreshold: CGFloat = -80
 
     var body: some View {
-        VStack(spacing: 0) {
-            playlistHeader
-            playlistContent
-        }
-        .background(Color.white)
-        .cornerRadius(cornerRadius)
-        .overlay(
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .stroke(AppTheme.rightPanelAccent, lineWidth: 1)
-        )
-        .alert("Error", isPresented: $viewModel.isShowingError) {
-            Button("OK") {
-                viewModel.dismissError()
+        ScrollView {
+            LazyVStack(spacing: 4) {
+                if viewModel.playlistItems.isEmpty {
+                    emptyPlaylistView
+                } else {
+                    ForEach(viewModel.playlistItems) { song in
+                        PlaylistItemView(song: song)
+                            .onTapGesture {
+                                print("👆 Tapped song in playlist: \(song.title)")
+                                viewModel.playSong(song)
+                            }
+                            .opacity(viewModel.isSongCurrentlyPlaying(song) ? 0.5 : 1.0)
+                    }
+                }
             }
-        } message: {
-            Text(viewModel.errorMessage)
+            .padding(.horizontal, 8)
         }
+        .background(AppTheme.rightPanelBackground)
+        .onAppear {
+            print("📱 PlaylistView appeared - \(viewModel.playlistItems.count) songs")
+        }
+    }
+    
+    private var emptyPlaylistView: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "music.note.list")
+                .font(.largeTitle)
+                .foregroundColor(AppTheme.rightPanelAccent)
+            Text("No songs in playlist")
+                .font(.headline)
+                .foregroundColor(AppTheme.rightPanelTextPrimary)
+            Text("Add songs from the song list")
+                .font(.subheadline)
+                .foregroundColor(AppTheme.rightPanelTextSecondary)
+        }
+        .frame(maxWidth: .infinity, minHeight: 200)
     }
     
     private var playlistContent: some View {
@@ -60,7 +79,7 @@ struct PlaylistView: View {
     }
     
     private var scrollableContent: some View {
-        Group {
+        VStack {
             if viewModel.playlistItems.isEmpty {
                 // Empty state - show PlaylistEmptyState
                 PlaylistEmptyState()
@@ -76,7 +95,7 @@ struct PlaylistView: View {
                     }
                     .background(Color.clear)
                     .padding(.vertical, 4)
-                    .onReceive(viewModel.scrollToBottomPublisher) {
+                    .onReceive(viewModel.scrollToBottomPublisher) { _ in
                         // Scroll to the last item with animation
                         if let lastSong = viewModel.playlistItems.last {
                             withAnimation(.easeInOut(duration: 0.5)) {
@@ -245,13 +264,10 @@ struct PlaylistView: View {
                 
                 // Remove the song from the playlist since it can't be played
                 if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
-                    await viewModel.removeFromPlaylist(at: IndexSet(integer: index))
+                    await viewModel.removeSong(at: index)
                 }
                 
-                // Show error alert
-                await MainActor.run {
-                    viewModel.showError("Cannot play '\(song.cleanTitle)' - MP4 file is missing")
-                }
+                print("❌ Cannot play '\(song.cleanTitle)' - MP4 file is missing")
                 return
             }
             
@@ -283,7 +299,7 @@ struct PlaylistView: View {
     private func deleteSong(_ song: Song) {
         Task {
             if let index = viewModel.playlistItems.firstIndex(where: { $0.id == song.id }) {
-                await viewModel.removeFromPlaylist(at: IndexSet(integer: index))
+                await viewModel.removeSong(at: index)
             }
         }
     }

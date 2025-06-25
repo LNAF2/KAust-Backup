@@ -1,78 +1,38 @@
 import SwiftUI
+import Foundation
+import Combine
 
 struct PlaylistPanelView: View {
-    @ObservedObject var viewModel: PlaylistViewModel
-    @EnvironmentObject var videoPlayerViewModel: VideoPlayerViewModel
+    @StateObject private var viewModel: PlaylistViewModel
+    @EnvironmentObject private var videoPlayerViewModel: VideoPlayerViewModel
+    
+    init(videoPlayerViewModel: VideoPlayerViewModel) {
+        _viewModel = StateObject(wrappedValue: PlaylistViewModel(videoPlayerViewModel: videoPlayerViewModel))
+    }
     
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text("PLAYLIST")
+                Text("PLAY LIST")
                     .font(.headline)
-                    .foregroundColor(.white)
+                    .foregroundColor(AppTheme.rightPanelAccent)
                 Spacer()
-                Text("\(viewModel.songs.count) songs")
+                Text("\(viewModel.playlistItems.count) Songs")
                     .font(.subheadline)
-                    .foregroundColor(.gray)
+                    .foregroundColor(AppTheme.rightPanelAccent)
             }
-            .padding()
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
             
-            // Song List
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ForEach(viewModel.songs) { song in
-                        PlaylistItemView(song: song)
-                            .onTapGesture {
-                                if videoPlayerViewModel.currentVideo == nil {
-                                    videoPlayerViewModel.play(song: song)
-                                    viewModel.removeSong(song)
-                                }
-                            }
-                            .opacity(videoPlayerViewModel.currentVideo == nil ? 1 : 0.5)
-                            .disabled(videoPlayerViewModel.currentVideo != nil)
-                    }
-                }
-            }
+            // Playlist
+            PlaylistView(viewModel: viewModel)
+                .frame(maxHeight: .infinity)
         }
-        .background(Color.black)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color.purple, lineWidth: 1)
-        )
-    }
-}
-
-struct PlaylistItemView: View {
-    let song: Song
-    
-    var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(song.title)
-                    .font(.headline)
-                    .foregroundColor(.white)
-                Text(song.artist)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-            Spacer()
-            Image(systemName: "play.fill")
-                .foregroundColor(.purple)
-        }
-        .padding()
-        .background(Color.black)
-        .overlay(
-            Rectangle()
-                .frame(height: 1)
-                .foregroundColor(Color.gray.opacity(0.3)),
-            alignment: .bottom
-        )
+        .background(AppTheme.rightPanelBackground)
     }
 }
 
 #Preview {
-    PlaylistPanelView(viewModel: PlaylistViewModel())
-        .environmentObject(VideoPlayerViewModel())
+    PlaylistPanelView(videoPlayerViewModel: VideoPlayerViewModel())
 } 

@@ -7,7 +7,7 @@ import CoreData
 struct SongListDisplayView: View {
     @StateObject private var viewModel = SonglistViewModel()
     @State private var selectedSong: Song?
-    @AppStorage("swipeToDeleteEnabled") private var swipeToDeleteEnabled = false
+    @EnvironmentObject var userPreferences: UserPreferencesService
     
     var body: some View {
         VStack(spacing: 0) {
@@ -111,7 +111,7 @@ struct SongListDisplayView: View {
             SongRowView(song: song)
             .listRowBackground(Color.clear)
             .listRowSeparator(.hidden)
-            .if(swipeToDeleteEnabled) { view in
+            .if(userPreferences.swipeToDeleteEnabled) { view in
                 view.swipeActions(edge: .trailing) {
                     Button("Delete", role: .destructive) {
                         Task {
@@ -125,8 +125,6 @@ struct SongListDisplayView: View {
         .background(Color.clear)
         .padding(.horizontal, AppConstants.Layout.defaultPadding)
     }
-    
-
 }
 
 // MARK: - Search Bar View
@@ -235,8 +233,6 @@ struct SongRowView: View {
         .background(Color.clear)
     }
 }
-
-
 
 // MARK: - Empty States
 

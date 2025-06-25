@@ -17,18 +17,18 @@ extension Notification.Name {
 @MainActor
 final class VideoPlayerViewModel: ObservableObject {
     // MARK: - Published Properties
-    @Published var currentVideo: Song?
-    @Published var isPlaying: Bool = false
+    @Published private(set) var currentVideo: Song?
+    @Published private(set) var isPlaying: Bool = false
     @Published var isMinimized: Bool = true
     @Published var areControlsVisible: Bool = true
     @Published var isAirPlayActive: Bool = false
     @Published var overlayOffset: CGSize = .zero
-    @Published var currentTime: Double = 0
-    @Published var duration: Double = 0
-    @Published var formattedCurrentTime: String = "00:00"
-    @Published var formattedDuration: String = "00:00"
-    @Published var formattedTimeRemaining: String = "00:00"
-    @Published var formattedScrubTime: String = "00:00" // Single time display during scrubbing
+    @Published private(set) var currentTime: Double = 0
+    @Published private(set) var duration: Double = 0
+    @Published private(set) var formattedCurrentTime: String = "00:00"
+    @Published private(set) var formattedDuration: String = "00:00"
+    @Published private(set) var formattedTimeRemaining: String = "00:00"
+    @Published private(set) var formattedScrubTime: String = "00:00"
     
     // MARK: - Scrub Bar State for Visual Feedback
     @Published var scrubPosition: Double = 0 // Visual position during scrubbing
@@ -46,10 +46,23 @@ final class VideoPlayerViewModel: ObservableObject {
     private let controlsFadeDelay: TimeInterval = 5.0
     
     // MARK: - Private Properties
-    private var _player: AVPlayer?
-    var player: AVPlayer? { _player } // Public getter
-    
-    private var playerItem: AVPlayerItem?
+    private var _player: AVPlayer? {
+        willSet {
+            if let oldPlayer = _player {
+                oldPlayer.pause()
+                if let timeObserver = timeObserver {
+                    oldPlayer.removeTimeObserver(timeObserver)
+                }
+            }
+        }
+    }
+    private var playerItem: AVPlayerItem? {
+        willSet {
+            if playerItem != newValue {
+                playerItem?.asset.cancelLoading()
+            }
+        }
+    }
     private var timeObserver: Any?
     private var controlsFadeTimer: Timer?
     private var cancellables = Set<AnyCancellable>()
@@ -65,6 +78,9 @@ final class VideoPlayerViewModel: ObservableObject {
     nonisolated(unsafe) private var systemInterruptionObserver: NSObjectProtocol?
     nonisolated(unsafe) private var appLifecycleObservers: [NSObjectProtocol] = []
     nonisolated(unsafe) private var volumeObserver: NSObjectProtocol?
+    
+    // MARK: - Public Properties
+    var player: AVPlayer? { _player }
     
     // MARK: - Drag State Management
 
@@ -592,112 +608,76 @@ final class VideoPlayerViewModel: ObservableObject {
         appLifecycleObservers.append(activeObserver)
     }
     
-         /// Setup volume control observer to listen for volume changes from settings
-     private func setupVolumeObserver() {
-         print("🔊 SYSTEM: Setting up volume observer...")
-         
-         // Remove existing observer
-         if let observer = volumeObserver {
-             NotificationCenter.default.removeObserver(observer)
-             print("🔊 SYSTEM: Removed existing volume observer")
-         }
-         
-         // Observe volume changes from UserPreferencesService
-         volumeObserver = NotificationCenter.default.addObserver(
-             forName: NSNotification.Name("ApplyAppVolume"),
-             object: nil,
-             queue: .main
-         ) { [weak self] notification in
-             print("🔊 SYSTEM: Volume observer received notification")
-             Task { @MainActor [weak self] in
-                 await self?.handleVolumeChange(notification)
-             }
-         }
-         
-         print("🔊 SYSTEM: Volume observer configured successfully")
-     }
+    /// Setup volume control observer to listen for volume changes from settings
+    private func setupVolumeObserver() {
+        Task { @MainActor in
+            // Remove existing observer
+            if let observer = volumeObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            
+            // Observe volume changes from UserPreferencesService
+            volumeObserver = NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("ApplyAppVolume"),
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                Task { @MainActor [weak self] in
+                    await self?.handleVolumeChange(notification)
+                }
+            }
+        }
+    }
     
-         /// Handle volume changes from settings
-     private func handleVolumeChange(_ notification: Notification) async {
-         print("🔊 VIDEO: Received volume change notification")
-         
-         guard let userInfo = notification.userInfo,
-               let volume = userInfo["volume"] as? Float,
-               let isMuted = userInfo["isMuted"] as? Bool else {
-             print("❌ VIDEO: Invalid volume notification userInfo")
-             return
-         }
-         
-         print("🔊 VIDEO: Volume change details - Volume: \(Int(volume * 100))%, Muted: \(isMuted)")
-         
-         // Apply volume to current player
-         if let player = _player {
-             // Configure audio session first
-             configureAudioSessionForVolumeControl()
-             
-             let effectiveVolume = isMuted ? 0.0 : volume
-             player.volume = effectiveVolume
-             
-             print("🔊 VIDEO: Applied volume change - Volume: \(Int(volume * 100))%, Effective: \(Int(effectiveVolume * 100))%, Muted: \(isMuted)")
-             print("🔊 VIDEO: AVPlayer.volume is now: \(player.volume)")
-             
-             // Debug: Double-check after a small delay
-             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                 print("🔊 VIDEO: Post-change check - AVPlayer.volume is: \(player.volume)")
-                 
-                 // Also log system volume for comparison
-                 let audioSession = AVAudioSession.sharedInstance()
-                 print("🔊 SYSTEM: Output volume is: \(audioSession.outputVolume)")
-             }
-         } else {
-             print("❌ VIDEO: Cannot apply volume change - no player available")
-         }
-     }
-     
-     /// Apply current volume settings from UserPreferencesService to the player
-     private func applyCurrentVolumeSettings() {
-         guard let player = _player else { 
-             print("❌ VIDEO: Cannot apply volume - no player available")
-             return 
-         }
-         
-         // First check and configure audio session for volume control
-         configureAudioSessionForVolumeControl()
-         
-         // Get current volume settings from UserDefaults (same keys as UserPreferencesService)
-         let userDefaults = UserDefaults.standard
-         let volume = userDefaults.object(forKey: "user_preferences_volume") as? Float ?? 1.0
-         let isMuted = userDefaults.bool(forKey: "user_preferences_is_muted")
-         
-         // Apply to player
-         let effectiveVolume = isMuted ? 0.0 : volume
-         player.volume = effectiveVolume
-         
-         print("🔊 VIDEO: Applied volume settings - Volume: \(Int(volume * 100))%, Muted: \(isMuted), Effective: \(Int(effectiveVolume * 100))%")
-         print("🔊 VIDEO: AVPlayer.volume is now: \(player.volume)")
-         
-         // Debug: Check if volume was actually applied
-         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-             print("🔊 VIDEO: Post-check - AVPlayer.volume is: \(player.volume)")
-         }
-     }
-     
-     /// Configure audio session specifically for volume control
-     private func configureAudioSessionForVolumeControl() {
-         do {
-             let audioSession = AVAudioSession.sharedInstance()
-             
-             // Try playback category which allows volume control
-             try audioSession.setCategory(.playback, options: [.allowBluetoothA2DP, .allowAirPlay])
-             try audioSession.setActive(true)
-             
-             print("🔊 AUDIO: Audio session configured for volume control")
-             print("🔊 AUDIO: Category: \(audioSession.category), Options: \(audioSession.categoryOptions)")
-             
-         } catch {
-             print("❌ AUDIO: Failed to configure audio session for volume control: \(error)")
-         }
-     }
+    /// Handle volume changes from settings
+    private func handleVolumeChange(_ notification: Notification) async {
+        guard let userInfo = notification.userInfo,
+              let volume = userInfo["volume"] as? Float,
+              let isMuted = userInfo["isMuted"] as? Bool else {
+            return
+        }
+        
+        // Apply volume to current player
+        if let player = _player {
+            // Configure audio session first
+            await configureAudioSessionForVolumeControl()
+            
+            let effectiveVolume = isMuted ? 0.0 : volume
+            await MainActor.run {
+                player.volume = effectiveVolume
+            }
+        }
+    }
+    
+    /// Configure audio session specifically for volume control
+    private func configureAudioSessionForVolumeControl() async {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try await audioSession.setCategory(.playback, options: [.allowBluetoothA2DP, .allowAirPlay])
+            try await audioSession.setActive(true)
+        } catch {
+            print("❌ AUDIO: Failed to configure audio session for volume control: \(error)")
+        }
+    }
+    
+    /// Apply current volume settings from UserPreferencesService to the player
+    private func applyCurrentVolumeSettings() {
+        Task { @MainActor in
+            guard let player = _player else { return }
+            
+            // First check and configure audio session for volume control
+            await configureAudioSessionForVolumeControl()
+            
+            // Get current volume settings from UserDefaults
+            let userDefaults = UserDefaults.standard
+            let volume = userDefaults.object(forKey: "user_preferences_volume") as? Float ?? 1.0
+            let isMuted = userDefaults.bool(forKey: "user_preferences_is_muted")
+            
+            // Apply to player
+            let effectiveVolume = isMuted ? 0.0 : volume
+            player.volume = effectiveVolume
+        }
+    }
     
     /// Handle system audio interruptions (calls, alarms, etc.)
     private func handleSystemInterruption(_ notification: Notification) async {
@@ -858,9 +838,10 @@ final class VideoPlayerViewModel: ObservableObject {
         appLifecycleObservers.removeAll()
         
         // Remove volume observer
-        if let observer = volumeObserver {
-            NotificationCenter.default.removeObserver(observer)
-            volumeObserver = nil
+        Task { @MainActor in
+            if let observer = volumeObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
         }
         
         print("✅ SYSTEM: Interruption handling removed")
@@ -887,9 +868,10 @@ final class VideoPlayerViewModel: ObservableObject {
         appLifecycleObservers.removeAll()
         
         // Remove volume observer
-        if let observer = volumeObserver {
-            NotificationCenter.default.removeObserver(observer)
-            volumeObserver = nil
+        Task { @MainActor in
+            if let observer = volumeObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
         }
         
         // Reset audio session to default (best effort)
@@ -1289,11 +1271,18 @@ final class VideoPlayerViewModel: ObservableObject {
             self.timeObserver = nil
         }
         
+        // Clean up all observers
+        Task { @MainActor in
+            if let observer = volumeObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
+        }
+        appLifecycleObservers.forEach { NotificationCenter.default.removeObserver($0) }
         NotificationCenter.default.removeObserver(self)
+        
+        // Clean up timers
         controlsFadeTimer?.invalidate()
         controlsFadeTimer = nil
-        
-        // Clean up slider timers
         sliderDragTimer?.invalidate()
         sliderDragTimer = nil
         sliderWatchdogTimer?.invalidate()
@@ -1305,6 +1294,8 @@ final class VideoPlayerViewModel: ObservableObject {
         
         // NEW: Cleanup system resources synchronously
         cleanupSystemResourcesSync()
+        
+        print("🗑️ VideoPlayerViewModel cleaned up successfully")
     }
     
     private func attemptFileMigration(for song: Song) async -> URL? {

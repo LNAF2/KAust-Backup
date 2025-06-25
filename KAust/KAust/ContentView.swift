@@ -9,17 +9,20 @@ import SwiftUI
 import AVKit
 import Foundation
 import UIKit
-
-
+import Combine
 
 struct ContentView: View {
     @StateObject private var playlistViewModel: PlaylistViewModel
     @StateObject private var videoPlayerViewModel = VideoPlayerViewModel()
-    @StateObject private var settingsViewModel: SettingsViewModel  // Global settings view model
-    @EnvironmentObject var kioskModeService: KioskModeService  // Add Kiosk Mode service
-    @State private var showSettings = false
-    @State private var showingDownloadProgressWindow = false  // Global download progress state
-    @State private var showingCustomResults = false  // For showing download results
+    @StateObject private var settingsViewModel: SettingsViewModel
+    @StateObject private var focusManager = FocusManager()
+    @EnvironmentObject var userPreferences: UserPreferencesService
+    @EnvironmentObject var roleManager: UserRoleManager
+    @EnvironmentObject var kioskModeService: KioskModeService
+    @State private var isSettingsPresented = false
+    // COMMENTED OUT FOR NOW
+    // @State private var showingDownloadProgressWindow = false  // Global download progress state
+    // @State private var showingCustomResults = false  // For showing download results
     
     // Layout constants
     private let outerPadding: CGFloat = 16
@@ -34,91 +37,48 @@ struct ContentView: View {
         let playlist = PlaylistViewModel(videoPlayerViewModel: videoPlayerVM)
         _playlistViewModel = StateObject(wrappedValue: playlist)
         
-        // Initialize SettingsViewModel with UserPreferencesService
-        let preferencesService = UserPreferencesService()
-        _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(userPreferencesService: preferencesService))
+        let preferences = UserPreferencesService()
+        _settingsViewModel = StateObject(wrappedValue: SettingsViewModel(userPreferencesService: preferences))
     }
     
     var body: some View {
         GeometryReader { geometry in
             let totalHeight = geometry.size.height
-            let totalWidth = geometry.size.width
-            let totalPadding = outerPadding * 2 + centerGap
-            let columnWidth = (totalWidth - totalPadding) / 2
+            let columnWidth = (geometry.size.width - centerGap - outerPadding * 2) / 2
             
             ZStack {
                 // BACKGROUND UI - Always visible
                 HStack(spacing: centerGap) {
+                    // Left Column - SONG LIST
                     leftColumn(totalHeight: totalHeight, columnWidth: columnWidth)
+                    
+                    // Right Column - PLAYLIST
                     rightColumn(totalHeight: totalHeight, columnWidth: columnWidth)
                 }
-                .padding(.horizontal, outerPadding)
-                .padding(.vertical, outerPadding)
-                .allowsHitTesting(!showingDownloadProgressWindow)  // Block ALL touches during download
-                .opacity(showingDownloadProgressWindow ? 0.3 : 1.0)  // Gray out during download
+                .padding(outerPadding)
                 
                 // DRAGGABLE VIDEO OVERLAY - Only when minimized, positioned over UI
-                if videoPlayerViewModel.currentVideo != nil && videoPlayerViewModel.isMinimized {
-                    VideoPlayerContainerView(viewModel: videoPlayerViewModel)
-                        .allowsHitTesting(!showingDownloadProgressWindow)  // Block video player touches during download
-                }
-                
-                // FULLSCREEN VIDEO - Only when maximized, covers everything
-                if videoPlayerViewModel.currentVideo != nil && !videoPlayerViewModel.isMinimized {
-                    VideoPlayerContainerView(viewModel: videoPlayerViewModel)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(!showingDownloadProgressWindow)  // Block video player touches during download
+                if let _ = videoPlayerViewModel.currentVideo {
+                    if videoPlayerViewModel.isMinimized {
+                        VideoPlayerContainerView(viewModel: videoPlayerViewModel)
+                    } else {
+                        VideoPlayerContainerView(viewModel: videoPlayerViewModel)
+                            .ignoresSafeArea()
+                    }
                 }
             }
             .background(AppTheme.appBackground.ignoresSafeArea())
         }
-
-        .onChange(of: settingsViewModel.filePickerService.processingState) { _, newState in
-            switch newState {
-            case .processing, .paused:
-                // Immediately show progress window and dismiss settings
-                showingDownloadProgressWindow = true
-                showSettings = false  // Close settings window
-            case .completed, .cancelled:
-                showingDownloadProgressWindow = true  // Keep showing until manually closed
-            case .idle:
-                showingDownloadProgressWindow = false
+        .sheet(isPresented: $isSettingsPresented) {
+            NavigationView {
+                SettingsView(kioskModeService: kioskModeService)
+                    .environmentObject(settingsViewModel)
+                    .environmentObject(roleManager)
+                    .environmentObject(userPreferences)
             }
         }
-        .sheet(isPresented: $showSettings) {
-            SettingsView(kioskModeService: kioskModeService)
-                .environmentObject(settingsViewModel)  // Pass shared settings view model
-        }
-        .sheet(isPresented: $settingsViewModel.isShowingFolderPicker) {
-            FolderPickerView(
-                isPresented: $settingsViewModel.isShowingFolderPicker,
-                onFolderSelected: settingsViewModel.handleFolderSelected,
-                onError: settingsViewModel.handleFilePickerError
-            )
-        }
-        .sheet(isPresented: $showingCustomResults) {
-            DownloadResultsView(
-                results: settingsViewModel.filePickerService.results,
-                onDismiss: {
-                    showingCustomResults = false
-                }
-            )
-        }
-        .fullScreenCover(isPresented: $showingDownloadProgressWindow) {
-            // GLOBAL DOWNLOAD PROGRESS WINDOW - Appears above EVERYTHING including sheets
-            DownloadProgressWindow(
-                progress: settingsViewModel.filePickerService.batchProgress,
-                filePickerService: settingsViewModel.filePickerService,
-                onDismiss: {
-                    showingDownloadProgressWindow = false
-                },
-                onShowResults: {
-                    showingCustomResults = true
-                }
-            )
-            .background(Color.clear) // Transparent background since the window has its own
-        }
         .environmentObject(videoPlayerViewModel)
+        .environmentObject(focusManager)
         .onAppear {
             NotificationCenter.default.addObserver(
                 forName: .deleteSongFromPlaylist,
@@ -130,21 +90,6 @@ struct ContentView: View {
                         print("🗑️ ContentView - Removing song from playlist: \(song.title)")
                         await playlistViewModel.removeFromPlaylist(song)
                     }
-                }
-            }
-            
-            // Handle folder picker requests from Settings
-            NotificationCenter.default.addObserver(
-                forName: .requestFolderPicker,
-                object: nil,
-                queue: .main
-            ) { _ in
-                print("📁 ContentView - Folder picker requested - dismissing Settings and showing folder picker")
-                showSettings = false  // Dismiss Settings first
-                
-                // Small delay to ensure Settings dismisses before presenting folder picker
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    settingsViewModel.isShowingFolderPicker = true
                 }
             }
             
@@ -179,12 +124,12 @@ struct ContentView: View {
                 )
             
             // Bottom Left Panel - SONG LIST (now takes remaining space)
-            SongListView(playlistViewModel: playlistViewModel)
+            SongListDisplayView()
                 .frame(maxHeight: CGFloat.infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.purple, lineWidth: 1)
+                        .stroke(Color.blue, lineWidth: 1)
                 )
         }
         .frame(width: columnWidth, height: totalHeight - outerPadding * 2)
@@ -192,34 +137,37 @@ struct ContentView: View {
     
     private func rightColumn(totalHeight: CGFloat, columnWidth: CGFloat) -> some View {
         VStack(spacing: 0) {
-            // Top Right Panel - EMPTY with COG icon
-            EmptyPanelView(onSettingsTapped: { showSettings = true })
-                .frame(height: topPanelHeight)
+            // Settings button panel
+            HStack {
+                Spacer()
+                Button(action: {
+                    isSettingsPresented = true
+                }) {
+                    Image(systemName: "gearshape")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 24, height: 24)
+                        .foregroundColor(AppTheme.rightPanelAccent)
+                }
+                .padding(.trailing, 16)
+                .padding(.vertical, 12)
+            }
+            .frame(height: topPanelHeight)
+            .background(AppTheme.rightPanelBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(AppTheme.rightPanelBorderColor, lineWidth: 1)
+            )
+            
+            // Playlist panel
+            PlaylistPanelView(videoPlayerViewModel: videoPlayerViewModel)
+                .frame(maxHeight: .infinity)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .overlay(
                     RoundedRectangle(cornerRadius: 8)
                         .stroke(AppTheme.rightPanelBorderColor, lineWidth: 1)
                 )
-            
-            // Bottom Right Panel - PLAYLIST (now takes remaining space)
-            PlaylistView(
-                viewModel: playlistViewModel,
-                onSongSelected: { song in
-                    print("🎬 ContentView.onSongSelected - Song tapped: '\(song.title)'")
-                    playlistViewModel.playSong(song)
-                }
-            )
-            .onTapGesture {
-                // Center video when playlist area is tapped
-                NotificationCenter.default.post(name: .centerVideoPlayer, object: nil)
-                print("🎯 Playlist tapped - centering video")
-            }
-            .frame(maxHeight: CGFloat.infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .overlay(
-                RoundedRectangle(cornerRadius: 8)
-                    .stroke(Color.red, lineWidth: 1)
-            )
         }
         .frame(width: columnWidth, height: totalHeight - outerPadding * 2)
     }
